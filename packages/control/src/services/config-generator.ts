@@ -181,9 +181,10 @@ function generateModelsConfig(): GeneratedConfig {
       },
       controlUi: {
         // Instance containers don't serve a web UI — only accessed via node agent proxy.
-        // Empty allowedOrigins array rejects browser UI requests, satisfying OpenClaw's
-        // security check without needing dangerouslyAllowHostHeaderOriginFallback.
-        allowedOrigins: [],
+        // We'd prefer allowedOrigins: [] but OpenClaw rejects empty arrays as "not set".
+        // Using the fallback flag is safe here since instances are only reachable via
+        // Docker-internal networking (node agent proxy), never exposed to the internet.
+        dangerouslyAllowHostHeaderOriginFallback: true,
       },
       reload: {
         // Armada controls restarts — disable config file watcher auto-restart
