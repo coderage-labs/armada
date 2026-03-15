@@ -81,6 +81,7 @@ if [ "$MODE" = "full" ] || [ "$MODE" = "control-only" ]; then
       - ARMADA_API_URL=http://armada-control:3001
       - ARMADA_DB_PATH=/data/armada.db
       - ARMADA_PLUGINS_PATH=/data/plugins
+      - ARMADA_NETWORK_NAME=armada-net
     volumes:
       - armada-data:/data
       - armada-plugins:/data/plugins

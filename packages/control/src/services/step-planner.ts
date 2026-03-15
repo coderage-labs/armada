@@ -246,7 +246,7 @@ export function buildStepsForInstance(instanceId: string, configVersion: number)
             memory: instance?.memory || '2g',
             cpus: instance?.cpus || '1',
           },
-          network: 'armada-net',
+          network: process.env.ARMADA_NETWORK_NAME || 'armada-net',
           labels: {
             'armada.instance': instanceId,
             'armada.instance.name': instanceName ?? '',
@@ -350,7 +350,7 @@ export function buildStepsForInstance(instanceId: string, configVersion: number)
             memory: instance?.memory || '2g',
             cpus: instance?.cpus || '1',
           },
-          network: 'armada-net',
+          network: process.env.ARMADA_NETWORK_NAME || 'armada-net',
           labels: {
             'armada.instance': instanceId,
             'armada.instance.name': instance?.name ?? '',
@@ -498,7 +498,7 @@ export function buildStepsForInstance(instanceId: string, configVersion: number)
             plugins: `/data/armada/instances/${instance.name}/plugins`,
           } : {},
           resources: { memory: resolvedMemory, cpus: resolvedCpus },
-          network: 'armada-net',
+          network: process.env.ARMADA_NETWORK_NAME || 'armada-net',
           labels: instance ? {
             'armada.instance': instance.id,
             'armada.instance.name': instance.name,
