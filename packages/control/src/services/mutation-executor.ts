@@ -149,11 +149,25 @@ function executeMutation(mutation: PendingMutation): void {
       break;
 
     case 'instance':
-      // Instance mutations update instance metadata (e.g. targetVersion after a container upgrade)
       if (action === 'create' && entityId) {
-        // The DB record already exists (created in the route before staging).
-        // Mark the instance as provisioning — the changeset steps handle container creation.
-        instancesRepo.update(entityId, { status: 'provisioning', statusMessage: 'Changeset applying: creating container' });
+        // Create the instance record if it doesn't exist yet (working copy flow),
+        // or update it if it was pre-created by an older code path.
+        const existing = instancesRepo.getById(entityId);
+        if (!existing) {
+          instancesRepo.create({
+            id: entityId,
+            name: payload?.name ?? entityId,
+            nodeId: payload?.nodeId ?? '',
+            status: 'provisioning',
+            statusMessage: 'Changeset applying: creating container',
+            memory: payload?.memory ?? '2g',
+            cpus: payload?.cpus ?? '1',
+            capacity: payload?.capacity ?? 5,
+            config: payload?.config ?? {},
+          });
+        } else {
+          instancesRepo.update(entityId, { status: 'provisioning', statusMessage: 'Changeset applying: creating container' });
+        }
       } else if (action === 'update' && entityId) {
         const { restart, ...rest } = (payload ?? {}) as any;
         if (restart) {

@@ -139,8 +139,8 @@ export const instancesRepo = {
     return (getDrizzle().all(sql`${INSTANCE_SELECT} WHERE i.node_id = ${nodeId} ORDER BY i.name`) as InstanceRow[]).map(rowToInstance);
   },
 
-  create(data: Omit<ArmadaInstance, 'id' | 'createdAt' | 'updatedAt' | 'agentCount' | 'nodeName' | 'agents'>): ArmadaInstance {
-    const id = uuidv4();
+  create(data: Omit<ArmadaInstance, 'id' | 'createdAt' | 'updatedAt' | 'agentCount' | 'nodeName' | 'agents'> & { id?: string }): ArmadaInstance {
+    const id = data.id ?? uuidv4();
     getDrizzle().insert(instances).values({
       id,
       name: data.name,

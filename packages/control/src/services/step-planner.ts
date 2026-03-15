@@ -265,7 +265,7 @@ export function buildStepsForInstance(instanceId: string, configVersion: number)
         metadata: {
           nodeId: resolvedNodeId,
           containerName,
-          pluginsDir: `/data/armada/instances/${instance?.name ?? instanceId}/plugins`,
+          pluginsDir: `/data/armada/instances/${instanceName ?? instanceId}/plugins`,
           plugins: [{ name: '@coderage-labs/armada-agent-plugin', version: AGENT_PLUGIN_VERSION }],
         },
       },
@@ -369,7 +369,7 @@ export function buildStepsForInstance(instanceId: string, configVersion: number)
         metadata: {
           nodeId,
           containerName,
-          pluginsDir: `/data/armada/instances/${instance?.name ?? instanceId}/plugins`,
+          pluginsDir: `/data/armada/instances/${instanceName ?? instanceId}/plugins`,
           plugins: [{ name: '@coderage-labs/armada-agent-plugin', version: AGENT_PLUGIN_VERSION }],
         },
       },
