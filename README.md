@@ -19,31 +19,35 @@ A control plane coordinates the team. The dashboard shows what's happening. The 
 
 ## Architecture
 
-```
-                    ┌── Machine 1 ────────────────┐
- Dashboard (:3001)  │  Control Plane              │
- ┌─────────────┐    │  ├── REST API               │
- │   Browser   │───►│  ├── SQLite DB              │
- └─────────────┘    │  ├── Web UI (React)         │
-                    │  ├── Health Monitor          │
- Operator Agent     │  ├── Task Dispatcher         │
- ┌─────────────┐    │  ├── Workflow Engine         │
- │ armada_* tools├──►│  └── Changeset Pipeline      │
- └─────────────┘    │         │                    │
-                    │         ▼ WebSocket           │
-                    │  Node Agent                  │
-                    │  └── Docker Socket           │
-                    │       ├── agent-1 (dev)      │
-                    │       ├── agent-2 (research) │
-                    │       └── agent-3 (PM)       │
-                    └──────────────────────────────┘
-                              │
-                    ┌── Machine 2 ────────────────┐
-                    │  Node Agent                  │
-              WS    │  └── Docker Socket           │
-              ─────►│       ├── agent-4            │
-                    │       └── agent-5            │
-                    └──────────────────────────────┘
+```mermaid
+graph TD
+    subgraph Machine1["Machine 1"]
+        CP["Control Plane :3001"]
+        CP --- API["REST API"]
+        CP --- DB["SQLite DB"]
+        CP --- UI["Web UI (React)"]
+        CP --- HM["Health Monitor"]
+        CP --- TD["Task Dispatcher"]
+        CP --- WE["Workflow Engine"]
+        CP --- CSP["Changeset Pipeline"]
+        NA1["Node Agent"]
+        NA1 --- DS1["Docker Socket"]
+        DS1 --- A1["agent-1 (dev)"]
+        DS1 --- A2["agent-2 (research)"]
+        DS1 --- A3["agent-3 (PM)"]
+    end
+
+    subgraph Machine2["Machine 2"]
+        NA2["Node Agent"]
+        NA2 --- DS2["Docker Socket"]
+        DS2 --- A4["agent-4"]
+        DS2 --- A5["agent-5"]
+    end
+
+    Browser["🖥️ Browser Dashboard"] --> CP
+    Operator["🤖 Operator Agent\n(armada_* tools)"] --> CP
+    CP -- "WebSocket" --> NA1
+    CP -- "WebSocket" --> NA2
 ```
 
 ## Features

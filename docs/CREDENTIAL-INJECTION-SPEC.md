@@ -15,14 +15,24 @@ Current state: integrations store credentials, but nothing connects them to agen
 
 ## Architecture
 
-```
-┌─────────────┐     ┌────────────────┐     ┌─────────────┐
-│  Armada       │────▸│  Node Agent     │────▸│  Agent      │
-│  Control     │     │  (per host)     │     │  Container  │
-│              │     │                 │     │             │
-│  Integrations│     │  Credential     │     │  git ──▸ credential-helper
-│  DB + proxy  │◂────│  Manager        │     │  armada-issue ──▸ armada API
-└──────────────┘     └─────────────────┘     └─────────────┘
+```mermaid
+graph LR
+    subgraph Control["Armada Control"]
+        INT["Integrations\nDB + proxy"]
+    end
+
+    subgraph Node["Node Agent (per host)"]
+        CM["Credential\nManager"]
+    end
+
+    subgraph Agent["Agent Container"]
+        GIT["git → credential-helper"]
+        ISSUE["armada-issue → armada API"]
+    end
+
+    Control -- "credentials" --> Node
+    Node -- "provision" --> Agent
+    Agent -. "proxy requests" .-> Control
 ```
 
 ## 1. Git Credential Helper

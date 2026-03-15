@@ -269,28 +269,20 @@ The node agent acts as the sole network gateway for all instances running on tha
 
 ### How It Works
 
-```
-┌─────────────────────────────────────────────────┐
-│ Node                                             │
-│                                                  │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐      │
-│  │ Instance │  │ Instance │  │ Instance │      │
-│  │ (forge)  │  │ (nexus)  │  │ (scout)  │      │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘      │
-│       │              │              │             │
-│       └──────────────┼──────────────┘             │
-│                      │ HTTP (local network)       │
-│              ┌───────┴────────┐                   │
-│              │  Node Agent    │                   │
-│              │  (gateway)     │                   │
-│              └───────┬────────┘                   │
-│                      │ WSS (outbound only)        │
-└──────────────────────┼──────────────────────────┘
-                       │
-                       ▼
-               ┌───────────────┐
-               │ Control Plane │
-               └───────────────┘
+```mermaid
+graph TD
+    subgraph Node["Node"]
+        I1["Instance\n(forge)"]
+        I2["Instance\n(nexus)"]
+        I3["Instance\n(scout)"]
+        NA["Node Agent\n(gateway)"]
+        I1 -- "HTTP" --> NA
+        I2 -- "HTTP" --> NA
+        I3 -- "HTTP" --> NA
+    end
+
+    CP["Control Plane"]
+    NA -- "WSS (outbound only)" --> CP
 ```
 
 ### Instance → Control Plane
@@ -425,53 +417,45 @@ Not needed initially — Docker covers all current use cases.
 ## Deployment Topologies
 
 ### Single Host (current setup, simplified)
-```
-┌─────────────────────────────────┐
-│ VPS                              │
-│  ┌─────────────┐                │
-│  │ Control      │◄── Cloudflare │◄── Browser
-│  │ Plane        │    Tunnel     │
-│  └──────┬───────┘               │
-│         │ WSS (localhost)        │
-│  ┌──────┴───────┐               │
-│  │ Node Agent   │               │
-│  │ ┌──────────┐ │               │
-│  │ │ Instances│ │               │
-│  │ └──────────┘ │               │
-│  └──────────────┘               │
-└─────────────────────────────────┘
+
+```mermaid
+graph LR
+    Browser["🖥️ Browser"] -- "HTTPS" --> CF["Cloudflare\nTunnel"]
+    CF --> CP["Control Plane"]
+
+    subgraph VPS
+        CP -- "WSS (localhost)" --> NA["Node Agent"]
+        NA --- Inst["Instances"]
+    end
 ```
 
 ### Multi-host
-```
-┌──────────────┐         ┌──────────────┐
-│ VPS          │         │ Mac Mini     │
-│ Control Plane│◄─WSS────│ Node Agent   │
-│ + Node Agent │         │ (home lab)   │
-└──────────────┘         └──────────────┘
-        ▲
-        │ WSS
-┌───────┴──────┐
-│ Office PC    │
-│ Node Agent   │
-└──────────────┘
+
+```mermaid
+graph TD
+    subgraph VPS
+        CP["Control Plane\n+ Node Agent"]
+    end
+    subgraph Mac["Mac Mini (home lab)"]
+        NA2["Node Agent"]
+    end
+    subgraph Office["Office PC"]
+        NA3["Node Agent"]
+    end
+
+    NA2 -- "WSS" --> CP
+    NA3 -- "WSS" --> CP
 ```
 
 ### Air-gapped control plane (via Cloudflare Tunnel)
-```
-                     ┌──────────────────┐
-Browser ──HTTPS──►   │ Cloudflare Edge  │
-                     └────────┬─────────┘
-                              │ Tunnel
-                     ┌────────┴─────────┐
-                     │ Home Server      │
-                     │ Control Plane    │
-                     │ cloudflared      │
-                     └────────┬─────────┘
-                              │ WSS (outbound from nodes)
-               ┌──────────────┼──────────────┐
-               ▼              ▼              ▼
-          Node (VPS)    Node (Pi)    Node (Cloud VM)
+
+```mermaid
+graph TD
+    Browser["🖥️ Browser"] -- "HTTPS" --> Edge["Cloudflare Edge"]
+    Edge -- "Tunnel" --> Home["Home Server\nControl Plane + cloudflared"]
+    N1["Node (VPS)"] -- "WSS" --> Home
+    N2["Node (Pi)"] -- "WSS" --> Home
+    N3["Node (Cloud VM)"] -- "WSS" --> Home
 ```
 
 ## Security

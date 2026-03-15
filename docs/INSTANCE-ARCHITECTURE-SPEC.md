@@ -20,62 +20,40 @@ This spec introduces **instances** as a first-class entity between nodes and age
 
 ### Current (v1)
 
+```mermaid
+graph TD
+    subgraph Node["Node (Docker host)"]
+        subgraph C1["Container (OpenClaw) ~2 GB"]
+            A1["Agent: forge"]
+        end
+        subgraph C2["Container (OpenClaw) ~2 GB"]
+            A2["Agent: scout"]
+        end
+        C3["..."]
+    end
 ```
-┌─────────────────────────────────────────────────┐
-│  Node (Docker host)                             │
-│                                                 │
-│  ┌──────────────┐  ┌──────────────┐             │
-│  │ Container    │  │ Container    │   ...       │
-│  │ (OpenClaw)   │  │ (OpenClaw)   │             │
-│  │              │  │              │             │
-│  │  Agent:      │  │  Agent:      │             │
-│  │  forge       │  │  scout       │             │
-│  │              │  │              │             │
-│  │  ~2 GB RAM   │  │  ~2 GB RAM   │             │
-│  └──────────────┘  └──────────────┘             │
-└─────────────────────────────────────────────────┘
 
-  1 container = 1 OpenClaw instance = 1 agent
-  N agents = N containers = N × 2 GB
-```
+> 1 container = 1 OpenClaw instance = 1 agent · N agents = N containers = N × 2 GB
 
 ### Proposed (v2)
 
+```mermaid
+graph TD
+    subgraph Node["Node (Docker host)"]
+        subgraph DevTeam["Instance: dev-team (~500 MB for 3 agents)"]
+            F["Agent: forge (lead)"]
+            FE["Agent: frontend"]
+            QA["Agent: qa"]
+            Shared1["Shared: event loop, plugins, node_modules"]
+            Isolated1["Isolated: workspaces, sessions, memory, creds"]
+        end
+        subgraph PMTeam["Instance: pm-team (~2 GB)"]
+            N["Agent: nexus (lead)"]
+        end
+    end
 ```
-┌──────────────────────────────────────────────────────────┐
-│  Node (Docker host)                                      │
-│                                                          │
-│  ┌────────────────────────────────────────────────────┐  │
-│  │  Instance: "dev-team" (single OpenClaw container)  │  │
-│  │                                                    │  │
-│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐        │  │
-│  │  │ Agent:   │  │ Agent:   │  │ Agent:   │        │  │
-│  │  │ forge    │  │ frontend │  │ qa       │        │  │
-│  │  │ (lead)   │  │          │  │          │        │  │
-│  │  └──────────┘  └──────────┘  └──────────┘        │  │
-│  │                                                    │  │
-│  │  Shared: event loop, plugins, node_modules         │  │
-│  │  Isolated: workspaces, sessions, memory, creds     │  │
-│  │                                                    │  │
-│  │  ~500 MB RAM (for 3 agents)                        │  │
-│  └────────────────────────────────────────────────────┘  │
-│                                                          │
-│  ┌────────────────────────────────────────────────────┐  │
-│  │  Instance: "pm-team" (single OpenClaw container)   │  │
-│  │                                                    │  │
-│  │  ┌──────────┐                                     │  │
-│  │  │ Agent:   │                                     │  │
-│  │  │ nexus    │                                     │  │
-│  │  │ (lead)   │                                     │  │
-│  │  └──────────┘                                     │  │
-│  │                                                    │  │
-│  │  ~2 GB RAM                                         │  │
-│  └────────────────────────────────────────────────────┘  │
-└──────────────────────────────────────────────────────────┘
 
-  1 instance = 1 OpenClaw container = N agents
-  Shared runtime amortises overhead across agents
-```
+> 1 instance = 1 OpenClaw container = N agents · Shared runtime amortises overhead across agents
 
 ### Entity Hierarchy
 

@@ -11,30 +11,27 @@
 
 ## Mutation → Changeset Pipeline (the critical chain)
 
+```mermaid
+graph TD
+    MS["mutation-service.stage()"] --> DB1["[DB] write PendingMutation\n(changesetId = 'pending')"]
+    MS --> E1["emit mutation.staged"]
+    E1 --> CVT["config-version-tracker\nbumpVersion()"]
+    CVT --> E2["emit config.changed → SSE / UI"]
+    MS --> CS["changesetService.create()\nor getExistingDraft"]
+    CS --> DB2["[DB] Changeset row + steps"]
+    MS --> DB3["[DB] link PendingMutation → Changeset"]
+    MS --> E3["emit mutation.created"]
+    E3 --> RS["changesetService.rebuildSteps()"]
 ```
-mutation-service.stage()
-        │
-        ├─► [DB] write PendingMutation (changesetId = 'pending')
-        │
-        ├─► emit  mutation.staged  ──► config-version-tracker
-        │                               └─► configDiffService.bumpVersion()
-        │                               └─► emit  config.changed  ──► SSE / UI clients
-        │
-        ├─► changesetService.create()  (or getExistingDraft)
-        │        └─► [DB] Changeset row, steps computed from pending mutations
-        │
-        ├─► [DB] link PendingMutation → Changeset
-        │
-        └─► emit  mutation.created  ──► index.ts listener
-                                          └─► changesetService.rebuildSteps(changesetId)
 
 Later, when operator applies the changeset:
 
-changesetService.apply()
-        │
-        ├─► emit  changeset.applying
-        ├─► [runs all operation steps against instances]
-        ├─► emit  changeset.completed  ─OR─  changeset.failed
+```mermaid
+graph LR
+    Apply["changesetService.apply()"] --> EA["emit changeset.applying"]
+    EA --> Run["Run operation steps\nagainst instances"]
+    Run --> EC["emit changeset.completed"]
+    Run --> EF["emit changeset.failed"]
 ```
 
 ---

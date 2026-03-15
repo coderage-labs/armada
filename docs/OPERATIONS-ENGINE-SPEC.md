@@ -59,26 +59,20 @@ interface OperationEvent {
 
 Every operation follows the same pattern, with type-specific steps plugged in:
 
-```
-┌─────────────┐
-│  Pre-flight  │  Validate targets exist, check permissions, assess impact
-└──────┬──────┘
-       │
-┌──────▼──────┐
-│    Drain     │  Stop dispatching new work to affected targets
-└──────┬──────┘
-       │
-┌──────▼──────┐
-│   Execute    │  Type-specific steps (config write, container ops, etc.)
-└──────┬──────┘
-       │
-┌──────▼──────┐
-│   Verify     │  Health checks, state validation
-└──────┬──────┘
-       │
-┌──────▼──────┐
-│  Complete    │  Update state, resume dispatch, notify
-└─────────────┘
+```mermaid
+graph TD
+    PF["🔍 Pre-flight\nValidate targets, check permissions, assess impact"]
+    DR["⏸️ Drain\nStop dispatching new work to affected targets"]
+    EX["⚙️ Execute\nType-specific steps (config write, container ops, etc.)"]
+    VE["✅ Verify\nHealth checks, state validation"]
+    CO["🏁 Complete\nUpdate state, resume dispatch, notify"]
+    FA["❌ Failed\nRollback (if possible), alert"]
+
+    PF --> DR --> EX --> VE --> CO
+    PF --> FA
+    DR --> FA
+    EX --> FA
+    VE --> FA
 ```
 
 At any point, failure → rollback (if possible) → mark failed → alert.

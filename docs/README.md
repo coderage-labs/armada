@@ -8,29 +8,34 @@
 
 Armada is a three-tier system: a **control plane**, one or more **node agents**, and **agent containers**.
 
-```
-                     ┌── Machine 1 ──────────────────────┐
- Browser Dashboard   │  Control Plane (:3001)            │
- ┌───────────────┐   │  ├── REST API (Fastify)           │
- │  React SPA    │──►│  ├── SQLite (Drizzle ORM)         │
- └───────────────┘   │  ├── WebSocket tunnel (node WS)   │
-                     │  ├── SSE event bus                │
- Operator Agent      │  ├── Changeset pipeline           │
- ┌───────────────┐   │  ├── Workflow engine (DAG)        │
- │  armada_* tools├──►│  ├── Task dispatcher              │
- └───────────────┘   │  └── Webhook dispatcher           │
-                     │          │  WebSocket              │
-                     │  Node Agent                       │
-                     │  ├── Docker socket                │
-                     │  ├── Container reconciliation     │
-                     │  └── Gateway proxy                │
-                     └───────────────────────────────────┘
-                                │
-                     ┌── Machine N ──────────────────────┐
-                     │  Node Agent                       │
-              WS     │  ├── Docker socket                │
-              ──────►│  └── Agent containers             │
-                     └───────────────────────────────────┘
+```mermaid
+graph TD
+    subgraph Machine1["Machine 1"]
+        CP["Control Plane :3001"]
+        CP --- API["REST API (Fastify)"]
+        CP --- DBL["SQLite (Drizzle ORM)"]
+        CP --- WS1["WebSocket tunnel"]
+        CP --- SSE["SSE event bus"]
+        CP --- CSP["Changeset pipeline"]
+        CP --- WFE["Workflow engine (DAG)"]
+        CP --- TDP["Task dispatcher"]
+        CP --- WHD["Webhook dispatcher"]
+        NA1["Node Agent"]
+        NA1 --- DS1["Docker socket"]
+        NA1 --- CR["Container reconciliation"]
+        NA1 --- GP["Gateway proxy"]
+    end
+
+    subgraph MachineN["Machine N"]
+        NA2["Node Agent"]
+        NA2 --- DS2["Docker socket"]
+        NA2 --- AC["Agent containers"]
+    end
+
+    Browser["🖥️ React SPA"] --> CP
+    Operator["🤖 Operator Agent\n(armada_* tools)"] --> CP
+    CP -- "WebSocket" --> NA1
+    CP -- "WebSocket" --> NA2
 ```
 
 ### Control Plane
