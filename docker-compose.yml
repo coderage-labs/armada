@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  control:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.control
+    container_name: armada-control
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - ARMADA_API_TOKEN=${ARMADA_API_TOKEN:-}
+      - ARMADA_API_URL=${ARMADA_API_URL:-http://armada-control:3001}
+      - ARMADA_HOOKS_TOKEN=${ARMADA_HOOKS_TOKEN:-${ARMADA_API_TOKEN}}
+      - ARMADA_UI_URL=${ARMADA_UI_URL:-}
+      - ARMADA_AVATAR_MODEL=${ARMADA_AVATAR_MODEL:-openai/dall-e-3}
+      - ARMADA_DEFAULT_NODE_URL=http://armada-node:8080
+      - ARMADA_DEFAULT_NODE_TOKEN=${ARMADA_NODE_TOKEN:-}
+      - ARMADA_DB_PATH=/data/armada.db
+      - ARMADA_PLUGINS_PATH=/data/plugins
+    volumes:
+      - armada-data:/data
+      - armada-plugins:/data/plugins
+    networks:
+      - armada
+    restart: unless-stopped
+
+  node:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.node
+    container_name: armada-node
+    ports:
+      - "8080:8080"
+    environment:
+      - ARMADA_NODE_TOKEN=${ARMADA_NODE_TOKEN:-}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - armada-volumes:/data/armada/volumes
+      - armada-plugins:/data/armada/plugins:ro
+    networks:
+      - armada
+    restart: unless-stopped
+
+volumes:
+  armada-data:
+  armada-plugins:
+  armada-volumes:
+
+networks:
+  armada:
+    driver: bridge

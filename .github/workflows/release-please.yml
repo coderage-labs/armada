@@ -1,0 +1,149 @@
+name: Release Please
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      force_publish:
+        description: 'Force publish all packages (bypass release_created check)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      releases_created: ${{ steps.release.outputs.releases_created }}
+      armada-control--release_created: ${{ steps.release.outputs['armada-control--release_created'] }}
+      armada-node--release_created: ${{ steps.release.outputs['armada-node--release_created'] }}
+      ui--release_created: ${{ steps.release.outputs['ui--release_created'] }}
+      armada--release_created: ${{ steps.release.outputs['armada--release_created'] }}
+      armada-shared--release_created: ${{ steps.release.outputs['armada-shared--release_created'] }}
+      armada-agent-plugin--release_created: ${{ steps.release.outputs['armada-agent-plugin--release_created'] }}
+      armada-control-plugin--release_created: ${{ steps.release.outputs['armada-control-plugin--release_created'] }}
+      armada-plugin-shared--release_created: ${{ steps.release.outputs['armada-plugin-shared--release_created'] }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-control-image:
+    needs: release-please
+    if: |
+      needs.release-please.outputs['armada-control--release_created'] == 'true' ||
+      needs.release-please.outputs['ui--release_created'] == 'true' ||
+      needs.release-please.outputs['armada--release_created'] == 'true' ||
+      inputs.force_publish == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Get version
+        id: version
+        run: echo "version=$(node -p 'require(\"./package.json\").version')" >> "$GITHUB_OUTPUT"
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile.control
+          push: true
+          tags: |
+            ghcr.io/coderage-labs/armada:latest
+            ghcr.io/coderage-labs/armada:v${{ steps.version.outputs.version }}
+
+  publish-armada-node-image:
+    needs: release-please
+    if: |
+      needs.release-please.outputs['armada-node--release_created'] == 'true' ||
+      needs.release-please.outputs['armada--release_created'] == 'true' ||
+      inputs.force_publish == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Get version
+        id: version
+        run: echo "version=$(node -p 'require(\"./packages/node/package.json\").version')" >> "$GITHUB_OUTPUT"
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile.node
+          push: true
+          tags: |
+            ghcr.io/coderage-labs/armada-node:latest
+            ghcr.io/coderage-labs/armada-node:v${{ steps.version.outputs.version }}
+
+  publish-armada-shared:
+    needs: release-please
+    if: needs.release-please.outputs['armada-shared--release_created'] == 'true' || inputs.force_publish == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - run: npm install
+      - run: npm run build -w @coderage-labs/armada-plugin-shared
+      - name: Publish to npm (trusted publishing)
+        run: cd plugins/shared && npm publish --access public --provenance || echo "Already published (409)"
+
+  publish-armada-control:
+    needs: release-please
+    if: needs.release-please.outputs['armada-control-plugin--release_created'] == 'true' || inputs.force_publish == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - run: npm install
+      - run: npm run build -w @coderage-labs/armada-plugin-shared
+      - run: npm run build -w @coderage-labs/armada-control-plugin
+      - name: Publish to npm (trusted publishing)
+        run: cd plugins/control && npm publish --access public --provenance || echo "Already published (409)"
+
+  publish-armada-agent:
+    needs: release-please
+    if: needs.release-please.outputs['armada-agent-plugin--release_created'] == 'true' || inputs.force_publish == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - run: npm install
+      - run: npm run build -w @coderage-labs/armada-plugin-shared
+      - run: npm run build -w @coderage-labs/armada-agent
+      - name: Publish to npm (trusted publishing)
+        run: cd plugins/agent && npm publish --access public --provenance || echo "Already published (409)"
