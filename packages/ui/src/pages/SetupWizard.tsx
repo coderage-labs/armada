@@ -1,5 +1,5 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { Rocket, User, Fingerprint, Globe, Cpu, CheckCircle, ArrowRight } from 'lucide-react';
+import { Rocket, User, Fingerprint, Lock, Globe, Cpu, CheckCircle, ArrowRight } from 'lucide-react';
 import RegisterPasskey from '../components/RegisterPasskey';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -8,11 +8,11 @@ interface Props {
   onComplete: () => void;
 }
 
-type Step = 'welcome' | 'account' | 'passkey' | 'url-check' | 'provider' | 'complete';
-const STEPS: Step[] = ['welcome', 'account', 'passkey', 'url-check', 'provider', 'complete'];
+type Step = 'welcome' | 'url-check' | 'account' | 'security' | 'provider' | 'complete';
+const STEPS: Step[] = ['welcome', 'url-check', 'account', 'security', 'provider', 'complete'];
 
 function StepIndicator({ current }: { current: Step }) {
-  const labels = ['Welcome', 'Account', 'Passkey', 'URL', 'Provider', 'Done'];
+  const labels = ['Welcome', 'URL', 'Account', 'Security', 'Provider', 'Done'];
   const idx = STEPS.indexOf(current);
 
   return (
@@ -84,10 +84,19 @@ export default function SetupWizard({ onComplete }: Props) {
   // URL check state
   const [detectedUrl, setDetectedUrl] = useState('');
   const [isLocalhost, setIsLocalhost] = useState(false);
+  const [isHttps, setIsHttps] = useState(false);
   const [urlInput, setUrlInput] = useState('');
   const [urlConfirmed, setUrlConfirmed] = useState(false);
   const [urlLoading, setUrlLoading] = useState(false);
   const [urlError, setUrlError] = useState('');
+
+  // Security state
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordSet, setPasswordSet] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passkeyRegistered, setPasskeyRegistered] = useState(false);
 
   // Provider state
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
@@ -95,6 +104,11 @@ export default function SetupWizard({ onComplete }: Props) {
   const [providerLoading, setProviderLoading] = useState(false);
   const [providerError, setProviderError] = useState('');
   const [providerAdded, setProviderAdded] = useState(false);
+
+  // Detect HTTPS from current page
+  useEffect(() => {
+    setIsHttps(window.location.protocol === 'https:');
+  }, []);
 
   // Fetch detected URL when entering url-check step
   useEffect(() => {
@@ -128,8 +142,8 @@ export default function SetupWizard({ onComplete }: Props) {
       }
       setCreatedUser(data.user);
       // Session cookie is set by server — we're now authenticated
-      localStorage.setItem('armada_authed', 'passkey');
-      setStep('passkey');
+      localStorage.setItem('armada_authed', 'session');
+      setStep('security');
     } catch (err: any) {
       setError(err.message || 'Failed to create account');
     } finally {
@@ -149,10 +163,38 @@ export default function SetupWizard({ onComplete }: Props) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to confirm URL');
       setUrlConfirmed(true);
+      setIsHttps(urlInput.startsWith('https://'));
     } catch (err: any) {
       setUrlError(err.message || 'Invalid URL');
     } finally {
       setUrlLoading(false);
+    }
+  }
+
+  async function handleSetPassword() {
+    if (password.length < 8) {
+      setPasswordError('Password must be at least 8 characters');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setPasswordError('Passwords do not match');
+      return;
+    }
+    setPasswordError('');
+    setPasswordLoading(true);
+    try {
+      const res = await fetch('/api/auth/password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to set password');
+      setPasswordSet(true);
+    } catch (err: any) {
+      setPasswordError(err.message || 'Failed to set password');
+    } finally {
+      setPasswordLoading(false);
     }
   }
 
@@ -180,6 +222,9 @@ export default function SetupWizard({ onComplete }: Props) {
   function handleComplete() {
     onComplete();
   }
+
+  // Can proceed from security step if they have at least one auth method
+  const hasAuth = passwordSet || passkeyRegistered;
 
   const cardStyle: React.CSSProperties = {
     background: 'rgba(255,255,255,0.05)',
@@ -281,13 +326,13 @@ export default function SetupWizard({ onComplete }: Props) {
                 Welcome to Armada
               </h1>
               <p style={{ color: '#94a3b8', fontSize: '14px', margin: 0, lineHeight: '1.5' }}>
-                Let's set up your Armada control plane. You'll create an owner account,
-                secure it with a passkey, and configure your AI providers.
+                Let's set up your Armada control plane. You'll confirm your URL,
+                create an owner account, and configure your AI providers.
               </p>
             </div>
             <Button
               variant="ghost" type="button"
-              onClick={() => setStep('account')}
+              onClick={() => setStep('url-check')}
               style={primaryBtnStyle}
             >
               Get Started <ArrowRight size={18} />
@@ -295,7 +340,106 @@ export default function SetupWizard({ onComplete }: Props) {
           </>
         )}
 
-        {/* Step 2: Create Account */}
+        {/* Step 2: URL Check (moved before account so RP ID is set for passkey) */}
+        {step === 'url-check' && (
+          <>
+            <div style={{ textAlign: 'center' }}>
+              <Globe size={28} color="#5eead4" style={{ marginBottom: '8px' }} />
+              <h2 style={{
+                color: '#f1f5f9',
+                fontSize: '20px',
+                margin: '0 0 4px',
+                fontWeight: 600,
+              }}>
+                Confirm Public URL
+              </h2>
+              <p style={{ color: '#94a3b8', fontSize: '13px', margin: 0 }}>
+                Armada needs to know its public URL for authentication and invite links.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {isLocalhost && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  background: 'rgba(16, 185, 129, 0.1)',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  borderRadius: '8px',
+                  padding: '12px 16px',
+                }}>
+                  <CheckCircle size={18} color="#6ee7b7" />
+                  <span style={{ color: '#6ee7b7', fontSize: '13px' }}>
+                    Localhost detected — works out of the box
+                  </span>
+                </div>
+              )}
+
+              <div>
+                <label style={labelStyle}>Public URL</label>
+                <Input
+                  type="text"
+                  value={urlInput}
+                  onChange={e => { setUrlInput(e.target.value); setUrlConfirmed(false); }}
+                  placeholder="https://armada.example.com"
+                  autoFocus
+                  style={inputStyle}
+                />
+              </div>
+
+              {urlError && (
+                <p style={{ color: '#f87171', fontSize: '13px', margin: 0, textAlign: 'center' }}>{urlError}</p>
+              )}
+
+              {urlConfirmed ? (
+                <>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    color: '#6ee7b7',
+                    fontSize: '13px',
+                    justifyContent: 'center',
+                  }}>
+                    <CheckCircle size={16} /> URL saved
+                  </div>
+                  <Button
+                    variant="ghost" type="button"
+                    onClick={() => setStep('account')}
+                    style={{ ...primaryBtnStyle, background: 'linear-gradient(135deg, #5eead4, #2563eb)' }}
+                  >
+                    Continue <ArrowRight size={18} />
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="ghost" type="button"
+                  disabled={!urlInput.trim() || urlLoading}
+                  onClick={handleConfirmUrl}
+                  style={{
+                    ...primaryBtnStyle,
+                    background: urlLoading ? '#475569' : 'linear-gradient(135deg, #5eead4, #2563eb)',
+                    opacity: !urlInput.trim() ? 0.5 : 1,
+                  }}
+                >
+                  {urlLoading ? 'Saving…' : 'Confirm URL'}
+                  {!urlLoading && <ArrowRight size={18} />}
+                </Button>
+              )}
+            </div>
+
+            <Button
+              variant="ghost" type="button"
+              onClick={() => setStep('account')}
+              style={skipBtnStyle}
+            >
+              I'll set this later →
+            </Button>
+          </>
+        )}
+
+        {/* Step 3: Create Account */}
         {step === 'account' && (
           <>
             <div style={{ textAlign: 'center' }}>
@@ -366,11 +510,11 @@ export default function SetupWizard({ onComplete }: Props) {
           </>
         )}
 
-        {/* Step 3: Register Passkey */}
-        {step === 'passkey' && (
+        {/* Step 4: Security — passkey (HTTPS only) OR password */}
+        {step === 'security' && (
           <>
             <div style={{ textAlign: 'center' }}>
-              <Fingerprint size={28} color="#5eead4" style={{ marginBottom: '8px' }} />
+              {isHttps ? <Fingerprint size={28} color="#5eead4" style={{ marginBottom: '8px' }} /> : <Lock size={28} color="#5eead4" style={{ marginBottom: '8px' }} />}
               <h2 style={{
                 color: '#f1f5f9',
                 fontSize: '20px',
@@ -380,117 +524,120 @@ export default function SetupWizard({ onComplete }: Props) {
                 Secure Your Account
               </h2>
               <p style={{ color: '#94a3b8', fontSize: '13px', margin: 0 }}>
-                Register a passkey to sign in. You won't be able to access your
-                account without one.
-              </p>
-            </div>
-
-            <RegisterPasskey
-              onSuccess={() => setStep('url-check')}
-              label="Setup passkey"
-            />
-
-            <p style={{ color: '#475569', fontSize: '12px', textAlign: 'center', margin: 0 }}>
-              A passkey is required to continue.
-            </p>
-          </>
-        )}
-
-        {/* Step 4: URL Check */}
-        {step === 'url-check' && (
-          <>
-            <div style={{ textAlign: 'center' }}>
-              <Globe size={28} color="#5eead4" style={{ marginBottom: '8px' }} />
-              <h2 style={{
-                color: '#f1f5f9',
-                fontSize: '20px',
-                margin: '0 0 4px',
-                fontWeight: 600,
-              }}>
-                Confirm Public URL
-              </h2>
-              <p style={{ color: '#94a3b8', fontSize: '13px', margin: 0 }}>
-                Armada needs to know its public URL for passkey authentication and invite links.
+                {isHttps
+                  ? 'Set up a passkey and/or password to sign in.'
+                  : 'Set a password to sign in. Passkeys require HTTPS.'}
               </p>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {isLocalhost && (
+              {/* Passkey section — only on HTTPS */}
+              {isHttps && (
                 <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  background: 'rgba(16, 185, 129, 0.1)',
-                  border: '1px solid rgba(16, 185, 129, 0.3)',
-                  borderRadius: '8px',
-                  padding: '12px 16px',
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: '10px',
+                  padding: '16px',
                 }}>
-                  <CheckCircle size={18} color="#6ee7b7" />
-                  <span style={{ color: '#6ee7b7', fontSize: '13px' }}>
-                    Localhost detected — works out of the box
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                    <Fingerprint size={18} color="#5eead4" />
+                    <span style={{ color: '#f1f5f9', fontSize: '14px', fontWeight: 600 }}>Passkey</span>
+                    {passkeyRegistered && <CheckCircle size={14} color="#6ee7b7" />}
+                  </div>
+                  {passkeyRegistered ? (
+                    <p style={{ color: '#6ee7b7', fontSize: '13px', margin: 0 }}>
+                      ✓ Passkey registered
+                    </p>
+                  ) : (
+                    <RegisterPasskey
+                      onSuccess={() => setPasskeyRegistered(true)}
+                      label="Register passkey"
+                    />
+                  )}
                 </div>
               )}
 
-              <div>
-                <label style={labelStyle}>Public URL</label>
-                <Input
-                  type="text"
-                  value={urlInput}
-                  onChange={e => { setUrlInput(e.target.value); setUrlConfirmed(false); }}
-                  placeholder="https://armada.example.com"
-                  style={inputStyle}
-                />
+              {/* Password section — always available */}
+              <div style={{
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: '10px',
+                padding: '16px',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                  <Lock size={18} color="#5eead4" />
+                  <span style={{ color: '#f1f5f9', fontSize: '14px', fontWeight: 600 }}>Password</span>
+                  {passwordSet && <CheckCircle size={14} color="#6ee7b7" />}
+                </div>
+                {passwordSet ? (
+                  <p style={{ color: '#6ee7b7', fontSize: '13px', margin: 0 }}>
+                    ✓ Password set
+                  </p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div>
+                      <label style={labelStyle}>Password</label>
+                      <Input
+                        type="password"
+                        value={password}
+                        onChange={e => setPassword(e.target.value)}
+                        placeholder="At least 8 characters"
+                        style={inputStyle}
+                      />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Confirm Password</label>
+                      <Input
+                        type="password"
+                        value={confirmPassword}
+                        onChange={e => setConfirmPassword(e.target.value)}
+                        placeholder="Confirm password"
+                        style={inputStyle}
+                      />
+                    </div>
+                    {passwordError && (
+                      <p style={{ color: '#f87171', fontSize: '13px', margin: 0 }}>{passwordError}</p>
+                    )}
+                    <Button
+                      variant="ghost" type="button"
+                      disabled={!password || !confirmPassword || passwordLoading}
+                      onClick={handleSetPassword}
+                      style={{
+                        ...primaryBtnStyle,
+                        background: passwordLoading ? '#475569' : 'rgba(94, 234, 212, 0.2)',
+                        border: '1px solid rgba(94, 234, 212, 0.3)',
+                        opacity: (!password || !confirmPassword) ? 0.5 : 1,
+                      }}
+                    >
+                      {passwordLoading ? 'Setting…' : 'Set Password'}
+                    </Button>
+                  </div>
+                )}
               </div>
 
-              {urlError && (
-                <p style={{ color: '#f87171', fontSize: '13px', margin: 0, textAlign: 'center' }}>{urlError}</p>
+              {!hasAuth && !isHttps && (
+                <p style={{ color: '#f59e0b', fontSize: '12px', margin: 0, textAlign: 'center' }}>
+                  ⚠ You must set a password to continue. Passkeys are only available over HTTPS.
+                </p>
               )}
 
-              {urlConfirmed ? (
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  color: '#6ee7b7',
-                  fontSize: '13px',
-                  justifyContent: 'center',
-                }}>
-                  <CheckCircle size={16} /> URL saved
-                </div>
-              ) : (
-                <Button
-                  variant="ghost" type="button"
-                  disabled={!urlInput.trim() || urlLoading}
-                  onClick={handleConfirmUrl}
-                  style={{
-                    ...primaryBtnStyle,
-                    background: urlLoading ? '#475569' : 'linear-gradient(135deg, #5eead4, #2563eb)',
-                    opacity: !urlInput.trim() ? 0.5 : 1,
-                  }}
-                >
-                  {urlLoading ? 'Saving…' : 'Confirm URL'}
-                  {!urlLoading && <ArrowRight size={18} />}
-                </Button>
-              )}
-
-              {urlConfirmed && (
-                <Button
-                  variant="ghost" type="button"
-                  onClick={() => setStep('provider')}
-                  style={{ ...primaryBtnStyle, background: 'linear-gradient(135deg, #5eead4, #2563eb)' }}
-                >
-                  Continue <ArrowRight size={18} />
-                </Button>
+              {!hasAuth && isHttps && (
+                <p style={{ color: '#94a3b8', fontSize: '12px', margin: 0, textAlign: 'center' }}>
+                  Set at least one authentication method to continue.
+                </p>
               )}
             </div>
 
             <Button
               variant="ghost" type="button"
+              disabled={!hasAuth}
               onClick={() => setStep('provider')}
-              style={skipBtnStyle}
+              style={{
+                ...primaryBtnStyle,
+                opacity: hasAuth ? 1 : 0.4,
+              }}
             >
-              I'll set this later →
+              Continue <ArrowRight size={18} />
             </Button>
           </>
         )}
@@ -636,6 +783,20 @@ export default function SetupWizard({ onComplete }: Props) {
                   : <CheckCircle size={14} color="#475569" />}
                 <span style={{ color: urlConfirmed ? '#94a3b8' : '#475569' }}>
                   {urlConfirmed ? 'Public URL configured' : 'Public URL not set (localhost)'}
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#94a3b8', fontSize: '13px' }}>
+                {(passkeyRegistered || passwordSet)
+                  ? <CheckCircle size={14} color="#6ee7b7" />
+                  : <CheckCircle size={14} color="#475569" />}
+                <span style={{ color: (passkeyRegistered || passwordSet) ? '#94a3b8' : '#475569' }}>
+                  {passkeyRegistered && passwordSet
+                    ? 'Passkey + password configured'
+                    : passkeyRegistered
+                    ? 'Passkey configured'
+                    : passwordSet
+                    ? 'Password configured'
+                    : 'No auth method set'}
                 </span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#94a3b8', fontSize: '13px' }}>
