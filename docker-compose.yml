@@ -10,12 +10,8 @@ services:
     environment:
       - NODE_ENV=production
       - ARMADA_API_URL=${ARMADA_API_URL:-http://armada-control:3001}
-      - ARMADA_AVATAR_MODEL=${ARMADA_AVATAR_MODEL:-openai/dall-e-3}
-      - ARMADA_DEFAULT_NODE_URL=http://armada-node:8080
-      - ARMADA_DEFAULT_NODE_TOKEN=${ARMADA_NODE_TOKEN:-}
       - ARMADA_DB_PATH=/data/armada.db
       - ARMADA_PLUGINS_PATH=/data/plugins
-      # ARMADA_PUBLIC_URL=https://armada.example.com
     volumes:
       - armada-data:/data
       - armada-plugins:/data/plugins
