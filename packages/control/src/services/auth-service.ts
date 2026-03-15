@@ -26,6 +26,7 @@ import { challengeRepo } from '../repositories/challenge-repo.js';
 import { inviteRepo } from '../repositories/invite-repo.js';
 import { usersRepo } from '../repositories/index.js';
 import { settingsRepo } from '../repositories/settings-repo.js';
+import type { Request } from 'express';
 import { getDefaultAvatarUrl, generateAvatar } from './avatar-generator.js';
 
 // ── Config ───────────────────────────────────────────────────────────
@@ -33,8 +34,45 @@ import { getDefaultAvatarUrl, generateAvatar } from './avatar-generator.js';
 const BCRYPT_COST = 12;
 
 export const rpName = process.env.ARMADA_RP_NAME || 'Armada Control';
-export const rpID = process.env.ARMADA_RP_ID || 'localhost';
-export const origin = process.env.ARMADA_ORIGIN || 'http://localhost:3001';
+
+export function getRpId(req?: Request): string {
+  // Env override always wins
+  if (process.env.ARMADA_RP_ID) return process.env.ARMADA_RP_ID;
+  // Single env var that derives both
+  if (process.env.ARMADA_PUBLIC_URL) {
+    try { return new URL(process.env.ARMADA_PUBLIC_URL).hostname; } catch {}
+  }
+  // DB setting (set during setup wizard or auto-detected)
+  const stored = settingsRepo.get('rp_id');
+  if (stored) return stored;
+  // Auto-detect from request
+  if (req) {
+    const host = ((req.headers['x-forwarded-host'] as string) || req.hostname || '').split(':')[0];
+    if (host && host !== 'localhost' && host !== '127.0.0.1') {
+      settingsRepo.set('rp_id', host);
+      return host;
+    }
+    return host || 'localhost';
+  }
+  return 'localhost';
+}
+
+export function getOrigin(req?: Request): string {
+  if (process.env.ARMADA_ORIGIN) return process.env.ARMADA_ORIGIN;
+  if (process.env.ARMADA_PUBLIC_URL) return process.env.ARMADA_PUBLIC_URL.replace(/\/+$/, '');
+  const stored = settingsRepo.get('origin');
+  if (stored) return stored;
+  if (req) {
+    const proto = (req.headers['x-forwarded-proto'] as string) || req.protocol || 'http';
+    const host = (req.headers['x-forwarded-host'] as string) || req.get('host') || 'localhost:3001';
+    const origin = `${proto}://${host}`;
+    if (!host.startsWith('localhost') && !host.startsWith('127.0.0.1')) {
+      settingsRepo.set('origin', origin);
+    }
+    return origin;
+  }
+  return 'http://localhost:3001';
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -201,12 +239,12 @@ export interface CallerInfo {
   role: string;
 }
 
-export async function createPasskeyRegisterOptions(caller: CallerInfo) {
+export async function createPasskeyRegisterOptions(caller: CallerInfo, req?: Request) {
   const existingPasskeys = passkeyRepo.getCredentialIdsByUser(caller.id);
 
   const options = await generateRegistrationOptions({
     rpName,
-    rpID,
+    rpID: getRpId(req),
     userName: caller.name,
     userDisplayName: caller.displayName,
     excludeCredentials: existingPasskeys.map(pk => ({ id: pk.credentialId })),
@@ -229,7 +267,7 @@ export interface PasskeyRegisterResult {
   label: string;
 }
 
-export async function verifyPasskeyRegistration(caller: CallerInfo, body: any, labelOverride?: string): Promise<PasskeyRegisterResult> {
+export async function verifyPasskeyRegistration(caller: CallerInfo, body: any, labelOverride?: string, req?: Request): Promise<PasskeyRegisterResult> {
   const challenge = challengeRepo.findLatestForUser(caller.id, 'registration');
   if (!challenge) {
     throw Object.assign(new Error('No valid challenge found — please try again'), { statusCode: 400 });
@@ -238,8 +276,8 @@ export async function verifyPasskeyRegistration(caller: CallerInfo, body: any, l
   const verification = await verifyRegistrationResponse({
     response: body,
     expectedChallenge: challenge.challenge,
-    expectedOrigin: origin,
-    expectedRPID: rpID,
+    expectedOrigin: getOrigin(req),
+    expectedRPID: getRpId(req),
     requireUserVerification: false,
   });
 
@@ -291,9 +329,9 @@ export async function verifyPasskeyRegistration(caller: CallerInfo, body: any, l
 
 // ── Passkey login ─────────────────────────────────────────────────────
 
-export async function createPasskeyLoginOptions() {
+export async function createPasskeyLoginOptions(req?: Request) {
   const options = await generateAuthenticationOptions({
-    rpID,
+    rpID: getRpId(req),
     userVerification: 'preferred',
   });
 
@@ -305,7 +343,7 @@ export async function createPasskeyLoginOptions() {
   return options;
 }
 
-export async function verifyPasskeyLogin(body: any): Promise<LoginResult> {
+export async function verifyPasskeyLogin(body: any, req?: Request): Promise<LoginResult> {
   const { id: credentialId } = body;
 
   if (!credentialId) {
@@ -325,8 +363,8 @@ export async function verifyPasskeyLogin(body: any): Promise<LoginResult> {
   const verification = await verifyAuthenticationResponse({
     response: body,
     expectedChallenge: challenge.challenge,
-    expectedOrigin: origin,
-    expectedRPID: rpID,
+    expectedOrigin: getOrigin(req),
+    expectedRPID: getRpId(req),
     requireUserVerification: false,
     credential: {
       id: passkey.credentialId,
@@ -419,7 +457,7 @@ export function createInviteLink(
 
   inviteRepo.create({ id, tokenHash, createdBy: creatorId, role, displayName: opts.displayName || null, expiresAt });
 
-  const inviteUrl = `${origin}/invite/${token}`;
+  const inviteUrl = `${getOrigin()}/invite/${token}`;
   return { id, inviteUrl, expiresAt };
 }
 

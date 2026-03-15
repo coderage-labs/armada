@@ -1,14 +1,16 @@
 import { Router } from 'express';
 import { getDrizzle } from '../db/drizzle.js';
-import { users } from '../db/drizzle-schema.js';
-import { eq } from 'drizzle-orm';
+import { users, providerApiKeys, modelProviders } from '../db/drizzle-schema.js';
+import { eq, sql as drizzleSql } from 'drizzle-orm';
+import { randomUUID } from 'node:crypto';
 import { logAudit } from '../services/audit.js';
 import { requireScope, getScopesForRole } from '../middleware/scopes.js';
 import { usersRepo } from '../repositories/user-repo.js';
 import { authTokenRepo } from '../repositories/auth-token-repo.js';
 import { passkeyRepo } from '../repositories/passkey-repo.js';
+import { settingsRepo } from '../repositories/settings-repo.js';
 import {
-  origin,
+  getOrigin,
   hashToken,
   createApiToken,
   loginWithPassword,
@@ -130,7 +132,7 @@ router.post('/login/password', async (req, res) => {
 
     res.cookie('armada_session', session.sessionToken, {
       httpOnly: true,
-      secure: origin.startsWith('https'),
+      secure: getOrigin(req).startsWith('https'),
       sameSite: 'lax',
       maxAge: 30 * 24 * 60 * 60 * 1000,
       path: '/',
@@ -191,7 +193,7 @@ router.post('/passkey/register-options', async (req, res) => {
     const caller = req.caller;
     if (!caller) { res.status(401).json({ error: 'Authentication required' }); return; }
 
-    const options = await createPasskeyRegisterOptions(caller);
+    const options = await createPasskeyRegisterOptions(caller, req);
     res.json(options);
   } catch (err: any) {
     console.error('passkey register-options error:', err);
@@ -205,7 +207,7 @@ router.post('/passkey/register-verify', async (req, res) => {
     const caller = req.caller;
     if (!caller) { res.status(401).json({ error: 'Auth required' }); return; }
 
-    const result = await verifyPasskeyRegistration(caller, req.body, req.body.label);
+    const result = await verifyPasskeyRegistration(caller, req.body, req.body.label, req);
     logAudit(req, 'passkey.register', 'passkey', result.id, { userId: caller.id, label: result.label });
     res.json({ ok: true, ...result });
   } catch (err: any) {
@@ -218,9 +220,9 @@ router.post('/passkey/register-verify', async (req, res) => {
 // ── Passkey Login ─────────────────────────────────────────────────────
 
 // POST /api/auth/passkey/login-options — PUBLIC (no auth needed)
-router.post('/passkey/login-options', async (_req, res) => {
+router.post('/passkey/login-options', async (req, res) => {
   try {
-    const options = await createPasskeyLoginOptions();
+    const options = await createPasskeyLoginOptions(req);
     res.json(options);
   } catch (err: any) {
     console.error('passkey login-options error:', err);
@@ -231,11 +233,11 @@ router.post('/passkey/login-options', async (_req, res) => {
 // POST /api/auth/passkey/login-verify — PUBLIC (no auth needed)
 router.post('/passkey/login-verify', async (req, res) => {
   try {
-    const { user, session } = await verifyPasskeyLogin(req.body);
+    const { user, session } = await verifyPasskeyLogin(req.body, req);
 
     res.cookie('armada_session', session.sessionToken, {
       httpOnly: true,
-      secure: origin.startsWith('https'),
+      secure: getOrigin(req).startsWith('https'),
       sameSite: 'lax',
       maxAge: 30 * 24 * 60 * 60 * 1000,
       path: '/',
@@ -297,7 +299,70 @@ router.delete('/passkeys/:id', (req, res) => {
 
 // GET /api/auth/setup-status — PUBLIC (no auth needed)
 router.get('/setup-status', (_req, res) => {
-  res.json({ needsSetup: checkSetupNeeded() });
+  const urlConfirmed = !!settingsRepo.get('rp_id');
+  const hasProvider = getDrizzle().select({ id: providerApiKeys.id }).from(providerApiKeys).limit(1).all().length > 0;
+  res.json({
+    needsSetup: checkSetupNeeded(),
+    urlConfirmed,
+    hasProvider,
+  });
+});
+
+// GET /api/auth/detected-url — PUBLIC (no auth needed during setup)
+router.get('/detected-url', (req, res) => {
+  const proto = (req.headers['x-forwarded-proto'] as string) || req.protocol;
+  const host = (req.headers['x-forwarded-host'] as string) || req.get('host');
+  const detectedUrl = `${proto}://${host}`;
+  const storedRpId = settingsRepo.get('rp_id');
+  const storedOrigin = settingsRepo.get('origin');
+  res.json({
+    detectedUrl,
+    detectedHost: (host || '').split(':')[0],
+    isLocalhost: !host || host.startsWith('localhost') || host.startsWith('127.0.0.1'),
+    stored: storedRpId ? { rpId: storedRpId, origin: storedOrigin } : null,
+  });
+});
+
+// POST /api/auth/confirm-url — PUBLIC during setup, owner-only after
+router.post('/confirm-url', (req, res) => {
+  if (!checkSetupNeeded() && (!req.caller || req.caller.role !== 'owner')) {
+    res.status(403).json({ error: 'Only owner can change URL after setup' });
+    return;
+  }
+  const { url } = req.body;
+  if (!url) { res.status(400).json({ error: 'url is required' }); return; }
+  try {
+    const parsed = new URL(url);
+    settingsRepo.set('rp_id', parsed.hostname);
+    settingsRepo.set('origin', `${parsed.protocol}//${parsed.host}`);
+    settingsRepo.set('ui_url', url.replace(/\/+$/, ''));
+    res.json({ ok: true, rpId: parsed.hostname, origin: `${parsed.protocol}//${parsed.host}` });
+  } catch {
+    res.status(400).json({ error: 'Invalid URL' });
+  }
+});
+
+// POST /api/auth/setup-provider — authenticated, for wizard AI provider step
+router.post('/setup-provider', (req, res) => {
+  if (!req.caller) { res.status(401).json({ error: 'Auth required' }); return; }
+
+  const { providerId, apiKey } = req.body;
+  if (!providerId || !apiKey) { res.status(400).json({ error: 'providerId and apiKey required' }); return; }
+
+  const provider = getDrizzle().select().from(modelProviders).where(eq(modelProviders.id, providerId)).get();
+  if (!provider) { res.status(404).json({ error: 'Provider not found' }); return; }
+
+  getDrizzle().insert(providerApiKeys).values({
+    id: randomUUID(),
+    providerId,
+    name: `${provider.name} key`,
+    apiKey,
+    isDefault: 1,
+    priority: 1,
+    createdAt: drizzleSql`strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`,
+  }).run();
+
+  res.status(201).json({ ok: true });
 });
 
 // POST /api/auth/setup — PUBLIC (no auth needed, only works when no human users exist)
@@ -328,7 +393,7 @@ router.post('/setup', (req, res) => {
 
   res.cookie('armada_session', session.sessionToken, {
     httpOnly: true,
-    secure: origin.startsWith('https'),
+    secure: getOrigin(req).startsWith('https'),
     sameSite: 'lax',
     maxAge: 30 * 24 * 60 * 60 * 1000,
     path: '/',
@@ -384,7 +449,7 @@ router.post('/invites/:token/accept', (req, res) => {
 
     res.cookie('armada_session', session.sessionToken, {
       httpOnly: true,
-      secure: origin.startsWith('https'),
+      secure: getOrigin(req).startsWith('https'),
       sameSite: 'lax',
       maxAge: 30 * 24 * 60 * 60 * 1000,
       path: '/',

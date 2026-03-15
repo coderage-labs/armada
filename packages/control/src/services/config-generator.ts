@@ -258,7 +258,7 @@ export function generateInstanceConfig(instanceId: string): GeneratedConfig {
 
   // Configure armada-agent plugin for health reporting
   const controlPlaneUrl = process.env.ARMADA_API_URL || 'http://armada-control:3001';
-  const armadaApiToken = process.env.ARMADA_API_TOKEN || '';
+  const armadaApiToken = '';
   config.plugins = {
     load: {
       // Individual plugin paths inside the instance container — extensions/ is bind-mounted from the node's shared plugins dir

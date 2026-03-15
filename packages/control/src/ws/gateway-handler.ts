@@ -10,7 +10,7 @@
  */
 
 import type { CommandMessage, ResponseMessage } from '@coderage-labs/armada-shared';
-import { getApiToken } from '../middleware/auth.js';
+
 
 const CONTROL_PORT = parseInt(process.env.PORT ?? '3001', 10);
 const CONTROL_HOST = process.env.GATEWAY_LOOPBACK_HOST ?? 'localhost';
@@ -49,10 +49,13 @@ export async function handleGatewayProxyCommand(msg: CommandMessage): Promise<Re
     'te', 'trailers', 'transfer-encoding', 'upgrade', 'host',
   ]);
 
+  // Use the original instance's Authorization header (DB-based token issued at provisioning)
+  const instanceAuthHeader = reqHeaders?.['authorization'] || reqHeaders?.['Authorization'];
+
   const forwardHeaders: Record<string, string> = {
-    // Use the API token so the request is authenticated inside the Express app
-    Authorization: `Bearer ${getApiToken()}`,
     'Content-Type': 'application/json',
+    // Forward the instance's own token for authentication
+    ...(instanceAuthHeader ? { Authorization: instanceAuthHeader } : {}),
     // Tag the request so the control plane knows it came from an instance
     ...(sourceInstance ? { 'X-Armada-Source-Instance': sourceInstance } : {}),
   };

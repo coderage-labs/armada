@@ -20,7 +20,6 @@ import { eventBus } from '../infrastructure/event-bus.js';
 import { getNodeClient } from '../infrastructure/node-client.js';
 import type { GitHubIssue } from '@coderage-labs/armada-shared';
 
-const HOOKS_TOKEN = process.env.ARMADA_HOOKS_TOKEN || '';
 const CONTROL_PLANE_URL = process.env.ARMADA_API_URL || 'http://armada-control:3001';
 
 // ── Persistent triage state (DB-backed) ─────────────────────────────

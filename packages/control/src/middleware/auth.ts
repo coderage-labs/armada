@@ -1,9 +1,7 @@
-import { randomBytes, createHash } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import type { Request, Response, NextFunction } from 'express';
 import { sessionRepo } from '../repositories/session-repo.js';
 import { authTokenRepo } from '../repositories/auth-token-repo.js';
-import { usersRepo } from '../repositories/user-repo.js';
 
 export interface Caller {
   id: string;
@@ -23,38 +21,8 @@ declare global {
   }
 }
 
-let apiToken: string | null = null;
-
-function getToken(): string {
-  if (apiToken) return apiToken;
-
-  // Check env first
-  if (process.env.ARMADA_API_TOKEN) {
-    apiToken = process.env.ARMADA_API_TOKEN;
-    return apiToken;
-  }
-
-  // Check token file
-  const tokenPath = './armada-token.txt';
-  if (existsSync(tokenPath)) {
-    apiToken = readFileSync(tokenPath, 'utf-8').trim();
-    return apiToken;
-  }
-
-  // Generate a new token
-  apiToken = randomBytes(32).toString('hex');
-  writeFileSync(tokenPath, apiToken + '\n', { mode: 0o600 });
-  console.log(`🔑 Generated API token → ${tokenPath}`);
-  return apiToken;
-}
-
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
-}
-
-/** Returns the API token used to authenticate against this control plane. */
-export function getApiToken(): string {
-  return getToken();
 }
 
 export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
@@ -91,7 +59,9 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
   // Skip auth for first-boot setup endpoints (public)
   if (
     (req.method === 'GET' && (req.path === '/api/auth/setup-status' || req.path === '/auth/setup-status')) ||
-    (req.method === 'POST' && (req.path === '/api/auth/setup' || req.path === '/auth/setup'))
+    (req.method === 'POST' && (req.path === '/api/auth/setup' || req.path === '/auth/setup')) ||
+    (req.method === 'GET' && (req.path === '/api/auth/detected-url' || req.path === '/auth/detected-url')) ||
+    (req.method === 'POST' && (req.path === '/api/auth/confirm-url' || req.path === '/auth/confirm-url'))
   ) {
     next();
     return;
@@ -162,37 +132,5 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
     console.warn('[auth] DB not initialized yet or table missing:', err.message);
   }
 
-  if (!token) {
-    res.status(401).json({ error: 'Missing or invalid Authorization header' });
-    return;
-  }
-
-  // 3. Fallback: legacy ARMADA_API_TOKEN / ARMADA_HOOKS_TOKEN (backward compat)
-  const hooksToken = process.env.ARMADA_HOOKS_TOKEN || '';
-  if (token === getToken() || (hooksToken && token === hooksToken)) {
-    const operatorName = process.env.ARMADA_OPERATOR_NAME || 'operator';
-    // Try to resolve to a real user record
-    let resolvedUser: any = null;
-    try {
-      // usersRepo imported at top level
-      resolvedUser = usersRepo.getByName(operatorName);
-    } catch (err: any) { console.warn('[auth] Failed to resolve operator user:', err.message); }
-    req.caller = resolvedUser ? {
-      id: resolvedUser.id,
-      name: resolvedUser.name,
-      displayName: resolvedUser.displayName || resolvedUser.name,
-      role: resolvedUser.role || 'owner',
-      type: resolvedUser.type || 'operator',
-    } : {
-      id: 'admin',
-      name: operatorName,
-      displayName: operatorName,
-      role: 'owner',
-      type: 'operator',
-    };
-    next();
-    return;
-  }
-
-  res.status(401).json({ error: 'Invalid API token' });
+  res.status(401).json({ error: 'Missing or invalid Authorization header' });
 }

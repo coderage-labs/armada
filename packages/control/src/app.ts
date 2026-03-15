@@ -38,6 +38,7 @@ import { eventsRoutes } from './routes/events.js';
 import { operationsRoutes } from './routes/operations.js';
 import { badgesRoutes } from './routes/badges.js';
 import authRoutes from './routes/auth.js';
+import { getOrigin } from './services/auth-service.js';
 import auditRoutes from './routes/audit.js';
 import settingsRoutes from './routes/settings.js';
 import configRoutes from './routes/config.js';
@@ -58,10 +59,15 @@ export function createApp(opts: AppOptions): express.Express {
 
   // ── Middleware ───────────────────────────────────────────────────────
   app.use(cors({
-    origin: [
-      'http://localhost:5173',
-      process.env.ARMADA_ORIGIN || 'https://armada.example.com',
-    ],
+    origin: (requestOrigin, callback) => {
+      // Always allow localhost dev
+      if (!requestOrigin || requestOrigin.startsWith('http://localhost')) {
+        callback(null, true);
+        return;
+      }
+      const allowed = getOrigin();
+      callback(null, requestOrigin === allowed);
+    },
     credentials: true,
   }));
   app.use(express.json());

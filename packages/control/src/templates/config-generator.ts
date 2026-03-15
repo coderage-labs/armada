@@ -94,7 +94,7 @@ export function generateOpenClawConfig(opts: GenerateConfigOptions): { config: o
         // Agents reach the control plane via the local gateway proxy (port 3002)
         // The control plane handles task routing to all agents
         armadaApiUrl: process.env.ARMADA_CONTROL_URL || process.env.ARMADA_AGENT_GATEWAY_URL || 'http://armada-gateway:3002',
-        armadaApiToken: process.env.ARMADA_API_TOKEN || '',
+        armadaApiToken: '',
         // Node agent proxy URL for remote deployments
         proxyUrl: process.env.ARMADA_AGENT_PROXY_URL || '',
       },
