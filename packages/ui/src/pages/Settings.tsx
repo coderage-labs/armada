@@ -5,7 +5,7 @@ import { useSettings } from '../hooks/queries/useSettings';
 import { useProviders } from '../hooks/queries/useProviders';
 import { useModels } from '../hooks/queries/useModels';
 import { useSSEConnection } from '../providers/SSEProvider';
-import { Settings as SettingsIcon, Tag, Save, Loader2, CheckCircle2, XCircle, Trash2, Radio, Wifi, WifiOff, Image } from 'lucide-react';
+import { Settings as SettingsIcon, Tag, Save, Loader2, CheckCircle2, XCircle, Trash2, Radio, Wifi, WifiOff, Image, Globe } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -46,6 +46,11 @@ export default function Settings() {
   const [savingRetention, setSavingRetention] = useState(false);
   const [retentionResult, setRetentionResult] = useState<{ ok: boolean; msg: string } | null>(null);
 
+  // Public URL state
+  const [publicUrl, setPublicUrl] = useState('');
+  const [savingUrl, setSavingUrl] = useState(false);
+  const [urlResult, setUrlResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
     // Avatar generation state
   const [avatarModelId, setAvatarModelId] = useState<string>('');
   const [avatarPrompt, setAvatarPrompt] = useState<string>('');
@@ -60,6 +65,10 @@ export default function Settings() {
     setRetentionDays(result.workspace_retention_days ?? 30);
     setAvatarModelId(result.avatar_model_id ?? '');
     setAvatarPrompt(result.avatar_prompt ?? '');
+    // Fetch public URL from settings
+    apiFetch<{ detectedUrl: string; stored: { origin: string } | null }>('/api/auth/detected-url')
+      .then(d => setPublicUrl(d.stored?.origin ?? d.detectedUrl ?? ''))
+      .catch(() => {});
   }, [settingsQueryData]);
 
   // Models with image generation capability for the avatar picker
@@ -142,6 +151,24 @@ export default function Settings() {
     }
   };
 
+  const handleSaveUrl = async () => {
+    if (!canWrite) return;
+    setSavingUrl(true);
+    setUrlResult(null);
+    try {
+      await apiFetch('/api/auth/confirm-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: publicUrl.trim() }),
+      });
+      setUrlResult({ ok: true, msg: 'Public URL saved. Passkeys will use this domain.' });
+    } catch (err: any) {
+      setUrlResult({ ok: false, msg: err.message ?? 'Failed to save.' });
+    } finally {
+      setSavingUrl(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -157,6 +184,49 @@ export default function Settings() {
         </div>
       ) : (
         <div className="space-y-8">
+          {/* Public URL */}
+            <section className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 space-y-4">
+              <div className="flex items-center gap-2">
+                <Globe className="w-4 h-4 text-teal-400" />
+                <h2 className="text-base font-semibold text-white">Public URL</h2>
+              </div>
+              <p className="text-sm text-zinc-400">
+                The public URL for this Armada control plane. Used for passkey authentication (WebAuthn),
+                notification links, and node agent connections.
+              </p>
+
+              <div className="space-y-1">
+                <label className={labelCls}>URL</label>
+                <Input
+                  value={publicUrl}
+                  onChange={(e) => setPublicUrl(e.target.value)}
+                  placeholder="https://armada.example.com"
+                  disabled={!canWrite}
+                />
+                <p className="text-xs text-zinc-500 mt-1">
+                  Changing this will affect passkey authentication. Existing passkeys are bound to the domain they were registered on.
+                </p>
+              </div>
+
+              {urlResult && (
+                <div className={`flex items-center gap-2 text-sm rounded-lg px-3 py-2 ${urlResult.ok ? 'bg-green-500/10 border border-green-500/20 text-green-400' : 'bg-red-500/10 border border-red-500/20 text-red-400'}`}>
+                  {urlResult.ok ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <XCircle className="w-4 h-4 shrink-0" />}
+                  {urlResult.msg}
+                </div>
+              )}
+
+              {canWrite && (
+                <Button
+                  onClick={handleSaveUrl}
+                  disabled={savingUrl || !publicUrl.trim()}
+                  className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm px-4 h-9"
+                >
+                  {savingUrl ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  {savingUrl ? 'Saving…' : 'Save URL'}
+                </Button>
+              )}
+            </section>
+
           {/* OpenClaw Version */}
             <section className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 space-y-4">
               <div className="flex items-center gap-2">

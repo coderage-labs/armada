@@ -323,9 +323,11 @@ router.get('/detected-url', (req, res) => {
   });
 });
 
-// POST /api/auth/confirm-url — PUBLIC during setup, owner-only after
+// POST /api/auth/confirm-url — allowed during setup wizard or by authenticated owner
 router.post('/confirm-url', (req, res) => {
-  if (!checkSetupNeeded() && (!req.caller || req.caller.role !== 'owner')) {
+  // Allow if: setup not complete yet, OR caller is an owner
+  const duringSetup = !settingsRepo.get('rp_id'); // URL not yet confirmed
+  if (!duringSetup && (!req.caller || req.caller.role !== 'owner')) {
     res.status(403).json({ error: 'Only owner can change URL after setup' });
     return;
   }

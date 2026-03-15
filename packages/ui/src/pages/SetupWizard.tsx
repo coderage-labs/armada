@@ -12,7 +12,7 @@ type Step = 'welcome' | 'account' | 'passkey' | 'url-check' | 'provider' | 'comp
 const STEPS: Step[] = ['welcome', 'account', 'passkey', 'url-check', 'provider', 'complete'];
 
 function StepIndicator({ current }: { current: Step }) {
-  const labels = ['Welcome', 'Account', 'Passkey', 'URL', 'AI Provider', 'Done'];
+  const labels = ['Welcome', 'Account', 'Passkey', 'URL', 'Provider', 'Done'];
   const idx = STEPS.indexOf(current);
 
   return (
@@ -20,21 +20,22 @@ function StepIndicator({ current }: { current: Step }) {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: '8px',
+      gap: '4px',
       marginBottom: '32px',
       position: 'relative',
     }}>
       {STEPS.map((step, i) => (
-        <div key={step} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div key={step} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           <div style={{
-            width: '32px',
-            height: '32px',
+            width: '26px',
+            height: '26px',
             borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '13px',
+            fontSize: '11px',
             fontWeight: 600,
+            flexShrink: 0,
             background: i <= idx
               ? 'linear-gradient(135deg, #5eead4, #2563eb)'
               : 'rgba(255,255,255,0.05)',
@@ -42,12 +43,13 @@ function StepIndicator({ current }: { current: Step }) {
             color: i <= idx ? '#fff' : '#64748b',
             transition: 'all 0.3s',
           }}>
-            {i < idx ? <CheckCircle size={16} /> : i + 1}
+            {i < idx ? <CheckCircle size={13} /> : i + 1}
           </div>
           {i < STEPS.length - 1 && (
             <div style={{
-              width: '24px',
+              width: '16px',
               height: '2px',
+              flexShrink: 0,
               background: i < idx ? '#2563eb' : 'rgba(255,255,255,0.1)',
               transition: 'background 0.3s',
             }} />
