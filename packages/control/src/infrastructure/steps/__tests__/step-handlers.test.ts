@@ -294,7 +294,7 @@ describe('health-check handler', () => {
     expect(node.relayRequest).toHaveBeenCalledWith(
       'armada-instance-health',
       'GET',
-      '/api/health',
+      '/health',
     );
     expect(instancesRepo.update).toHaveBeenCalledWith('inst-1', {
       status: 'running',
@@ -431,9 +431,9 @@ describe('install-plugins handler', () => {
     expect(node.installPlugin).not.toHaveBeenCalled();
   });
 
-  it('continues installing remaining plugins when one fails (non-fatal)', async () => {
+  it('continues installing remaining plugins when one fails, then throws', async () => {
     // With withRetry defaults (3 attempts), the failing plugin will be tried 3 times
-    // before giving up and continuing to the next plugin.
+    // before giving up and continuing to the next plugin. Step still fails at the end.
     const node = makeNodeClient({
       listPlugins: vi.fn().mockResolvedValue([]),
       installPlugin: vi.fn()
@@ -453,7 +453,14 @@ describe('install-plugins handler', () => {
 
     const promise = installPluginsHandler.execute(ctx as any);
     await vi.runAllTimersAsync();
-    await expect(promise).resolves.not.toThrow();
+    // All plugins are attempted, but the step fails because one couldn't install
+    let error: Error | undefined;
+    try {
+      await promise;
+    } catch (e: any) {
+      error = e;
+    }
+    expect(error?.message).toMatch(/Failed to install 1 plugin/);
     // 3 retry attempts for failing-plugin + 1 successful call for ok-plugin
     expect(node.installPlugin).toHaveBeenCalledTimes(4);
   });

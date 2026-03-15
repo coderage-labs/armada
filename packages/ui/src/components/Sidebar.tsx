@@ -136,10 +136,10 @@ export default function Sidebar({ onLogout }: Props) {
         {/* Logo */}
         <div className="p-6 border-b border-zinc-700">
           <h1 className="text-xl font-bold text-zinc-100 flex items-center gap-2">
-            <span className="flex items-center justify-center w-7 h-7 rounded-lg bg-violet-500/20 text-violet-400">
+            <span className="flex items-center justify-center w-7 h-7 rounded-lg bg-teal-500/20 text-teal-400">
               <Rocket className="w-4 h-4" />
             </span>
-            <span><span className="text-violet-400">Armada</span></span>
+            <span><span className="text-teal-400">Armada</span></span>
           </h1>
           <p className="text-xs text-zinc-500 mt-1">Agent orchestration platform</p>
         </div>

@@ -22,6 +22,19 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# Check prerequisites
+for cmd in docker openssl; do
+  if ! command -v "$cmd" &> /dev/null; then
+    echo "❌ Required command not found: $cmd"
+    exit 1
+  fi
+done
+
+if ! docker compose version &> /dev/null; then
+  echo "❌ docker compose (v2) is required"
+  exit 1
+fi
+
 echo "🚀 Armada Installer"
 echo "==========================="
 echo "Mode: $MODE"
@@ -31,86 +44,86 @@ echo ""
 
 mkdir -p "$ARMADA_DIR"
 
-# Generate tokens
+# Generate node token for .env (only needed for initial node registration)
 if [ ! -f "$ARMADA_DIR/.env" ]; then
-  ARMADA_API_TOKEN=$(openssl rand -hex 32)
-  ARMADA_NODE_TOKEN="${NODE_TOKEN:-$(openssl rand -hex 32)}"
+  ARMADA_NODE_TOKEN="${NODE_TOKEN:-}"
   cat > "$ARMADA_DIR/.env" << EOF
-ARMADA_API_TOKEN=$ARMADA_API_TOKEN
+# Node agent install token — set this after registering a node in the UI
 ARMADA_NODE_TOKEN=$ARMADA_NODE_TOKEN
 EOF
-  echo "✅ Generated tokens → $ARMADA_DIR/.env"
+  echo "✅ Created $ARMADA_DIR/.env"
 else
-  echo "ℹ️  Using existing tokens from $ARMADA_DIR/.env"
+  echo "ℹ️  Using existing $ARMADA_DIR/.env"
   source "$ARMADA_DIR/.env"
 fi
 
+# Create the shared network (instances will also join this)
+docker network create armada-net 2>/dev/null || true
+
+# Create host data directory for node agent bind mount
+DATA_DIR="$ARMADA_DIR/data"
+mkdir -p "$DATA_DIR/node-credentials"
+
 # Write docker-compose.yml
-if [ "$MODE" = "full" ] || [ "$MODE" = "control-only" ]; then
-  cat > "$ARMADA_DIR/docker-compose.yml" << 'COMPOSE'
-version: '3.8'
+cat > "$ARMADA_DIR/docker-compose.yml" << COMPOSE
 services:
+COMPOSE
+
+if [ "$MODE" = "full" ] || [ "$MODE" = "control-only" ]; then
+  cat >> "$ARMADA_DIR/docker-compose.yml" << COMPOSE
   control:
-    image: ghcr.io/coderage-labs/armada:${ARMADA_VERSION:-latest}
+    image: ${REGISTRY}/armada:\${ARMADA_VERSION:-latest}
     container_name: armada-control
     ports:
       - "3001:3001"
     environment:
       - NODE_ENV=production
-      - ARMADA_API_TOKEN=${ARMADA_API_TOKEN}
-      - ARMADA_DEFAULT_NODE_URL=http://armada-node:8080
-      - ARMADA_DEFAULT_NODE_TOKEN=${ARMADA_NODE_TOKEN}
+      - ARMADA_API_URL=http://armada-control:3001
       - ARMADA_DB_PATH=/data/armada.db
       - ARMADA_PLUGINS_PATH=/data/plugins
     volumes:
       - armada-data:/data
+      - armada-plugins:/data/plugins
     networks:
-      - armada
+      - armada-net
     restart: unless-stopped
 COMPOSE
 fi
 
 if [ "$MODE" = "full" ] || [ "$MODE" = "node-only" ]; then
-  if [ "$MODE" = "node-only" ]; then
-    cat > "$ARMADA_DIR/docker-compose.yml" << 'COMPOSE'
-version: '3.8'
-services:
-COMPOSE
-  fi
-
-  cat >> "$ARMADA_DIR/docker-compose.yml" << 'COMPOSE'
-  armada-node:
-    image: ghcr.io/coderage-labs/armada-node:${ARMADA_VERSION:-latest}
+  cat >> "$ARMADA_DIR/docker-compose.yml" << COMPOSE
+  node:
+    image: ${REGISTRY}/armada-node:\${ARMADA_VERSION:-latest}
     container_name: armada-node
     ports:
       - "8080:8080"
     environment:
-      - ARMADA_NODE_TOKEN=${ARMADA_NODE_TOKEN}
+      - ARMADA_NODE_TOKEN=\${ARMADA_NODE_TOKEN:-}
+      - ARMADA_CONTROL_URL=${CONTROL_URL:-ws://armada-control:3001/api/nodes/ws}
+      - HOST_DATA_DIR=${DATA_DIR}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - armada-volumes:/data/armada/volumes
+      - ${DATA_DIR}:/data
+      - ${DATA_DIR}/node-credentials:/etc/armada-node
       - armada-plugins:/data/armada/plugins:ro
     networks:
-      - armada
-      - armada
+      - armada-net
     restart: unless-stopped
 COMPOSE
+fi
 
-  cat >> "$ARMADA_DIR/docker-compose.yml" << 'COMPOSE'
+# Volumes and networks
+cat >> "$ARMADA_DIR/docker-compose.yml" << 'COMPOSE'
 
 volumes:
   armada-data:
-  armada-volumes:
   armada-plugins:
 
 networks:
-  armada:
-    driver: bridge
-  armada:
-    driver: bridge
-    name: armada
+  armada-net:
+    name: armada-net
+    external: true
 COMPOSE
-fi
 
 echo ""
 echo "✅ Configuration written to $ARMADA_DIR/"
@@ -126,16 +139,16 @@ echo "✅ Armada is running!"
 echo ""
 if [ "$MODE" = "full" ] || [ "$MODE" = "control-only" ]; then
   echo "  🌐 Dashboard:  http://localhost:3001"
-  echo "  🔑 API Token:  $ARMADA_API_TOKEN"
+  echo ""
+  echo "  Next steps:"
+  echo "  1. Open the dashboard and complete the setup wizard"
+  echo "  2. Register a node (Nodes → Add Node → copy the install token)"
+  echo "  3. Set the token in $ARMADA_DIR/.env: ARMADA_NODE_TOKEN=<token>"
+  echo "  4. Restart the node: cd $ARMADA_DIR && docker compose restart node"
+  echo "  5. Create templates, instances, and agents from the dashboard"
 fi
-if [ "$MODE" = "full" ] || [ "$MODE" = "node-only" ]; then
-  echo "  🖥️  Node Agent: http://localhost:8080"
-  echo "  🔑 Node Token: $ARMADA_NODE_TOKEN"
+if [ "$MODE" = "node-only" ]; then
+  echo "  🖥️  Node Agent: running on port 8080"
+  echo "  📡 Control:    $CONTROL_URL"
 fi
-echo ""
-echo "To install on another machine (node agent only):"
-echo "  curl -fsSL https://raw.githubusercontent.com/coderage-labs/armada/main/install.sh | bash -s -- --node-only --token $ARMADA_NODE_TOKEN"
-echo ""
-echo "To install the OpenClaw plugin:"
-echo "  npm install @coderage-labs/armada-agent --registry https://npm.pkg.github.com"
 echo ""

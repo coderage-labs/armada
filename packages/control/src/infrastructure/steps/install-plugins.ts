@@ -24,6 +24,8 @@ export const installPluginsHandler: StepHandler = {
       console.warn('[install-plugins] listPlugins failed:', err.message);
     }
 
+    const failures: string[] = [];
+
     for (const plugin of plugins) {
       const installedVersion = installedPluginVersions.get(plugin.name);
       if (installedVersion && (!plugin.version || installedVersion === plugin.version)) {
@@ -55,10 +57,15 @@ export const installPluginsHandler: StepHandler = {
         );
         ctx.emit(`Plugin installed: ${plugin.name}`, { plugin: plugin.name });
       } catch (err: any) {
-        // Plugin install failure is fatal — the instance won't boot without its plugin
+        // Record failure but continue installing remaining plugins
         ctx.emit(`Plugin install FAILED: ${plugin.name} — ${err.message}`, { plugin: plugin.name, error: err.message });
-        throw new Error(`Failed to install plugin ${plugin.name}: ${err.message}`);
+        failures.push(`${plugin.name}: ${err.message}`);
       }
+    }
+
+    // Fail the step if any plugins couldn't be installed
+    if (failures.length > 0) {
+      throw new Error(`Failed to install ${failures.length} plugin(s): ${failures.join('; ')}`);
     }
   },
 };
