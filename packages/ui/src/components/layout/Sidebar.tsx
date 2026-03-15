@@ -7,7 +7,7 @@ import { useSSEConnection } from '../../providers/SSEProvider';
 import { Button } from '../ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import {
-  Home, Monitor, Bot, Cpu, Zap, FileCode, FolderKanban, GitBranch,
+  Home, Monitor, Bot, Cpu, Rocket, FileCode, FolderKanban, GitBranch,
   Activity, Bell, Puzzle, Plug, Terminal, LogOut, Users,
   Workflow, Radio, Cable, Layers, Settings, Server, GitPullRequest,
   ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, ListChecks,
@@ -178,14 +178,14 @@ export default function Sidebar({ onLogout, open, onOpenChange }: Props) {
           {collapsed ? (
             <div className="flex items-center justify-center">
               <span className="flex items-center justify-center w-7 h-7 rounded-lg bg-violet-500/20 text-violet-400">
-                <Zap className="w-4 h-4" />
+                <Rocket className="w-4 h-4" />
               </span>
             </div>
           ) : (
             <>
               <h1 className="text-xl font-bold text-zinc-100 flex items-center gap-2">
                 <span className="flex items-center justify-center w-7 h-7 rounded-lg bg-violet-500/20 text-violet-400">
-                  <Zap className="w-4 h-4" />
+                  <Rocket className="w-4 h-4" />
                 </span>
                 <span className="text-violet-400">Armada</span>
               </h1>
