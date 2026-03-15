@@ -19,6 +19,7 @@ import type { Operation } from '@coderage-labs/armada-shared';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
 
 /* ── Types ─────────────────────────────────────────── */
 
@@ -773,80 +774,60 @@ export default function Operations() {
         </Button>
         {showRecent && (
           <div className="mt-3 space-y-3">
-            {/* Tabs */}
-            <div className="flex gap-1 border-b border-zinc-800 pb-px">
-              <Button
-                variant="ghost" onClick={() => setRecentTab('workflows')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-t-lg transition ${
-                  recentTab === 'workflows'
-                    ? 'bg-zinc-700/50 text-zinc-100 border-b-2 border-violet-400'
-                    : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
-                }`}
-              >
-                Workflow Runs
-                {recentRuns.length > 0 && (
-                  <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-500/20 text-zinc-400">{recentRuns.length}</span>
+            <Tabs value={recentTab} onValueChange={v => { setRecentTab(v as 'workflows' | 'tasks'); if (v === 'tasks' && recentTasks.length === 0) loadRecentTasks(); }}>
+              <TabsList>
+                <TabsTrigger value="workflows">
+                  Workflow Runs
+                  {recentRuns.length > 0 && <Badge variant="secondary" className="ml-1.5">{recentRuns.length}</Badge>}
+                </TabsTrigger>
+                <TabsTrigger value="tasks">
+                  Tasks
+                  {recentTasks.length > 0 && <Badge variant="secondary" className="ml-1.5">{recentTasks.length}</Badge>}
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="workflows">
+                {recentRuns.length === 0 ? (
+                  <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-6 text-center">
+                    <p className="text-sm text-zinc-600">No completed workflow runs in the last 24 hours</p>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-zinc-800 bg-zinc-900/50">
+                    <TableSectionHeader>
+                      <span className="flex-1">Workflow</span>
+                      <span className="hidden md:block w-32 text-center">Steps</span>
+                      <span className="w-28 text-right">Duration</span>
+                    </TableSectionHeader>
+                    {recentRuns.map(run => (
+                      <RunCard
+                        key={run.id}
+                        run={run}
+                        expanded={expandedRunId === run.id}
+                        onToggle={() => setExpandedRunId(expandedRunId === run.id ? null : run.id)}
+                        agents={agentMap}
+                        onRefresh={loadRecent}
+                      />
+                    ))}
+                  </div>
                 )}
-              </Button>
-              <Button
-                variant="ghost" onClick={() => { setRecentTab('tasks'); if (recentTasks.length === 0) loadRecentTasks(); }}
-                className={`px-3 py-1.5 text-xs font-medium rounded-t-lg transition ${
-                  recentTab === 'tasks'
-                    ? 'bg-zinc-700/50 text-zinc-100 border-b-2 border-violet-400'
-                    : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
-                }`}
-              >
-                Tasks
-                {recentTasks.length > 0 && (
-                  <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-500/20 text-zinc-400">{recentTasks.length}</span>
+              </TabsContent>
+              <TabsContent value="tasks">
+                {recentTasks.length === 0 ? (
+                  <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-6 text-center">
+                    <p className="text-sm text-zinc-600">No completed tasks in the last 24 hours</p>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-zinc-800 bg-zinc-900/50">
+                    <TableSectionHeader>
+                      <span className="flex-1">Task</span>
+                      <span className="hidden sm:block w-32 text-right">Agent · Duration</span>
+                    </TableSectionHeader>
+                    {recentTasks.map(task => (
+                      <TaskRow key={task.id} task={task} />
+                    ))}
+                  </div>
                 )}
-              </Button>
-            </div>
-
-            {/* Tab content */}
-            {recentTab === 'workflows' && (
-              recentRuns.length === 0 ? (
-                <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-6 text-center">
-                  <p className="text-sm text-zinc-600">No completed workflow runs in the last 24 hours</p>
-                </div>
-              ) : (
-                <div className="rounded-lg border border-zinc-800 bg-zinc-900/50">
-                  <TableSectionHeader>
-                    <span className="flex-1">Workflow</span>
-                    <span className="hidden md:block w-32 text-center">Steps</span>
-                    <span className="w-28 text-right">Duration</span>
-                  </TableSectionHeader>
-                  {recentRuns.map(run => (
-                    <RunCard
-                      key={run.id}
-                      run={run}
-                      expanded={expandedRunId === run.id}
-                      onToggle={() => setExpandedRunId(expandedRunId === run.id ? null : run.id)}
-                      agents={agentMap}
-                      onRefresh={loadRecent}
-                    />
-                  ))}
-                </div>
-              )
-            )}
-
-            {recentTab === 'tasks' && (
-              recentTasks.length === 0 ? (
-                <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-6 text-center">
-                  <p className="text-sm text-zinc-600">No completed tasks in the last 24 hours</p>
-                </div>
-              ) : (
-                <div className="rounded-lg border border-zinc-800 bg-zinc-900/50">
-                  <TableSectionHeader>
-                    <span className="flex-1">Task</span>
-                    <span className="hidden sm:block w-32 text-right">Agent · Duration</span>
-                  </TableSectionHeader>
-                  {recentTasks.map(task => (
-                    <TaskRow key={task.id} task={task} />
-                  ))}
-                </div>
-              )
-            )}
+              </TabsContent>
+            </Tabs>
           </div>
         )}
       </section>

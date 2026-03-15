@@ -1,13 +1,7 @@
 import { useEffect, useState } from 'react';
 import { apiFetch } from '../hooks/useApi';
 import { Button } from './ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from './ui/dialog';
+import { ResponsiveDialog as Dialog, ResponsiveDialogContent as DialogContent, ResponsiveDialogFooter as DialogFooter, ResponsiveDialogHeader as DialogHeader, ResponsiveDialogTitle as DialogTitle } from './ui/responsive-dialog';
 import { Input } from './ui/input';
 
 interface NodeOption {

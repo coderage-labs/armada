@@ -15,7 +15,7 @@ import { EmptyState } from '../components/EmptyState';
 import { CardGrid, BaseCard } from '../components/shared';
 import { Input } from '../components/ui/input';
 import { Textarea } from '../components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/responsive-dialog';
 
 /* ── Types ─────────────────────────────────────────── */
 

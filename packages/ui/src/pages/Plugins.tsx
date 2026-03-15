@@ -15,7 +15,7 @@ import {
 } from '../components/ui/select';
 import { EmptyState } from '../components/EmptyState';
 import { CardGrid, BaseCard } from '../components/shared';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/responsive-dialog';
 import { toast } from 'sonner';
 
 function SourceBadge({ source }: { source: string }) {

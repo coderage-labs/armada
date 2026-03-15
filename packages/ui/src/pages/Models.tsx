@@ -18,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { RowSkeleton } from '../components/ui/skeleton';
 import { EmptyState } from '../components/EmptyState';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/responsive-dialog';
 import type { UsagePeriod } from '../hooks/queries/useUsage';
 
 interface DiscoveredModel {

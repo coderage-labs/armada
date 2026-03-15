@@ -12,12 +12,7 @@ import { Switch } from '../components/ui/switch';
 import { EmptyState } from '../components/EmptyState';
 import { RowSkeleton } from '../components/ui/skeleton';
 import ConfirmDialog from '../components/ConfirmDialog';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '../components/ui/dialog';
+import { ResponsiveDialog as Dialog, ResponsiveDialogContent as DialogContent, ResponsiveDialogHeader as DialogHeader, ResponsiveDialogTitle as DialogTitle } from '../components/ui/responsive-dialog';
 import {
   useNotificationChannels,
   useCreateNotificationChannel,

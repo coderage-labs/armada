@@ -4,13 +4,7 @@ import { apiFetch } from '../hooks/useApi';
 import type { Template } from '@coderage-labs/armada-shared';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from './ui/dialog';
+import { ResponsiveDialog as Dialog, ResponsiveDialogContent as DialogContent, ResponsiveDialogFooter as DialogFooter, ResponsiveDialogHeader as DialogHeader, ResponsiveDialogTitle as DialogTitle } from './ui/responsive-dialog';
 import { Input } from './ui/input';
 
 interface SpawnDialogProps {

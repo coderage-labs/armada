@@ -21,7 +21,7 @@ import { Switch } from '../components/ui/switch';
 import { EmptyState } from '../components/EmptyState';
 import { RowSkeleton } from '../components/ui/skeleton';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/responsive-dialog';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
 
 /* ── Types ─────────────────────────────────────────── */

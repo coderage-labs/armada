@@ -2,13 +2,7 @@ import { useCallback, useState } from 'react';
 import { Check, Copy, X } from 'lucide-react';
 import { useSSEAll } from '../providers/SSEProvider';
 import { Button } from './ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from './ui/dialog';
+import { ResponsiveDialog as Dialog, ResponsiveDialogContent as DialogContent, ResponsiveDialogHeader as DialogHeader, ResponsiveDialogTitle as DialogTitle, ResponsiveDialogDescription as DialogDescription } from './ui/responsive-dialog';
 
 interface NodeInstallModalProps {
   nodeId: string;
