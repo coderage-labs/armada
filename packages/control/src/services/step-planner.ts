@@ -259,7 +259,7 @@ export function buildStepsForInstance(instanceId: string, configVersion: number)
           nodeId: resolvedNodeId,
           containerName,
           pluginsDir: `/data/armada/instances/${instance?.name ?? instanceId}/plugins`,
-          plugins: [{ name: '@coderage-labs/armada-agent', version: AGENT_PLUGIN_VERSION }],
+          plugins: [{ name: '@coderage-labs/armada-agent-plugin', version: AGENT_PLUGIN_VERSION }],
         },
       },
     };
@@ -363,7 +363,7 @@ export function buildStepsForInstance(instanceId: string, configVersion: number)
           nodeId,
           containerName,
           pluginsDir: `/data/armada/instances/${instance?.name ?? instanceId}/plugins`,
-          plugins: [{ name: '@coderage-labs/armada-agent', version: AGENT_PLUGIN_VERSION }],
+          plugins: [{ name: '@coderage-labs/armada-agent-plugin', version: AGENT_PLUGIN_VERSION }],
         },
       },
     };
@@ -599,7 +599,7 @@ export function buildStepsForInstance(instanceId: string, configVersion: number)
 
     // If no explicit plugins found in mutations, fall back to the armada agent plugin
     if (pluginsToInstall.length === 0) {
-      pluginsToInstall.push({ name: '@coderage-labs/armada-agent', version: AGENT_PLUGIN_VERSION });
+      pluginsToInstall.push({ name: '@coderage-labs/armada-agent-plugin', version: AGENT_PLUGIN_VERSION });
     }
 
     installPluginsId = crypto.randomUUID();

@@ -135,21 +135,20 @@ export default function App() {
     );
   }
 
-  // Still checking setup status
+  // Dismiss splash loader once React takes over
+  useEffect(() => {
+    if (needsSetup !== null) {
+      const splash = document.getElementById('splash');
+      if (splash) {
+        splash.classList.add('fade');
+        setTimeout(() => splash.remove(), 500);
+      }
+    }
+  }, [needsSetup]);
+
+  // Still checking setup status — splash screen handles the loading state
   if (needsSetup === null) {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-        color: '#94a3b8',
-        fontSize: '14px',
-      }}>
-        Loading…
-      </div>
-    );
+    return null;
   }
 
   // First boot — show setup wizard
