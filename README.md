@@ -113,6 +113,13 @@ curl -fsSL https://raw.githubusercontent.com/coderage-labs/armada/main/install.s
 | `plugins/control` | OpenClaw plugin for the operator agent |
 | `plugins/shared` | Shared plugin utilities |
 
+## Roadmap
+
+- **CLI** (`armada agents list`, `armada changesets apply`, `armada events --follow`) — thin client over the REST API for terminal-based fleet management
+- **Escalation system** — agents pause and escalate to humans via inline buttons
+- **Cost tracking dashboard** — per-agent, per-model usage and spend
+- **Scheduled workflows** — cron-triggered DAG runs
+
 ## Documentation
 
 - [Developer docs](docs/README.md) — architecture, configuration, API reference
