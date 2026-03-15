@@ -178,10 +178,6 @@ function generateModelsConfig(): GeneratedConfig {
         mode: 'token',
         token: crypto.randomBytes(24).toString('hex'),
       },
-      controlUi: {
-        // Armada-managed instances don't serve a Control UI externally
-        dangerouslyAllowHostHeaderOriginFallback: true,
-      },
       reload: {
         // Armada controls restarts — disable config file watcher auto-restart
         mode: 'off',

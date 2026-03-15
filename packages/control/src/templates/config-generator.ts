@@ -217,11 +217,6 @@ export function generateOpenClawConfig(opts: GenerateConfigOptions): { config: o
     },
     gateway: {
       mode: 'local',
-      controlUi: {
-        dangerouslyAllowHostHeaderOriginFallback: true,
-        allowInsecureAuth: true,
-        dangerouslyDisableDeviceAuth: true,
-      },
       auth: {
         mode: 'token',
         token: gatewayToken,
