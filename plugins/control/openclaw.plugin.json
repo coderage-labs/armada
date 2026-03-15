@@ -1,0 +1,28 @@
+{
+  "id": "armada-control-plugin",
+  "kind": "tools",
+  "name": "Armada Control",
+  "description": "Armada control plugin \u2014 operator-level tools for managing the armada. Queries armada-control API dynamically for instance data.",
+  "version": "0.2.0",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "fleetApiUrl": {
+        "type": "string",
+        "description": "Armada control API URL (e.g. http://armada-control:3001)"
+      },
+      "fleetApiToken": {
+        "type": "string",
+        "description": "Armada control API Bearer token"
+      },
+      "callbackUrl": {
+        "type": "string",
+        "description": "Operator callback URL for results (e.g. http://172.22.0.7:18789)"
+      },
+      "hooksToken": {
+        "type": "string",
+        "description": "Shared org-level hooks token for instance auth"
+      }
+    }
+  }
+}

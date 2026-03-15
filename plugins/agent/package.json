@@ -1,0 +1,48 @@
+{
+  "name": "@coderage-labs/armada-agent",
+  "version": "0.1.0",
+  "description": "Fleet agent plugin for OpenClaw \u2014 managed team communication with ACL, status reporting, and maintenance support",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test dist/**/*.test.js"
+  },
+  "keywords": [
+    "openclaw",
+    "openclaw-plugin",
+    "fleet",
+    "agent",
+    "team-communication"
+  ],
+  "author": "Chris Kitch",
+  "license": "MIT",
+  "dependencies": {
+    "@coderage-labs/armada-plugin-shared": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.2"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/coderage-labs/armada.git",
+    "directory": "plugins/armada-agent"
+  },
+  "files": [
+    "dist/",
+    "openclaw.plugin.json",
+    "README.md",
+    "LICENSE",
+    "package.json"
+  ],
+  "openclaw": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  }
+}
