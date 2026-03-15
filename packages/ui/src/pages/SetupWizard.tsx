@@ -380,8 +380,8 @@ export default function SetupWizard({ onComplete }: Props) {
                 Secure Your Account
               </h2>
               <p style={{ color: '#94a3b8', fontSize: '13px', margin: 0 }}>
-                Register a passkey to sign in securely. Use your fingerprint,
-                face recognition, or a security key.
+                Register a passkey to sign in. You won't be able to access your
+                account without one.
               </p>
             </div>
 
@@ -390,13 +390,9 @@ export default function SetupWizard({ onComplete }: Props) {
               label="Setup passkey"
             />
 
-            <Button
-              variant="ghost" type="button"
-              onClick={() => setStep('url-check')}
-              style={skipBtnStyle}
-            >
-              Skip for now →
-            </Button>
+            <p style={{ color: '#475569', fontSize: '12px', textAlign: 'center', margin: 0 }}>
+              A passkey is required to continue.
+            </p>
           </>
         )}
 
