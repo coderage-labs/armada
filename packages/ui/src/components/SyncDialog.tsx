@@ -82,7 +82,7 @@ export default function SyncDialog({ templateName, agents, onClose, onSync }: Pr
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto" showClose={false}>
+      <DialogContent className="max-w-2xl sm:max-h-[80vh] sm:overflow-y-auto" showClose={false}>
         <DialogHeader>
           <DialogTitle>
             Sync &quot;{templateName}&quot; to {agents.length} agent{agents.length !== 1 ? 's' : ''}

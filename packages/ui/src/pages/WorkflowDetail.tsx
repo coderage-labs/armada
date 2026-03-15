@@ -179,7 +179,7 @@ function StepEditorDialog({
 
   return (
     <Dialog open onOpenChange={(isOpen) => !isOpen && onCancel()}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-lg sm:max-h-[90vh] sm:overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{step ? 'Edit Step' : 'Add Step'}</DialogTitle>
         </DialogHeader>
@@ -460,7 +460,7 @@ function RunNowDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-md rounded-lg border border-zinc-800 bg-zinc-900/95 p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto"
+        className="w-full max-w-md rounded-lg border border-zinc-800 bg-zinc-900/95 p-6 shadow-2xl space-y-4 sm:max-h-[90vh] sm:overflow-y-auto"
       >
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold text-zinc-200">Run "{workflowName}"</h3>

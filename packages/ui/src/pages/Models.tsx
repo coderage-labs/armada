@@ -600,7 +600,7 @@ export default function Models() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={showDialog} onOpenChange={(open) => !open && setShowDialog(false)}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-lg sm:max-h-[90vh] sm:overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editId ? 'Edit Model' : 'Add Model'}</DialogTitle>
           </DialogHeader>
