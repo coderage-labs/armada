@@ -1,15 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '../useApi';
 
-export interface DiscoveredNode {
-  id: string;
-  name: string;
-  ip: string;
-  port: number;
-  firstSeenAt: string;
-  lastSeenAt: string;
-}
-
 interface NodeData {
   id: string;
   hostname: string;
@@ -71,10 +62,4 @@ export function useDeleteNode() {
   });
 }
 
-export function useDiscoveredNodes() {
-  return useQuery({
-    queryKey: ['nodes', 'discovered'],
-    queryFn: () => apiFetch<DiscoveredNode[]>('/api/nodes/discovered'),
-    refetchInterval: 30_000, // re-poll every 30s to pick up new discoveries
-  });
-}
+

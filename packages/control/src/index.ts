@@ -13,7 +13,7 @@ import { registerAllProviders } from './services/integrations/index.js';
 import { startVersionChecker, stopVersionChecker } from './services/version-checker.js';
 import { startStuckDetector, stopStuckDetector } from './services/stuck-detector.js';
 import { pluginManager } from './services/plugin-manager.js';
-import { startMdnsScanner, stopMdnsScanner } from './infrastructure/mdns-scanner.js';
+
 
 const PORT = parseInt(process.env.PORT ?? '3001', 10);
 const HOST = process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1';
@@ -133,9 +133,6 @@ async function start() {
   // ── Telegram bot ───────────────────────────────────────────────────
   await initTelegramBot();
 
-  // ── mDNS scanner — auto-discover armada nodes on LAN ───────────────
-  startMdnsScanner();
-
   // Cleanup on shutdown
   const shutdown = async () => {
     stopHealthMonitor();
@@ -143,7 +140,6 @@ async function start() {
     stopStuckDetector();
     stopVersionChecker();
     stopGithubSyncScheduler();
-    stopMdnsScanner();
     await stopTelegramBot();
     process.exit(0);
   };

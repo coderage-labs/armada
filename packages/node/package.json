@@ -12,9 +12,7 @@
   },
   "dependencies": {
     "@coderage-labs/armada-shared": "*",
-    "@types/multicast-dns": "^7.2.4",
     "dockerode": "^4.0.5",
-    "multicast-dns": "^7.2.5",
     "ws": "^8.19.0"
   },
   "devDependencies": {

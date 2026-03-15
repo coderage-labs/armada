@@ -127,7 +127,7 @@ The mesh plugin's core communication patterns were hard-won and work well. We ke
 
 ### What We Drop
 
-- **mDNS discovery** — armada-control knows where everything is, contact list has addresses
+- **mDNS discovery** — removed; nodes register by connecting to the control plane via WebSocket
 - **Peer-to-peer topology** — hierarchy is explicit, not emergent
 - **A2A agent cards** — replaced by Armada plugin's HTTP endpoints
 - **Health monitor with peer probing** — replaced by armada-control polling `/armada/health`

@@ -17,17 +17,6 @@ import { docker } from './docker/client.js';
 import { StatsCollector } from './stats.js';
 import { ensureCredentialHelper } from './credential-helper.js';
 import { startStatsStreamer } from './services/stats-streamer.js';
-// Dynamic import — multicast-dns may not be installed in all environments
-let startMdnsAdvertiser: () => void = () => {};
-let stopMdnsAdvertiser: () => void = () => {};
-try {
-  const mdnsMod = await import('./mdns.js');
-  startMdnsAdvertiser = mdnsMod.startMdnsAdvertiser;
-  stopMdnsAdvertiser = mdnsMod.stopMdnsAdvertiser;
-} catch {
-  console.log('[node] mDNS not available — skipping discovery advertisement');
-}
-
 // ── Deploy credential helper on startup ─────────────────────────────
 try {
   ensureCredentialHelper();
@@ -43,17 +32,10 @@ stats.start();
 console.log('🐳 Armada Node Agent starting (WS-only mode)');
 console.log(`   Stats collector: active (30s interval)`);
 
-// ── mDNS service advertisement ───────────────────────────────────────
-// Advertise this node so armada control planes on the same LAN can discover it.
-// Non-fatal: if mDNS fails (e.g. no multicast support) the agent still works.
-
-startMdnsAdvertiser();
-
 // ── Graceful shutdown ────────────────────────────────────────────────
 
 function shutdown(signal: string): void {
   console.log(`\n[armada-node] Received ${signal} — shutting down`);
-  stopMdnsAdvertiser();
   process.exit(0);
 }
 

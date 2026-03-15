@@ -978,13 +978,16 @@ function AddAgentDialog({
         }),
       });
       try {
-        const tokenData = await apiFetch<{ token: string }>(`/api/users/${user.id}/tokens`, {
+        const tokenData = await apiFetch<{ token: string }>('/api/auth/tokens', {
           method: 'POST',
-          body: JSON.stringify({ label: `${name.trim()} API token` }),
+          body: JSON.stringify({ userId: user.id, label: `${name.trim()} API token` }),
         });
         setCreatedToken(tokenData.token);
       } catch {
-        // Token generation endpoint may not be available yet
+        // Token generation failed — close dialog since there's nothing more to show
+        onCreated();
+        onClose();
+        return;
       }
       onCreated();
     } catch (err: any) {

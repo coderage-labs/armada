@@ -2,9 +2,8 @@ import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../hooks/useApi';
 import { useAuth } from '../hooks/useAuth';
-import { useNodes, useDiscoveredNodes } from '../hooks/queries/useNodes';
-import type { DiscoveredNode } from '../hooks/queries/useNodes';
-import { CheckCircle2, XCircle, Monitor, Cpu, HardDrive, MemoryStick, Box, Loader2, Pencil, Zap, Trash2, Radar, Plus } from 'lucide-react';
+import { useNodes } from '../hooks/queries/useNodes';
+import { CheckCircle2, XCircle, Monitor, Cpu, HardDrive, MemoryStick, Box, Loader2, Pencil, Zap, Trash2, Plus } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import ConfirmDialog from '../components/ConfirmDialog';
 import NodeDialog from '../components/NodeDialog';
@@ -231,60 +230,6 @@ function NodeCard({
   );
 }
 
-/* ── Discovered Node Card ──────────────────────────── */
-
-function DiscoveredNodeCard({
-  node,
-  onAdd,
-}: {
-  node: DiscoveredNode;
-  onAdd: (node: DiscoveredNode) => void;
-}) {
-  return (
-    <BaseCard
-      accentColor="bg-amber-500"
-      footer={
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onAdd(node)}
-          className="flex-1 text-xs h-8 gap-1.5 border-amber-500/30 text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 hover:border-amber-500/50"
-        >
-          <Plus className="w-3 h-3" /> Add to Armada
-        </Button>
-      }
-    >
-      <div className="p-5">
-        <div className="flex items-start justify-between mb-3">
-          <div>
-            <h3 className="text-base font-semibold text-zinc-100">{node.name}</h3>
-            <span className="inline-flex items-center gap-1.5 text-[11px] text-amber-400 mt-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-              Discovered via mDNS
-            </span>
-          </div>
-          <Radar className="w-5 h-5 text-amber-500/60 mt-0.5" />
-        </div>
-
-        <div className="space-y-1.5 text-xs">
-          <div className="flex justify-between">
-            <span className="text-zinc-500">IP Address</span>
-            <span className="text-zinc-300 font-mono">{node.ip}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-zinc-500">Port</span>
-            <span className="text-zinc-300 tabular-nums">{node.port}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-zinc-500">First seen</span>
-            <span className="text-zinc-400">{new Date(node.firstSeenAt).toLocaleTimeString()}</span>
-          </div>
-        </div>
-      </div>
-    </BaseCard>
-  );
-}
-
 /* ── Page Component ────────────────────────────────── */
 
 export default function Nodes() {
@@ -292,10 +237,9 @@ export default function Nodes() {
   const { hasScope } = useAuth();
   const canMutate = hasScope('nodes:write');
   const { data: nodes = [], isLoading: loading, refetch: fetchNodes } = useNodes();
-  const { data: discoveredNodes = [] } = useDiscoveredNodes();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editNode, setEditNode] = useState<NodeData | null>(null);
-  const [prefillHostname, setPrefillHostname] = useState<string | undefined>();
+
   const [confirmRemove, setConfirmRemove] = useState<NodeData | null>(null);
   const [removeImpact, setRemoveImpact] = useState<{
     instances: Array<{ id: string; name: string; status: string }>;
@@ -348,13 +292,6 @@ export default function Nodes() {
 
   function handleAdd() {
     setEditNode(null);
-    setPrefillHostname(undefined);
-    setDialogOpen(true);
-  }
-
-  function handleAddDiscovered(discovered: DiscoveredNode) {
-    setEditNode(null);
-    setPrefillHostname(discovered.name);
     setDialogOpen(true);
   }
 
@@ -417,33 +354,10 @@ export default function Nodes() {
         </CardGrid>
       )}
 
-      {/* ── Discovered Nodes (mDNS) ──────────────────────────────────── */}
-      {discoveredNodes.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Radar className="w-4 h-4 text-amber-500" />
-            <h2 className="text-sm font-medium text-zinc-300">Discovered on LAN</h2>
-            <span className="text-xs text-zinc-500 ml-1">
-              — found via mDNS, not yet added to armada
-            </span>
-          </div>
-          <CardGrid>
-            {discoveredNodes.map((node) => (
-              <DiscoveredNodeCard
-                key={node.id}
-                node={node}
-                onAdd={handleAddDiscovered}
-              />
-            ))}
-          </CardGrid>
-        </div>
-      )}
-
       <NodeDialog
         open={dialogOpen}
         node={editNode}
-        prefillHostname={prefillHostname}
-        onClose={() => { setDialogOpen(false); setPrefillHostname(undefined); }}
+        onClose={() => setDialogOpen(false)}
         onSaved={fetchNodes}
         onCreated={handleNodeCreated}
       />

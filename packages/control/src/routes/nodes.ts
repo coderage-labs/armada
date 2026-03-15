@@ -9,7 +9,7 @@ import { WsNodeClient } from '../infrastructure/ws-node-client.js';
 import type { ArmadaNodeEnriched } from '@coderage-labs/armada-shared';
 import { nodeConnectionManager } from '../ws/node-connections.js';
 import { nodeRemovalService } from '../services/node-removal.js';
-import { getDiscoveredNodes } from '../infrastructure/mdns-scanner.js';
+
 
 registerToolDef({
   name: 'armada_nodes',
@@ -227,13 +227,6 @@ export function createNodeRoutes(nodeManager: NodeManager): Router {
       liveStats,
     };
   }
-
-  // GET /api/nodes/discovered — list mDNS-discovered nodes (not yet registered)
-  // Must be registered before /:id to avoid route shadowing.
-  router.get('/discovered', (_req, res) => {
-    const nodes = getDiscoveredNodes();
-    res.json(nodes);
-  });
 
   // GET /api/nodes — list all nodes with live health
   router.get('/', async (_req, res, next) => {

@@ -73,7 +73,6 @@ export const EVENT_NAMES = {
   NODE_DISCONNECTED:            'node.disconnected',
   NODE_STALE:                   'node.stale',
   NODE_STATS:                   'node.stats',
-  NODE_DISCOVERED:              'node.discovered',
 
   // ── Activity ───────────────────────────────────────────────────────
   ACTIVITY_CREATED:             'activity.created',

@@ -33,9 +33,11 @@ const router = Router();
 // POST /api/auth/tokens — create a new API token (owner only)
 router.post('/tokens', requireScope('users:write'), (req, res) => {
   const caller = req.caller!;
-  const { agentName, label, scopes, expiresIn } = req.body;
+  const { userId, agentName, label, scopes, expiresIn } = req.body;
 
-  const result = createApiToken({ userId: caller.id, agentName, label, scopes, expiresIn });
+  // Owners can create tokens for other users; otherwise scope to self
+  const targetUserId = (caller.role === 'owner' && userId) ? userId : caller.id;
+  const result = createApiToken({ userId: targetUserId, agentName, label, scopes, expiresIn });
 
   logAudit(req, 'token.create', 'auth_token', result.id, { agentName, label });
   res.status(201).json(result);
