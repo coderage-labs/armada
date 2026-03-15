@@ -298,7 +298,6 @@ export function generateInstanceConfig(instanceId: string): GeneratedConfig {
       'armada-agent': {
         config: {
           instanceName: instance?.name ?? instanceId,
-          armadaApiUrl: controlPlaneUrl,
           armadaApiToken,
           // Route plugin→control comms through the node agent gateway proxy.
           // Instances on remote nodes can't reach the control plane directly,

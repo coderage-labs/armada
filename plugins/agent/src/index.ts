@@ -52,20 +52,21 @@ interface ArmadaConfig {
   progressTimeoutMs?: number;
   pingWatchdogMs?: number;
   hardTimeoutMs?: number;
+  /** @deprecated Instances must ONLY communicate via proxyUrl (node agent relay). Direct control plane access is not supported. */
   armadaApiUrl?: string;
   armadaApiToken?: string;
-  /** Node agent proxy URL — preferred over armadaApiUrl for remote node deployments */
+  /** Node agent proxy URL — ALL control plane communication MUST go through this relay */
   proxyUrl?: string;
   projects?: string[];
 }
 
 /**
  * Get the base URL for armada API calls.
- * Prefers proxyUrl (node agent gateway proxy) over armadaApiUrl (direct control plane).
- * This allows remote node deployments where the control plane isn't directly reachable.
+ * MUST use proxyUrl (node agent gateway proxy) — direct control plane access is not supported.
+ * All instance→control communication is routed through the node agent relay.
  */
 function getApiBaseUrl(): string {
-  return _config?.proxyUrl || _config?.armadaApiUrl || '';
+  return _config?.proxyUrl || '';
 }
 
 // ── Usage reporting to control plane ────────────────────────────────
@@ -316,9 +317,8 @@ interface ArmadaToolDef {
 
 /**
  * Build Authorization headers for tool-related API calls.
- * When routing via the node agent relay (proxyUrl), the proxy handles control-plane
- * auth — the agent authenticates with the proxy using hooksToken.
- * When calling the control plane directly (armadaApiUrl only), armadaApiToken is used.
+ * All communication is routed via the node agent relay (proxyUrl).
+ * The proxy handles control-plane auth; instances authenticate using armadaApiToken.
  */
 function getToolAuthHeaders(): Record<string, string> {
   if (!_config) return {};
@@ -327,9 +327,8 @@ function getToolAuthHeaders(): Record<string, string> {
 }
 
 async function loadarmadaTools(api: any) {
-  // Require a base URL; armadaApiToken is optional when routing via proxyUrl (relay handles auth)
+  // Require proxyUrl — all control plane communication must go through the node agent relay
   if (!_config || !getApiBaseUrl()) return;
-  if (!_config.proxyUrl && !_config.armadaApiToken) return; // direct: token required
 
   try {
     const resp = await fetch(`${getApiBaseUrl()}/api/meta/tools`, {
@@ -376,12 +375,9 @@ async function loadarmadaTools(api: any) {
 }
 
 async function executearmadaTool(def: ArmadaToolDef, args: Record<string, any>): Promise<any> {
-  // Require a base URL; armadaApiToken is optional when routing via proxyUrl (relay handles auth)
+  // Require proxyUrl — all control plane communication must go through the node agent relay
   if (!_config || !getApiBaseUrl()) {
-    return { error: 'Armada API not configured' };
-  }
-  if (!_config.proxyUrl && !_config.armadaApiToken) {
-    return { error: 'Armada API authentication not configured (set armadaApiToken or proxyUrl)' };
+    return { error: 'Armada proxy not configured — instances must communicate via node agent relay (proxyUrl)' };
   }
 
   // Resolve path params
@@ -826,11 +822,9 @@ export default function register(api: any) {
   // These are proxy tools (issue tracker, etc.) that agents use
   // without seeing credentials.
   //
-  // Routing: when proxyUrl is configured (node agent relay), all calls go through
-  // the relay — armadaApiToken is not required (proxy handles control-plane auth).
-  // For direct deployments (armadaApiUrl only), armadaApiToken is required.
+  // All calls are routed through the node agent relay (proxyUrl).
 
-  if (getApiBaseUrl() && (_config.proxyUrl || _config.armadaApiToken)) {
+  if (getApiBaseUrl()) {
     loadarmadaTools(api).catch(err => {
       _logger.warn(`[armada-agent] Failed to load armada tools: ${err.message}`);
     });
