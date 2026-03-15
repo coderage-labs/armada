@@ -84,8 +84,15 @@ export function resolveFileWrites(mutations: any[], instanceId: string): Array<{
  */
 export function buildStepsForInstance(instanceId: string, configVersion: number): StepDAG {
   const instance = instancesRepo.getById(instanceId);
+  // For new instances not yet committed, resolve name from pending create mutation
+  const instanceName = instance?.name ?? (() => {
+    const createMut = pendingMutationRepo.getAll().find(
+      m => m.entityType === 'instance' && m.entityId === instanceId && m.action === 'create'
+    );
+    return createMut?.payload?.name ?? undefined;
+  })();
   const nodeId = instance?.nodeId ?? undefined;
-  const containerName = instance ? `armada-instance-${instance.name}` : undefined;
+  const containerName = instanceName ? `armada-instance-${instanceName}` : undefined;
 
   // Get all pending mutations relevant to this instance:
   // 1. Agent-level mutations for agents on this instance
@@ -229,11 +236,11 @@ export function buildStepsForInstance(instanceId: string, configVersion: number)
           templateId,
           env: [
             `OPENCLAW_INSTANCE_ID=${instanceId}`,
-            `OPENCLAW_INSTANCE_NAME=${instance?.name ?? ''}`,
+            `OPENCLAW_INSTANCE_NAME=${instanceName ?? ''}`,
           ],
           volumes: {
-            data: `/data/armada/instances/${instance?.name ?? instanceId}`,
-            plugins: `/data/armada/instances/${instance?.name ?? instanceId}/plugins`,
+            data: `/data/armada/instances/${instanceName ?? instanceId}`,
+            plugins: `/data/armada/instances/${instanceName ?? instanceId}/plugins`,
           },
           resources: {
             memory: instance?.memory || '2g',
@@ -242,7 +249,7 @@ export function buildStepsForInstance(instanceId: string, configVersion: number)
           network: 'armada-net',
           labels: {
             'armada.instance': instanceId,
-            'armada.instance.name': instance?.name ?? '',
+            'armada.instance.name': instanceName ?? '',
           },
         },
       },

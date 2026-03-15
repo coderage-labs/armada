@@ -167,6 +167,12 @@ export function createChangesetService(): ChangesetService {
       const inst = instancesRepo.getById(m.entityId!);
       if (inst && !instanceMap.has(inst.id)) {
         instanceMap.set(inst.id, { instanceId: inst.id, instanceName: inst.name });
+      } else if (!inst && m.action === 'create' && m.payload) {
+        // New instance not yet committed — use data from the mutation payload
+        const id = m.entityId!;
+        if (!instanceMap.has(id)) {
+          instanceMap.set(id, { instanceId: id, instanceName: m.payload.name || id });
+        }
       }
     }
 
@@ -177,6 +183,14 @@ export function createChangesetService(): ChangesetService {
         const inst = instancesRepo.getById(instanceId);
         if (inst && !instanceMap.has(inst.id)) {
           instanceMap.set(inst.id, { instanceId: inst.id, instanceName: inst.name });
+        } else if (!inst && !instanceMap.has(instanceId)) {
+          // Instance may be a pending create — check if there's a mutation for it
+          const instMutation = allMutations.find(
+            im => im.entityType === 'instance' && im.entityId === instanceId && im.action === 'create'
+          );
+          if (instMutation) {
+            instanceMap.set(instanceId, { instanceId, instanceName: instMutation.payload?.name || instanceId });
+          }
         }
       }
     }
