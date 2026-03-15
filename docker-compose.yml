@@ -1,4 +1,3 @@
-version: '3.8'
 
 services:
   control:
@@ -19,6 +18,8 @@ services:
       - ARMADA_DEFAULT_NODE_TOKEN=${ARMADA_NODE_TOKEN:-}
       - ARMADA_DB_PATH=/data/armada.db
       - ARMADA_PLUGINS_PATH=/data/plugins
+      - ARMADA_RP_ID=${ARMADA_RP_ID:-localhost}
+      - ARMADA_ORIGIN=${ARMADA_ORIGIN:-http://localhost:3001}
     volumes:
       - armada-data:/data
       - armada-plugins:/data/plugins

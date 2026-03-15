@@ -255,6 +255,20 @@ router.get('/passkeys', (req, res) => {
   res.json(passkeyRepo.listByUser(caller.id));
 });
 
+// PATCH /api/auth/passkeys/:id — rename own passkey
+router.patch('/passkeys/:id', (req, res) => {
+  const caller = req.caller;
+  if (!caller) { res.status(401).json({ error: 'Auth required' }); return; }
+  const { label } = req.body as { label?: string };
+  if (!label || typeof label !== 'string' || !label.trim()) {
+    res.status(400).json({ error: 'Label is required' }); return;
+  }
+  const changes = passkeyRepo.renameByIdAndUser(req.params.id, caller.id, label.trim());
+  if (changes === 0) { res.status(404).json({ error: 'Passkey not found' }); return; }
+  logAudit(req, 'passkey.rename', 'passkey', req.params.id, { label: label.trim() });
+  res.json({ ok: true });
+});
+
 // DELETE /api/auth/passkeys/:id — remove own passkey
 router.delete('/passkeys/:id', (req, res) => {
   const caller = req.caller;

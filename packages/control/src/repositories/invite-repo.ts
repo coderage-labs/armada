@@ -59,7 +59,7 @@ export const inviteRepo = {
   markUsed(id: string, userId: string) {
     getDrizzle()
       .update(invites)
-      .set({ usedAt: sql`datetime('now')`, usedBy: userId })
+      .set({ usedAt: sql`strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`, usedBy: userId })
       .where(eq(invites.id, id))
       .run();
   },

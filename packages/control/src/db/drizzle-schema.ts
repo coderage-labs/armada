@@ -48,7 +48,7 @@ export const templates = sqliteTable('templates', {
   soul: text('soul'),
   agentsMd: text('agents_md'),
   envJson: text('env_json').notNull().default('[]'),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
   pluginsListJson: text('plugins_list_json').notNull().default('[]'),
   toolsAllowJson: text('tools_allow_json').notNull().default('[]'),
   toolsProfile: text('tools_profile').notNull().default(''),
@@ -70,8 +70,8 @@ export const instances = sqliteTable('instances', {
   statusMessage: text('status_message'),
   capacity: integer('capacity').notNull().default(5),
   config: text('config').default('{}'),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
-  updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+  updatedAt: text('updated_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
   memory: text('memory').default('2g'),
   cpus: text('cpus').default('1'),
   version: text('version'),
@@ -93,7 +93,7 @@ export const agents = sqliteTable('agents', {
   role: text('role'),
   skills: text('skills'),
   model: text('model'),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
   lastHeartbeat: text('last_heartbeat'),
   healthStatus: text('health_status').notNull().default('unknown'),
   heartbeatMetaJson: text('heartbeat_meta_json'),
@@ -109,7 +109,7 @@ export const plugins = sqliteTable('plugins', {
   name: text('name').notNull(),
   version: text('version').notNull(),
   path: text('path').notNull(),
-  updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
+  updatedAt: text('updated_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 });
 
 // ── tasks ────────────────────────────────────────────────────────────
@@ -120,7 +120,7 @@ export const tasks = sqliteTable('tasks', {
   taskText: text('task_text').notNull(),
   result: text('result'),
   status: text('status').notNull().default('pending'),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
   completedAt: text('completed_at'),
   blockedReason: text('blocked_reason'),
   blockedAt: text('blocked_at'),
@@ -142,7 +142,7 @@ export const deploys = sqliteTable('deploys', {
   target: text('target'),
   status: text('status').notNull().default('pending'),
   log: text('log'),
-  startedAt: text('started_at').notNull().default(sql`(datetime('now'))`),
+  startedAt: text('started_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
   completedAt: text('completed_at'),
 });
 
@@ -150,7 +150,7 @@ export const deploys = sqliteTable('deploys', {
 export const settings = sqliteTable('settings', {
   key: text('key').primaryKey(),
   value: text('value').notNull(),
-  updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
+  updatedAt: text('updated_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 });
 
 // ── role_metadata ────────────────────────────────────────────────────
@@ -170,7 +170,7 @@ export const activity = sqliteTable('activity', {
   agentName: text('agent_name'),
   detail: text('detail'),
   metadata: text('metadata'),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 });
 
 // ── task_comments ────────────────────────────────────────────────────
@@ -179,7 +179,7 @@ export const taskComments = sqliteTable('task_comments', {
   taskId: text('task_id').notNull().references(() => tasks.id, { onDelete: 'cascade' }),
   author: text('author').notNull(),
   content: text('content').notNull(),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 });
 
 // ── projects ─────────────────────────────────────────────────────────
@@ -193,7 +193,7 @@ export const projects = sqliteTable('projects', {
   archived: integer('archived').notNull().default(0),
   configJson: text('config_json').notNull().default('{}'),
   maxConcurrent: integer('max_concurrent').notNull().default(3),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 });
 
 // ── webhooks ─────────────────────────────────────────────────────────
@@ -203,7 +203,7 @@ export const webhooks = sqliteTable('webhooks', {
   events: text('events').notNull().default('*'),
   secret: text('secret'),
   enabled: integer('enabled').notNull().default(1),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 });
 
 // ── webhook_deliveries ────────────────────────────────────────────────
@@ -218,7 +218,7 @@ export const webhookDeliveries = sqliteTable('webhook_deliveries', {
   attempt: integer('attempt').default(1),
   error: text('error'),
   latencyMs: integer('latency_ms'),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
   completedAt: text('completed_at'),
 });
 
@@ -233,7 +233,7 @@ export const webhooksInbound = sqliteTable('webhooks_inbound', {
   enabled: integer('enabled').notNull().default(1),
   lastDeliveryAt: text('last_delivery_at'),
   deliveryCount: integer('delivery_count').notNull().default(0),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 });
 
 // ── skill_library ────────────────────────────────────────────────────
@@ -245,7 +245,7 @@ export const skillLibrary = sqliteTable('skill_library', {
   version: text('version'),
   description: text('description').default(''),
   installedVersion: text('installed_version'),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 });
 
 // ── plugin_library ───────────────────────────────────────────────────
@@ -256,7 +256,7 @@ export const pluginLibrary = sqliteTable('plugin_library', {
   url: text('url'),
   version: text('version'),
   description: text('description').notNull().default(''),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
   system: integer('system').notNull().default(0),
   npmPkg: text('npm_pkg'),
 });
@@ -268,7 +268,7 @@ export const workflows = sqliteTable('workflows', {
   description: text('description').notNull().default(''),
   stepsJson: text('steps_json').notNull().default('[]'),
   enabled: integer('enabled').notNull().default(1),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 });
 
 // ── workflow_projects ────────────────────────────────────────────────
@@ -289,7 +289,7 @@ export const workflowRuns = sqliteTable('workflow_runs', {
   status: text('status').notNull().default('running'),
   currentStep: text('current_step'),
   contextJson: text('context_json').notNull().default('{}'),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
   completedAt: text('completed_at'),
 });
 
@@ -323,7 +323,7 @@ export const users = sqliteTable('users', {
   passwordHash: text('password_hash'),
   linkedAccountsJson: text('linked_accounts_json').notNull().default('{}'),
   notificationsJson: text('notifications_json').notNull().default('{}'),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
   avatarGenerating: integer('avatar_generating').notNull().default(0),
   avatarVersion: integer('avatar_version').notNull().default(0),
 });
@@ -333,7 +333,7 @@ export const userProjects = sqliteTable('user_projects', {
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
   role: text('role').notNull().default('member'),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 }, (table) => [
   primaryKey({ columns: [table.userId, table.projectId] }),
 ]);
@@ -348,8 +348,8 @@ export const integrations = sqliteTable('integrations', {
   capabilities: text('capabilities').notNull().default('[]'),
   status: text('status').default('active'),
   statusMessage: text('status_message'),
-  createdAt: text('created_at').default(sql`(datetime('now'))`),
-  updatedAt: text('updated_at').default(sql`(datetime('now'))`),
+  createdAt: text('created_at').default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+  updatedAt: text('updated_at').default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 });
 
 // ── project_integrations ─────────────────────────────────────────────
@@ -362,7 +362,7 @@ export const projectIntegrations = sqliteTable('project_integrations', {
   enabled: integer('enabled').default(1),
   syncCursor: text('sync_cursor'),
   lastSyncedAt: text('last_synced_at'),
-  createdAt: text('created_at').default(sql`(datetime('now'))`),
+  createdAt: text('created_at').default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 }, (table) => [
   unique().on(table.projectId, table.integrationId, table.capability),
 ]);
@@ -407,9 +407,9 @@ export const externalIssues = sqliteTable('external_issues', {
   labels: text('labels').default('[]'),
   url: text('url'),
   rawData: text('raw_data'),
-  createdAt: text('created_at').default(sql`(datetime('now'))`),
-  updatedAt: text('updated_at').default(sql`(datetime('now'))`),
-  syncedAt: text('synced_at').default(sql`(datetime('now'))`),
+  createdAt: text('created_at').default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+  updatedAt: text('updated_at').default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+  syncedAt: text('synced_at').default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 }, (table) => [
   unique().on(table.projectIntegrationId, table.externalId),
 ]);
@@ -424,7 +424,7 @@ export const authTokens = sqliteTable('auth_tokens', {
   scopes: text('scopes').notNull().default('[]'),
   expiresAt: text('expires_at'),
   lastUsedAt: text('last_used_at'),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 });
 
 // ── sessions ─────────────────────────────────────────────────────────
@@ -433,13 +433,13 @@ export const sessions = sqliteTable('sessions', {
   userId: text('user_id').notNull().references(() => users.id),
   tokenHash: text('token_hash').notNull().unique(),
   expiresAt: text('expires_at').notNull(),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 });
 
 // ── audit_log ────────────────────────────────────────────────────────
 export const auditLog = sqliteTable('audit_log', {
   id: text('id').primaryKey(),
-  timestamp: text('timestamp').notNull().default(sql`(datetime('now'))`),
+  timestamp: text('timestamp').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
   callerId: text('caller_id'),
   callerName: text('caller_name'),
   callerType: text('caller_type').notNull().default('system'),
@@ -459,7 +459,7 @@ export const passkeys = sqliteTable('passkeys', {
   counter: integer('counter').notNull().default(0),
   transports: text('transports'),
   label: text('label').notNull().default('Passkey'),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 });
 
 // ── auth_challenges ──────────────────────────────────────────────────
@@ -469,7 +469,7 @@ export const authChallenges = sqliteTable('auth_challenges', {
   userId: text('user_id'),
   type: text('type').notNull(),
   expiresAt: text('expires_at').notNull(),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 });
 
 // ── operations ───────────────────────────────────────────────────────
@@ -506,7 +506,7 @@ export const modelProviders = sqliteTable('model_providers', {
   fallbackBehavior: text('fallback_behavior').notNull().default('immediate'),
   lastSyncAt: text('last_sync_at'),
   modelCount: integer('model_count').notNull().default(0),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 });
 
 // ── provider_api_keys ────────────────────────────────────────────────
@@ -517,7 +517,7 @@ export const providerApiKeys = sqliteTable('provider_api_keys', {
   apiKey: text('api_key').notNull(),
   isDefault: integer('is_default').notNull().default(0),
   priority: integer('priority').notNull().default(0),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 });
 
 // ── model_registry ───────────────────────────────────────────────────
@@ -533,7 +533,7 @@ export const modelRegistry = sqliteTable('model_registry', {
   costTier: text('cost_tier').default('standard'),
   providerId: text('provider_id'),
   source: text('source').default('manual'),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 });
 
 // ── deleted_agents ────────────────────────────────────────────────────
@@ -542,7 +542,7 @@ export const deletedAgents = sqliteTable('deleted_agents', {
   name: text('name').notNull(),
   nodeId: text('node_id').notNull(),
   instanceId: text('instance_id').notNull(),
-  deletedAt: text('deleted_at').notNull().default(sql`(datetime('now'))`),
+  deletedAt: text('deleted_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
   workspaceDeleted: integer('workspace_deleted').notNull().default(0),
 });
 
@@ -556,7 +556,7 @@ export const invites = sqliteTable('invites', {
   expiresAt: text('expires_at').notNull(),
   usedAt: text('used_at'),
   usedBy: text('used_by'),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 });
 
 // ── operation_locks ──────────────────────────────────────────────────
@@ -577,7 +577,7 @@ export const changesets = sqliteTable('changesets', {
   planJson: text('plan_json').notNull().default('{}'),
   rollbackJson: text('rollback_json'),
   createdBy: text('created_by'),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
   approvedBy: text('approved_by'),
   approvedAt: text('approved_at'),
   appliedAt: text('applied_at'),
@@ -609,7 +609,7 @@ export const apiUsageLog = sqliteTable('api_usage_log', {
   totalTokens: integer('total_tokens').default(0),
   costUsd: real('cost_usd').default(0),
   sessionKey: text('session_key'),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 });
 
 // ── pending_mutations ────────────────────────────────────────────────
@@ -621,7 +621,7 @@ export const pendingMutations = sqliteTable('pending_mutations', {
   action: text('action').notNull(), // 'create' | 'update' | 'delete'
   payloadJson: text('payload_json').notNull().default('{}'),
   instanceId: text('instance_id'),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 });
 
 // ── notification_channels (#512) ────────────────────────────────────
@@ -631,6 +631,6 @@ export const notificationChannels = sqliteTable('notification_channels', {
   name: text('name').notNull(),
   enabled: integer('enabled').notNull().default(1),
   config: text('config').notNull().default('{}'), // JSON blob: channel-specific config
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
-  updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+  updatedAt: text('updated_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 });

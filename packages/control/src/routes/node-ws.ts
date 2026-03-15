@@ -104,7 +104,7 @@ async function authenticateNode(token: string, fingerprint: string): Promise<Aut
 function setNodeStatus(nodeId: string, status: 'online' | 'offline'): void {
   const db = getDb();
   db.prepare(
-    "UPDATE nodes SET status = ?, last_seen = datetime('now') WHERE id = ?",
+    "UPDATE nodes SET status = ?, last_seen = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?",
   ).run(status, nodeId);
 }
 

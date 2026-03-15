@@ -20,7 +20,7 @@ export const challengeRepo = {
       .where(and(
         eq(authChallenges.userId, userId),
         eq(authChallenges.type, type),
-        sql`${authChallenges.expiresAt} > datetime('now')`,
+        sql`${authChallenges.expiresAt} > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`,
       ))
       .orderBy(desc(authChallenges.createdAt))
       .limit(1)
@@ -33,7 +33,7 @@ export const challengeRepo = {
       .from(authChallenges)
       .where(and(
         eq(authChallenges.type, type),
-        sql`${authChallenges.expiresAt} > datetime('now')`,
+        sql`${authChallenges.expiresAt} > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`,
       ))
       .orderBy(desc(authChallenges.createdAt))
       .limit(1)
@@ -47,7 +47,7 @@ export const challengeRepo = {
   deleteExpired() {
     getDrizzle()
       .delete(authChallenges)
-      .where(sql`${authChallenges.expiresAt} < datetime('now')`)
+      .where(sql`${authChallenges.expiresAt} < strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`)
       .run();
   },
 };

@@ -57,6 +57,14 @@ export const passkeyRepo = {
     return row?.count ?? 0;
   },
 
+  renameByIdAndUser(id: string, userId: string, label: string): number {
+    return getDrizzle()
+      .update(passkeys)
+      .set({ label })
+      .where(and(eq(passkeys.id, id), eq(passkeys.userId, userId)))
+      .run().changes;
+  },
+
   deleteByIdAndUser(id: string, userId: string): number {
     return getDrizzle()
       .delete(passkeys)

@@ -99,7 +99,7 @@ export const notificationChannelRepo = {
     if (!existing) return null;
 
     const patch: Partial<ChannelRow> = {
-      updatedAt: sql`datetime('now')` as unknown as string,
+      updatedAt: sql`strftime('%Y-%m-%dT%H:%M:%fZ', 'now')` as unknown as string,
     };
     if (data.type !== undefined) patch.type = data.type;
     if (data.name !== undefined) patch.name = data.name;

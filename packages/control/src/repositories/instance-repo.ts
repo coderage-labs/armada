@@ -176,7 +176,7 @@ export const instancesRepo = {
     if (data.targetVersion !== undefined) updateData.targetVersion = data.targetVersion;
 
     if (Object.keys(updateData).length > 0) {
-      updateData.updatedAt = sql`(datetime('now'))`;
+      updateData.updatedAt = sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`;
       getDrizzle().update(instances).set(updateData).where(eq(instances.id, id)).run();
     }
 
@@ -198,7 +198,7 @@ export const instancesRepo = {
     getDrizzle().update(instances).set({
       status,
       statusMessage: message ?? null,
-      updatedAt: sql`(datetime('now'))`,
+      updatedAt: sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`,
     }).where(eq(instances.id, id)).run();
     return instancesRepo.getById(id);
   },

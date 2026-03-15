@@ -53,7 +53,7 @@ export function createTables(db: Database.Database): void {
       projects_json         TEXT NOT NULL DEFAULT '[]',
       internal_agents_json  TEXT NOT NULL DEFAULT '[]',
       contacts_json         TEXT NOT NULL DEFAULT '[]',
-      created_at            TEXT NOT NULL DEFAULT (datetime('now'))
+      created_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
     );
 
     CREATE TABLE IF NOT EXISTS instances (
@@ -72,8 +72,8 @@ export function createTables(db: Database.Database): void {
       target_version          TEXT DEFAULT NULL,
       applied_config_version  INTEGER DEFAULT 0,
       drain_mode              INTEGER DEFAULT 0,
-      created_at              TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at              TEXT NOT NULL DEFAULT (datetime('now'))
+      created_at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      updated_at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
     );
     CREATE INDEX IF NOT EXISTS idx_instances_node_id ON instances(node_id);
     CREATE INDEX IF NOT EXISTS idx_instances_status  ON instances(status);
@@ -96,7 +96,7 @@ export function createTables(db: Database.Database): void {
       avatar_generating     INTEGER NOT NULL DEFAULT 0,
       soul                  TEXT,
       agents_md             TEXT,
-      created_at            TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
       FOREIGN KEY (node_id)      REFERENCES nodes(id),
       FOREIGN KEY (template_id)  REFERENCES templates(id)
     );
@@ -106,7 +106,7 @@ export function createTables(db: Database.Database): void {
       name       TEXT NOT NULL,
       version    TEXT NOT NULL,
       path       TEXT NOT NULL,
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
     );
 
     CREATE TABLE IF NOT EXISTS tasks (
@@ -125,7 +125,7 @@ export function createTables(db: Database.Database): void {
       board_column         TEXT DEFAULT NULL,
       workflow_run_id      TEXT DEFAULT NULL,
       last_progress_at     TEXT DEFAULT NULL,
-      created_at           TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
       completed_at         TEXT
     );
 
@@ -135,14 +135,14 @@ export function createTables(db: Database.Database): void {
       target       TEXT,
       status       TEXT NOT NULL DEFAULT 'pending',
       log          TEXT,
-      started_at   TEXT NOT NULL DEFAULT (datetime('now')),
+      started_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
       completed_at TEXT
     );
 
     CREATE TABLE IF NOT EXISTS settings (
       key        TEXT PRIMARY KEY,
       value      TEXT NOT NULL,
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
     );
 
     CREATE TABLE IF NOT EXISTS role_metadata (
@@ -160,7 +160,7 @@ export function createTables(db: Database.Database): void {
       agent_name TEXT,
       detail     TEXT,
       metadata   TEXT,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
     );
 
     CREATE TABLE IF NOT EXISTS task_comments (
@@ -168,7 +168,7 @@ export function createTables(db: Database.Database): void {
       task_id    TEXT NOT NULL,
       author     TEXT NOT NULL,
       content    TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
       FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
     );
 
@@ -184,7 +184,7 @@ export function createTables(db: Database.Database): void {
       archived       INTEGER NOT NULL DEFAULT 0,
       config_json    TEXT NOT NULL DEFAULT '{}',
       max_concurrent INTEGER NOT NULL DEFAULT 3,
-      created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+      created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
     );
 
     CREATE TABLE IF NOT EXISTS workflows (
@@ -193,7 +193,7 @@ export function createTables(db: Database.Database): void {
       description TEXT NOT NULL DEFAULT '',
       steps_json  TEXT NOT NULL DEFAULT '[]',
       enabled     INTEGER NOT NULL DEFAULT 1,
-      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
     );
 
     CREATE TABLE IF NOT EXISTS workflow_projects (
@@ -213,7 +213,7 @@ export function createTables(db: Database.Database): void {
       status       TEXT NOT NULL DEFAULT 'running',
       current_step TEXT DEFAULT NULL,
       context_json TEXT NOT NULL DEFAULT '{}',
-      created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
       completed_at TEXT DEFAULT NULL,
       FOREIGN KEY (workflow_id) REFERENCES workflows(id) ON DELETE CASCADE
     );
@@ -244,7 +244,7 @@ export function createTables(db: Database.Database): void {
       events     TEXT NOT NULL DEFAULT '*',
       secret     TEXT DEFAULT NULL,
       enabled    INTEGER NOT NULL DEFAULT 1,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
     );
 
     CREATE TABLE IF NOT EXISTS webhook_deliveries (
@@ -258,7 +258,7 @@ export function createTables(db: Database.Database): void {
       attempt      INTEGER DEFAULT 1,
       error        TEXT,
       latency_ms   INTEGER,
-      created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
       completed_at TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_webhook_id ON webhook_deliveries(webhook_id);
@@ -273,7 +273,7 @@ export function createTables(db: Database.Database): void {
       enabled         INTEGER NOT NULL DEFAULT 1,
       last_delivery_at TEXT,
       delivery_count  INTEGER NOT NULL DEFAULT 0,
-      created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+      created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
     );
 
     -- ── Skills & plugins library ──────────────────────────────────────────
@@ -286,7 +286,7 @@ export function createTables(db: Database.Database): void {
       version           TEXT DEFAULT NULL,
       description       TEXT DEFAULT '',
       installed_version TEXT DEFAULT NULL,
-      created_at        TEXT NOT NULL DEFAULT (datetime('now'))
+      created_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
     );
 
     CREATE TABLE IF NOT EXISTS plugin_library (
@@ -298,7 +298,7 @@ export function createTables(db: Database.Database): void {
       description TEXT NOT NULL DEFAULT '',
       system      INTEGER NOT NULL DEFAULT 0,
       npm_pkg     TEXT,
-      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
     );
 
     -- ── Users, auth & access control ──────────────────────────────────────
@@ -314,14 +314,14 @@ export function createTables(db: Database.Database): void {
       password_hash        TEXT DEFAULT NULL,
       linked_accounts_json TEXT NOT NULL DEFAULT '{}',
       notifications_json   TEXT NOT NULL DEFAULT '{}',
-      created_at           TEXT NOT NULL DEFAULT (datetime('now'))
+      created_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
     );
 
     CREATE TABLE IF NOT EXISTS user_projects (
       user_id    TEXT NOT NULL,
       project_id TEXT NOT NULL,
       role       TEXT NOT NULL DEFAULT 'member',
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
       PRIMARY KEY (user_id, project_id),
       FOREIGN KEY (user_id)    REFERENCES users(id)    ON DELETE CASCADE,
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
@@ -336,7 +336,7 @@ export function createTables(db: Database.Database): void {
       scopes      TEXT NOT NULL DEFAULT '[]',
       expires_at  TEXT,
       last_used_at TEXT,
-      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
 
@@ -345,7 +345,7 @@ export function createTables(db: Database.Database): void {
       user_id    TEXT NOT NULL,
       token_hash TEXT NOT NULL UNIQUE,
       expires_at TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
 
@@ -357,7 +357,7 @@ export function createTables(db: Database.Database): void {
       counter       INTEGER NOT NULL DEFAULT 0,
       transports    TEXT,
       label         TEXT NOT NULL DEFAULT 'Passkey',
-      created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
 
@@ -367,7 +367,7 @@ export function createTables(db: Database.Database): void {
       user_id    TEXT,
       type       TEXT NOT NULL,
       expires_at TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
     );
 
     CREATE TABLE IF NOT EXISTS invites (
@@ -379,12 +379,12 @@ export function createTables(db: Database.Database): void {
       expires_at   TEXT NOT NULL,
       used_at      TEXT,
       used_by      TEXT,
-      created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+      created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
     );
 
     CREATE TABLE IF NOT EXISTS audit_log (
       id            TEXT PRIMARY KEY,
-      timestamp     TEXT NOT NULL DEFAULT (datetime('now')),
+      timestamp     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
       caller_id     TEXT,
       caller_name   TEXT,
       caller_type   TEXT NOT NULL DEFAULT 'system',
@@ -406,8 +406,8 @@ export function createTables(db: Database.Database): void {
       capabilities   TEXT NOT NULL DEFAULT '[]',
       status         TEXT DEFAULT 'active',
       status_message TEXT,
-      created_at     TEXT DEFAULT (datetime('now')),
-      updated_at     TEXT DEFAULT (datetime('now'))
+      created_at     TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      updated_at     TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
     );
 
     CREATE TABLE IF NOT EXISTS project_integrations (
@@ -419,7 +419,7 @@ export function createTables(db: Database.Database): void {
       enabled        INTEGER DEFAULT 1,
       sync_cursor    TEXT,
       last_synced_at TEXT,
-      created_at     TEXT DEFAULT (datetime('now')),
+      created_at     TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
       UNIQUE(project_id, integration_id, capability),
       FOREIGN KEY (project_id)     REFERENCES projects(id)     ON DELETE CASCADE,
       FOREIGN KEY (integration_id) REFERENCES integrations(id) ON DELETE CASCADE
@@ -460,9 +460,9 @@ export function createTables(db: Database.Database): void {
       labels                 TEXT DEFAULT '[]',
       url                    TEXT,
       raw_data               TEXT,
-      created_at             TEXT DEFAULT (datetime('now')),
-      updated_at             TEXT DEFAULT (datetime('now')),
-      synced_at              TEXT DEFAULT (datetime('now')),
+      created_at             TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      updated_at             TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      synced_at              TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
       UNIQUE(project_integration_id, external_id),
       FOREIGN KEY (project_integration_id) REFERENCES project_integrations(id) ON DELETE CASCADE
     );
@@ -481,7 +481,7 @@ export function createTables(db: Database.Database): void {
       fallback_behavior TEXT NOT NULL DEFAULT 'immediate',
       last_sync_at     TEXT,
       model_count      INTEGER NOT NULL DEFAULT 0,
-      created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+      created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
     );
 
     CREATE TABLE IF NOT EXISTS provider_api_keys (
@@ -491,7 +491,7 @@ export function createTables(db: Database.Database): void {
       api_key     TEXT NOT NULL,
       is_default  INTEGER NOT NULL DEFAULT 0,
       priority    INTEGER NOT NULL DEFAULT 0,
-      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
     );
 
     CREATE TABLE IF NOT EXISTS model_registry (
@@ -506,7 +506,7 @@ export function createTables(db: Database.Database): void {
       cost_tier       TEXT DEFAULT 'standard',
       provider_id     TEXT,
       source          TEXT DEFAULT 'manual',
-      created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+      created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
     );
 
     -- ── Operations engine ─────────────────────────────────────────────────
@@ -545,7 +545,7 @@ export function createTables(db: Database.Database): void {
       plan_json    TEXT NOT NULL DEFAULT '{}',
       rollback_json TEXT,
       created_by   TEXT,
-      created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
       approved_by  TEXT,
       approved_at  TEXT,
       applied_at   TEXT,
@@ -568,7 +568,7 @@ export function createTables(db: Database.Database): void {
       action        TEXT NOT NULL CHECK(action IN ('create', 'update', 'delete')),
       payload_json  TEXT NOT NULL DEFAULT '{}',
       instance_id   TEXT,
-      created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+      created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
     );
     CREATE INDEX IF NOT EXISTS idx_pending_mutations_changeset ON pending_mutations(changeset_id);
 
@@ -579,7 +579,7 @@ export function createTables(db: Database.Database): void {
       name             TEXT NOT NULL,
       node_id          TEXT NOT NULL,
       instance_id      TEXT NOT NULL,
-      deleted_at       TEXT NOT NULL DEFAULT (datetime('now')),
+      deleted_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
       workspace_deleted INTEGER NOT NULL DEFAULT 0
     );
 

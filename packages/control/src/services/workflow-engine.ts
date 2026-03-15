@@ -312,7 +312,7 @@ async function advanceRun(
     const finalStatus = anyRequiredFailed ? 'failed' : 'completed';
 
     getDrizzle().run(sql`
-      UPDATE workflow_runs SET status = ${finalStatus}, completed_at = datetime('now') WHERE id = ${run.id}
+      UPDATE workflow_runs SET status = ${finalStatus}, completed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ${run.id}
     `);
 
     
@@ -389,7 +389,7 @@ async function dispatchStep(
   // Mark step as running and store the resolved prompt
   const db = getDrizzle();
   db.run(sql`
-    UPDATE workflow_step_runs SET status = 'running', started_at = datetime('now'), task_id = ${taskId}, input_json = ${JSON.stringify({ prompt })}
+    UPDATE workflow_step_runs SET status = 'running', started_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), task_id = ${taskId}, input_json = ${JSON.stringify({ prompt })}
     WHERE id = ${stepRun.id}
   `);
 
@@ -485,7 +485,7 @@ export async function onStepCompleted(
   const stepStatus: StepRunStatus = status === 'completed' ? 'completed' : 'failed';
   db.run(sql`
     UPDATE workflow_step_runs
-    SET status = ${stepStatus}, output = ${output}, shared_refs_json = ${JSON.stringify(sharedRefs)}, completed_at = datetime('now')
+    SET status = ${stepStatus}, output = ${output}, shared_refs_json = ${JSON.stringify(sharedRefs)}, completed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
     WHERE id = ${stepRun.id}
   `);
 
@@ -619,8 +619,8 @@ export async function onStepCompleted(
 
       if (nextIter >= maxIter) {
         console.log(`[workflow-engine] Review step "${stepId}" exceeded max loop iterations (${maxIter}). Failing.`);
-        db.run(sql`UPDATE workflow_step_runs SET status = 'failed', output = ${'Max review loop iterations (' + maxIter + ') exceeded without approval'}, completed_at = datetime('now') WHERE id = ${stepRun.id}`);
-        db.run(sql`UPDATE workflow_runs SET status = 'failed', completed_at = datetime('now') WHERE id = ${runId}`);
+        db.run(sql`UPDATE workflow_step_runs SET status = 'failed', output = ${'Max review loop iterations (' + maxIter + ') exceeded without approval'}, completed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ${stepRun.id}`);
+        db.run(sql`UPDATE workflow_runs SET status = 'failed', completed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ${runId}`);
         if (_notifyFn) _notifyFn({ type: 'failed', workflowName: workflow.name, runId, projectId: run.projectId });
         return;
       }
@@ -668,7 +668,7 @@ export async function approveGate(runId: string, stepId: string, resolvedBy?: st
   // Mark gate step as completed (gates are checkpoints, not work)
   const output = resolvedBy ? `✅ Approved by ${resolvedBy}` : '✅ Approved';
   db.run(sql`
-    UPDATE workflow_step_runs SET status = 'completed', output = ${output}, completed_at = datetime('now') WHERE id = ${stepRun.id}
+    UPDATE workflow_step_runs SET status = 'completed', output = ${output}, completed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ${stepRun.id}
   `);
 
   // Ensure run is back to running
@@ -695,7 +695,7 @@ export async function rejectGate(runId: string, stepId: string, reason?: string)
 
   // Mark gate step as failed with reason
   db.run(sql`
-    UPDATE workflow_step_runs SET status = 'failed', output = ${reason || 'Gate rejected'}, completed_at = datetime('now') WHERE id = ${stepRun.id}
+    UPDATE workflow_step_runs SET status = 'failed', output = ${reason || 'Gate rejected'}, completed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ${stepRun.id}
   `);
 
   // Check if this was a required step — if so, fail the run
@@ -706,7 +706,7 @@ export async function rejectGate(runId: string, stepId: string, reason?: string)
   const stepDef = workflow.steps.find(s => s.id === stepId);
 
   if (!stepDef?.optional) {
-    db.run(sql`UPDATE workflow_runs SET status = 'failed', completed_at = datetime('now') WHERE id = ${runId}`);
+    db.run(sql`UPDATE workflow_runs SET status = 'failed', completed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ${runId}`);
 
     if (_notifyFn) {
       _notifyFn({
@@ -926,7 +926,7 @@ function findDownstream(stepId: string, steps: WorkflowStep[]): Set<string> {
 
 export function cancelRun(runId: string): void {
   const db = getDrizzle();
-  db.run(sql`UPDATE workflow_runs SET status = 'cancelled', completed_at = datetime('now') WHERE id = ${runId}`);
+  db.run(sql`UPDATE workflow_runs SET status = 'cancelled', completed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ${runId}`);
   db.run(sql`UPDATE workflow_step_runs SET status = 'skipped' WHERE run_id = ${runId} AND status IN ('pending', 'waiting_gate')`);
   
 }
@@ -936,7 +936,7 @@ export function cancelRun(runId: string): void {
 function markStepStatus(stepRunId: string, status: StepRunStatus) {
   const db = getDrizzle();
   if (status === 'waiting_gate') {
-    db.run(sql`UPDATE workflow_step_runs SET status = ${status}, started_at = datetime('now') WHERE id = ${stepRunId}`);
+    db.run(sql`UPDATE workflow_step_runs SET status = ${status}, started_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ${stepRunId}`);
   } else {
     db.update(workflowStepRuns).set({ status }).where(eq(workflowStepRuns.id, stepRunId)).run();
   }
@@ -963,7 +963,7 @@ function getPreviousStepOutput(run: WorkflowRun, currentStep: WorkflowStep): str
 
 function markStepFailed(stepRunId: string, error: string) {
   getDrizzle().run(sql`
-    UPDATE workflow_step_runs SET status = 'failed', output = ${error}, completed_at = datetime('now') WHERE id = ${stepRunId}
+    UPDATE workflow_step_runs SET status = 'failed', output = ${error}, completed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ${stepRunId}
   `);
 }
 

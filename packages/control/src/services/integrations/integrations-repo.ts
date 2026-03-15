@@ -121,7 +121,7 @@ export const integrationsRepo = {
     const existing = integrationsRepo.getById(id);
     if (!existing) throw new Error(`Integration not found: ${id}`);
 
-    const updateData: Record<string, any> = { updatedAt: sql`(datetime('now'))` };
+    const updateData: Record<string, any> = { updatedAt: sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))` };
     if (data.name !== undefined) updateData.name = data.name;
     if (data.provider !== undefined) updateData.provider = data.provider;
     if (data.authType !== undefined) updateData.authType = data.authType;

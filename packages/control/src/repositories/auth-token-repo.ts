@@ -84,7 +84,7 @@ export const authTokenRepo = {
   updateLastUsed(id: string) {
     getDrizzle()
       .update(authTokens)
-      .set({ lastUsedAt: sql`datetime('now')` })
+      .set({ lastUsedAt: sql`strftime('%Y-%m-%dT%H:%M:%fZ', 'now')` })
       .where(eq(authTokens.id, id))
       .run();
   },

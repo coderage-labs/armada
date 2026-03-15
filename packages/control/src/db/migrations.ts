@@ -156,7 +156,7 @@ const migrations: Migration[] = [
           description TEXT NOT NULL DEFAULT '',
           steps_json TEXT NOT NULL DEFAULT '[]',
           enabled INTEGER NOT NULL DEFAULT 1,
-          created_at TEXT NOT NULL DEFAULT (datetime('now'))
+          created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
         );
         INSERT INTO workflows_new (id, name, description, steps_json, enabled, created_at)
           SELECT id, name, description, steps_json, enabled, created_at FROM workflows;
@@ -294,7 +294,7 @@ const migrations: Migration[] = [
         attempt      INTEGER DEFAULT 1,
         error        TEXT,
         latency_ms   INTEGER,
-        created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+        created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
         completed_at TEXT
       )`,
       'CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_webhook_id ON webhook_deliveries(webhook_id)',
@@ -333,7 +333,7 @@ const migrations: Migration[] = [
         total_tokens  INTEGER DEFAULT 0,
         cost_usd      REAL DEFAULT 0,
         session_key   TEXT,
-        created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+        created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
       )`,
       'CREATE INDEX IF NOT EXISTS idx_usage_api_key ON api_usage_log(api_key_id)',
       'CREATE INDEX IF NOT EXISTS idx_usage_provider ON api_usage_log(provider_id)',

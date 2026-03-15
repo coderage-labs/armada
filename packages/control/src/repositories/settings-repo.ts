@@ -12,12 +12,12 @@ export const settingsRepo = {
     getDrizzle().insert(settings).values({
       key,
       value,
-      updatedAt: sql`datetime('now')`,
+      updatedAt: sql`strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`,
     }).onConflictDoUpdate({
       target: settings.key,
       set: {
         value,
-        updatedAt: sql`datetime('now')`,
+        updatedAt: sql`strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`,
       },
     }).run();
   },

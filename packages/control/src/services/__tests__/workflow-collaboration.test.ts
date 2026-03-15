@@ -24,14 +24,14 @@ const CREATE_TABLES = `
   CREATE TABLE IF NOT EXISTS workflows (
     id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
     steps_json TEXT NOT NULL DEFAULT '[]', enabled INTEGER NOT NULL DEFAULT 1,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
   );
   CREATE TABLE IF NOT EXISTS workflow_runs (
     id TEXT PRIMARY KEY, workflow_id TEXT NOT NULL, project_id TEXT NOT NULL DEFAULT '',
     trigger_type TEXT NOT NULL DEFAULT 'manual', trigger_ref TEXT,
     status TEXT NOT NULL DEFAULT 'running', current_step TEXT,
     context_json TEXT NOT NULL DEFAULT '{}',
-    created_at TEXT NOT NULL DEFAULT (datetime('now')), completed_at TEXT
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')), completed_at TEXT
   );
   CREATE TABLE IF NOT EXISTS workflow_step_runs (
     id TEXT PRIMARY KEY, run_id TEXT NOT NULL, step_id TEXT NOT NULL,

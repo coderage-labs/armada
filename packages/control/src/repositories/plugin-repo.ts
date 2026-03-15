@@ -46,7 +46,7 @@ export const pluginsRepo = {
       name: merged.name,
       version: merged.version,
       path: merged.path,
-      updatedAt: sql`datetime('now')`,
+      updatedAt: sql`strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`,
     }).where(eq(plugins.id, id)).run();
     const row = getDrizzle().select().from(plugins).where(eq(plugins.id, id)).get()!;
     return rowToPlugin(row);

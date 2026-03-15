@@ -615,6 +615,59 @@ interface Passkey {
   createdAt: string;
 }
 
+function PasskeyRow({ pk, onDelete, onRename, deletingId }: {
+  pk: Passkey;
+  onDelete: (id: string) => void;
+  onRename: (id: string, label: string) => void;
+  deletingId: string | null;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [label, setLabel] = useState(pk.label || 'Passkey');
+
+  function handleSave() {
+    const trimmed = label.trim();
+    if (trimmed && trimmed !== pk.label) {
+      onRename(pk.id, trimmed);
+    }
+    setEditing(false);
+  }
+
+  return (
+    <div className="flex items-center justify-between bg-zinc-800/50 rounded-lg px-3 py-2 text-sm">
+      <div className="flex items-center gap-2 min-w-0">
+        <Fingerprint className="w-4 h-4 text-violet-400 shrink-0" />
+        {editing ? (
+          <Input
+            value={label}
+            onChange={e => setLabel(e.target.value)}
+            onBlur={handleSave}
+            onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') { setLabel(pk.label || 'Passkey'); setEditing(false); } }}
+            autoFocus
+            className="h-6 text-sm bg-zinc-900 border-zinc-700 px-2 py-0"
+          />
+        ) : (
+          <>
+            <span className="text-zinc-200 truncate">{pk.label || 'Passkey'}</span>
+            <button onClick={() => setEditing(true)} className="text-zinc-500 hover:text-zinc-300 transition" title="Rename">
+              <Pencil className="w-3 h-3" />
+            </button>
+          </>
+        )}
+        <span className="text-[10px] text-zinc-500 shrink-0">
+          Added {formatDate(pk.createdAt)}
+        </span>
+      </div>
+      <Button
+        variant="ghost" onClick={() => onDelete(pk.id)}
+        disabled={deletingId === pk.id}
+        className="text-red-400/60 hover:text-red-400 transition disabled:opacity-50"
+      >
+        <Trash2 className="w-3.5 h-3.5" />
+      </Button>
+    </div>
+  );
+}
+
 function MyAccount() {
   const [passkeys, setPasskeys] = useState<Passkey[]>([]);
   const [showRegister, setShowRegister] = useState(false);
@@ -646,6 +699,18 @@ function MyAccount() {
     }
   }
 
+  async function handleRename(id: string, label: string) {
+    try {
+      await apiFetch(`/api/auth/passkeys/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ label }),
+      });
+      await fetchPasskeys();
+    } catch {
+      // silent
+    }
+  }
+
   return (
     <div className="bg-zinc-800/50 border border-zinc-800 rounded-lg p-5 space-y-4">
       <div className="flex items-center justify-between">
@@ -673,22 +738,7 @@ function MyAccount() {
       ) : (
         <div className="space-y-2">
           {passkeys.map(pk => (
-            <div key={pk.id} className="flex items-center justify-between bg-zinc-800/50 rounded-lg px-3 py-2 text-sm">
-              <div className="flex items-center gap-2">
-                <Fingerprint className="w-4 h-4 text-violet-400" />
-                <span className="text-zinc-200">{pk.label || 'Passkey'}</span>
-                <span className="text-[10px] text-zinc-500">
-                  Added {formatDate(pk.createdAt)}
-                </span>
-              </div>
-              <Button
-                variant="ghost" onClick={() => handleDelete(pk.id)}
-                disabled={deletingId === pk.id}
-                className="text-red-400/60 hover:text-red-400 transition disabled:opacity-50"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </Button>
-            </div>
+            <PasskeyRow key={pk.id} pk={pk} onDelete={handleDelete} onRename={handleRename} deletingId={deletingId} />
           ))}
         </div>
       )}
