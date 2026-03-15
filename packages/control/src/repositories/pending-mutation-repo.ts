@@ -29,12 +29,43 @@ function rowToMutation(r: typeof pendingMutations.$inferSelect): PendingMutation
 
 export const pendingMutationRepo = {
   create(data: Omit<PendingMutation, 'id' | 'createdAt'>): PendingMutation {
+    // Check for existing mutation with same changeset + entity + action (fixes #22)
+    const entityId = data.entityId ?? null;
+    const conditions = [
+      eq(pendingMutations.changesetId, data.changesetId),
+      eq(pendingMutations.entityType, data.entityType),
+      eq(pendingMutations.action, data.action),
+    ];
+    
+    // Handle nullable entityId properly
+    if (entityId !== null) {
+      conditions.push(eq(pendingMutations.entityId, entityId));
+    } else {
+      conditions.push(sql`${pendingMutations.entityId} IS NULL`);
+    }
+    
+    const existing = getDrizzle()
+      .select()
+      .from(pendingMutations)
+      .where(and(...conditions))
+      .get();
+    
+    if (existing) {
+      // Update the existing mutation instead of creating a duplicate
+      getDrizzle()
+        .update(pendingMutations)
+        .set({ payloadJson: JSON.stringify(data.payload) })
+        .where(eq(pendingMutations.id, existing.id))
+        .run();
+      return rowToMutation(existing);
+    }
+
     const id = uuidv4();
     getDrizzle().insert(pendingMutations).values({
       id,
       changesetId: data.changesetId,
       entityType: data.entityType,
-      entityId: data.entityId ?? null,
+      entityId: entityId,
       action: data.action,
       payloadJson: JSON.stringify(data.payload),
       instanceId: data.instanceId ?? null,

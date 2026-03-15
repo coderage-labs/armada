@@ -153,10 +153,14 @@ function emitChange(): void {
  * pipeline so approve/apply/UI all work unchanged.
  */
 function syncToChangesetPipeline(): void {
-  // Clear existing pending mutations for our draft changeset
+  // Clear existing pending mutations for our draft changeset AND temp mutations.
+  // This prevents duplicates when syncToChangesetPipeline() is called multiple
+  // times before a changeset is created (fixes #22).
   if (draftChangesetId) {
     pendingMutationRepo.removeByChangeset(draftChangesetId);
   }
+  // Also clear any temp mutations from previous syncs
+  pendingMutationRepo.removeByChangeset('pending-wc');
 
   // If working copy is empty, cancel the draft changeset
   if (store.size === 0) {
