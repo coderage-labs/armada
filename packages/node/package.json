@@ -1,0 +1,28 @@
+{
+  "name": "@coderage-labs/armada-node",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Per-host daemon that manages Docker containers and instance lifecycle",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@coderage-labs/armada-shared": "workspace:*",
+    "@types/multicast-dns": "^7.2.4",
+    "dockerode": "^4.0.5",
+    "multicast-dns": "^7.2.5",
+    "ws": "^8.19.0"
+  },
+  "devDependencies": {
+    "@types/dockerode": "^3.3.35",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3",
+    "vitest": "^4.1.0"
+  }
+}
