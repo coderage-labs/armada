@@ -1,7 +1,7 @@
 {
   "name": "@coderage-labs/armada-control-plugin",
-  "version": "0.1.0",
-  "description": "Armada control plugin for OpenClaw \u2014 operator-level management tools",
+  "version": "0.2.0",
+  "description": "Armada control plugin for OpenClaw — operator-level management tools",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
@@ -19,7 +19,7 @@
   "author": "Chris Kitch",
   "license": "MIT",
   "dependencies": {
-    "@coderage-labs/armada-plugin-shared": "^1.0.0"
+    "@coderage-labs/armada-plugin-shared": "^0.2.0"
   },
   "devDependencies": {
     "@types/node": "^25.3.2"
