@@ -33,9 +33,11 @@ services:
     environment:
       - ARMADA_NODE_TOKEN=${ARMADA_NODE_TOKEN:-}
       - ARMADA_CONTROL_URL=ws://armada-control:3001/api/nodes/ws
+      - HOST_DATA_DIR=/opt/armada-data
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - armada-volumes:/data/armada/volumes
+      - /opt/armada-data:/data
+      - /opt/armada-data/node-credentials:/etc/armada-node
       - armada-plugins:/data/armada/plugins:ro
     networks:
       - armada
@@ -44,7 +46,6 @@ services:
 volumes:
   armada-data:
   armada-plugins:
-  armada-volumes:
 
 networks:
   armada:
