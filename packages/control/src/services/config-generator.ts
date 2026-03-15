@@ -40,6 +40,7 @@ export interface GeneratedConfig {
       token?: string;
     };
     controlUi?: {
+      allowedOrigins?: string[];
       dangerouslyAllowHostHeaderOriginFallback?: boolean;
     };
     reload?: {
@@ -177,6 +178,12 @@ function generateModelsConfig(): GeneratedConfig {
         // on first boot when it sees no gateway.auth.token present.
         mode: 'token',
         token: crypto.randomBytes(24).toString('hex'),
+      },
+      controlUi: {
+        // Instance containers don't serve a web UI — only accessed via node agent proxy.
+        // Empty allowedOrigins array rejects browser UI requests, satisfying OpenClaw's
+        // security check without needing dangerouslyAllowHostHeaderOriginFallback.
+        allowedOrigins: [],
       },
       reload: {
         // Armada controls restarts — disable config file watcher auto-restart
