@@ -1,0 +1,24 @@
+FROM node:22-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+COPY packages/shared/package*.json packages/shared/
+COPY packages/node/package*.json packages/node/
+COPY packages/control/package*.json packages/control/
+COPY packages/ui/package*.json packages/ui/
+RUN npm install
+COPY . .
+RUN npm run build -w @coderage-labs/armada-shared && npm run build -w @coderage-labs/armada-node
+
+FROM node:22-alpine
+RUN apk add --no-cache curl bash git && \
+    curl -o /tmp/eget.sh https://zyedidia.github.io/eget.sh && \
+    bash /tmp/eget.sh && mv ./eget /usr/local/bin/eget && rm /tmp/eget.sh
+WORKDIR /app
+COPY --from=builder /app/packages/shared/dist packages/shared/dist
+COPY --from=builder /app/packages/shared/package.json packages/shared/
+COPY --from=builder /app/packages/node/dist packages/node/dist
+COPY --from=builder /app/packages/node/package.json packages/node/
+COPY --from=builder /app/package.json .
+RUN npm install --omit=dev --workspace=@coderage-labs/armada-node
+EXPOSE 8080
+CMD ["node", "packages/node/dist/index.js"]

@@ -1,0 +1,37 @@
+{
+    "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+    "packages": {
+        "packages/control": {
+            "package-name": "@coderage-labs/armada-control",
+            "component": "armada-control"
+        },
+        "packages/node": {
+            "package-name": "@coderage-labs/armada-node",
+            "component": "armada-node"
+        },
+        "packages/ui": {
+            "package-name": "@coderage-labs/armada-ui",
+            "component": "ui"
+        },
+        ".": {
+            "package-name": "armada",
+            "component": "armada"
+        },
+        "plugins/agent": {
+            "package-name": "@coderage-labs/armada-agent-plugin",
+            "component": "armada-agent-plugin"
+        },
+        "plugins/shared": {
+            "package-name": "@coderage-labs/armada-plugin-shared",
+            "component": "armada-plugin-shared"
+        },
+        "plugins/control": {
+            "package-name": "@coderage-labs/armada-control-plugin",
+            "component": "armada-control-plugin"
+        }
+    },
+    "separate-pull-requests": false,
+    "plugins": [
+        "node-workspace"
+    ]
+}

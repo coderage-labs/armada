@@ -1,0 +1,26 @@
+{
+  "name": "@coderage-labs/armada-plugin-shared",
+  "version": "0.1.0",
+  "description": "Shared utilities for armada plugins",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.2"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/coderage-labs/armada.git",
+    "directory": "plugins/shared"
+  },
+  "files": [
+    "dist"
+  ],
+  "license": "MIT"
+}

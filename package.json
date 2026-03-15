@@ -1,0 +1,21 @@
+{
+  "name": "armada",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "plugins/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @coderage-labs/armada-shared && npm run build -w @coderage-labs/armada-node && npm run build -w @coderage-labs/armada-control && npm run build -w @coderage-labs/armada-ui",
+    "dev": "concurrently -n node,api,ui -c yellow,blue,green \"npm run dev -w @coderage-labs/armada-node\" \"npm run dev -w @coderage-labs/armada-control\" \"npm run dev -w @coderage-labs/armada-ui\"",
+    "clean": "rm -rf packages/*/dist"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.7.3"
+  },
+  "dependencies": {
+    "sharp": "^0.34.5"
+  }
+}
