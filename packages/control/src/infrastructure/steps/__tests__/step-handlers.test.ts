@@ -51,7 +51,10 @@ vi.mock('../../../repositories/index.js', () => ({
 vi.mock('../../../services/config-generator.js', () => ({
   generateInstanceConfig: vi.fn(() => ({
     models: { providers: [] },
-    gateway: { controlUi: { dangerouslyAllowHostHeaderOriginFallback: true } },
+    gateway: {
+      auth: { mode: 'token', token: 'generated-token-abc123' },
+      controlUi: { dangerouslyAllowHostHeaderOriginFallback: true },
+    },
   })),
 }));
 
@@ -170,6 +173,39 @@ describe('push-config handler', () => {
     await pushConfigHandler.execute(ctx as any);
 
     expect(generateInstanceConfig).toHaveBeenCalledWith('inst-xyz');
+  });
+
+  it('saves generated auth token to instance record after writing config', async () => {
+    const node = makeNodeClient();
+    const ctx = makeCtx(node, {
+      instanceId: 'inst-token',
+      nodeId: 'node-1',
+      containerName: 'armada-instance-epsilon-token',
+    });
+
+    await pushConfigHandler.execute(ctx as any);
+
+    expect(instancesRepo.update).toHaveBeenCalledWith('inst-token', { token: 'generated-token-abc123' });
+  });
+
+  it('saves preserved existing auth token to instance record', async () => {
+    const existingConfig = {
+      models: { providers: [] },
+      gateway: { auth: { token: 'pre-existing-token-xyz' } },
+    };
+    const node = makeNodeClient({
+      readInstanceFile: vi.fn().mockResolvedValue(JSON.stringify(existingConfig)),
+    });
+    const ctx = makeCtx(node, {
+      instanceId: 'inst-preserved',
+      nodeId: 'node-1',
+      containerName: 'armada-instance-zeta-preserved',
+    });
+
+    await pushConfigHandler.execute(ctx as any);
+
+    // The preserved token should override the generated one and be saved to DB
+    expect(instancesRepo.update).toHaveBeenCalledWith('inst-preserved', { token: 'pre-existing-token-xyz' });
   });
 });
 

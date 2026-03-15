@@ -48,6 +48,13 @@ export const pushConfigHandler: StepHandler = {
       },
     );
 
+    // Persist the auth token to the instance record so the control plane
+    // can authenticate future API calls to this instance.
+    const authToken = (config as any).gateway?.auth?.token as string | undefined;
+    if (authToken) {
+      ctx.services.instanceRepo.update(instanceId, { token: authToken });
+    }
+
     ctx.emit(`Config pushed to ${containerName} (version ${configVersion ?? 'current'})`, {
       instanceId,
       containerName,

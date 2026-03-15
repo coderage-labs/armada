@@ -5,6 +5,7 @@
  * into the openclaw.json `models.providers` format.
  */
 
+import crypto from 'node:crypto';
 import { getDrizzle } from '../db/drizzle.js';
 import { modelProviders, providerApiKeys, modelRegistry, templates, agents } from '../db/drizzle-schema.js';
 import { instancesRepo, templatesRepo } from '../repositories/index.js';
@@ -34,6 +35,10 @@ const PROVIDER_BASE_URL: Record<string, string> = {
 
 export interface GeneratedConfig {
   gateway?: {
+    auth?: {
+      mode?: string;
+      token?: string;
+    };
     controlUi?: {
       dangerouslyAllowHostHeaderOriginFallback?: boolean;
     };
@@ -167,6 +172,12 @@ function generateModelsConfig(): GeneratedConfig {
 
   return {
     gateway: {
+      auth: {
+        // Pre-generate a token so OpenClaw doesn't overwrite the entire config
+        // on first boot when it sees no gateway.auth.token present.
+        mode: 'token',
+        token: crypto.randomBytes(24).toString('hex'),
+      },
       controlUi: {
         // Armada-managed instances don't serve a Control UI externally
         dangerouslyAllowHostHeaderOriginFallback: true,
