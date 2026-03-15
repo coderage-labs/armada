@@ -20,7 +20,7 @@ services:
       - armada-data:/data
       - armada-plugins:/data/plugins
     networks:
-      - armada
+      - armada-net
     restart: unless-stopped
 
   node:
@@ -40,7 +40,6 @@ services:
       - /opt/armada-data/node-credentials:/etc/armada-node
       - armada-plugins:/data/armada/plugins:ro
     networks:
-      - armada
       - armada-net
     restart: unless-stopped
 
@@ -49,8 +48,6 @@ volumes:
   armada-plugins:
 
 networks:
-  armada:
-    driver: bridge
   armada-net:
     name: armada-net
     external: true
