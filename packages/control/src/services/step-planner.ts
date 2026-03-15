@@ -201,6 +201,7 @@ export function buildStepsForInstance(instanceId: string, configVersion: number)
       return tmpl?.image || defaultImage;
     })() : defaultImage);
 
+
     const nodes: StepDAG['nodes'] = {};
     const deps: StepDAG['deps'] = [];
 
@@ -299,6 +300,111 @@ export function buildStepsForInstance(instanceId: string, configVersion: number)
 
     return { nodes, deps };
   }
+
+  // ── Fresh instance without a running container ────────────────────
+  // Instance exists in DB but has never been provisioned (no url set).
+  // Generate the full bootstrap sequence just like the create path.
+  if (!instance?.url) {
+    const resolvedImage = resolveInstanceImage(instanceId);
+
+    const nodes: StepDAG['nodes'] = {};
+    const deps: StepDAG['deps'] = [];
+
+    const pullImageId = crypto.randomUUID();
+    nodes[pullImageId] = {
+      step: {
+        id: pullImageId,
+        name: 'pull_image',
+        status: 'pending',
+        metadata: { nodeId, image: resolvedImage },
+      },
+    };
+
+    const createContainerId = crypto.randomUUID();
+    nodes[createContainerId] = {
+      step: {
+        id: createContainerId,
+        name: 'create_container',
+        status: 'pending',
+        metadata: {
+          nodeId,
+          containerName,
+          image: resolvedImage,
+          instanceId,
+          env: [
+            `OPENCLAW_INSTANCE_ID=${instanceId}`,
+            `OPENCLAW_INSTANCE_NAME=${instance?.name ?? ''}`,
+          ],
+          volumes: {
+            data: `/data/armada/instances/${instance?.name ?? instanceId}`,
+            plugins: `/data/armada/instances/${instance?.name ?? instanceId}/plugins`,
+          },
+          resources: {
+            memory: instance?.memory || '2g',
+            cpus: instance?.cpus || '1',
+          },
+          network: 'armada-net',
+          labels: {
+            'armada.instance': instanceId,
+            'armada.instance.name': instance?.name ?? '',
+          },
+        },
+      },
+    };
+    deps.push([pullImageId, createContainerId]); // pull_image before create_container
+
+    const installPluginsId = crypto.randomUUID();
+    nodes[installPluginsId] = {
+      step: {
+        id: installPluginsId,
+        name: 'install_plugins',
+        status: 'pending',
+        metadata: {
+          nodeId,
+          containerName,
+          pluginsDir: `/data/armada/instances/${instance?.name ?? instanceId}/plugins`,
+          plugins: [{ name: '@coderage-labs/armada-agent', version: AGENT_PLUGIN_VERSION }],
+        },
+      },
+    };
+    deps.push([createContainerId, installPluginsId]); // create_container before install_plugins
+
+    const pushConfigId = crypto.randomUUID();
+    nodes[pushConfigId] = {
+      step: {
+        id: pushConfigId,
+        name: 'push_config',
+        status: 'pending',
+        metadata: { instanceId, configVersion, nodeId, containerName },
+      },
+    };
+    deps.push([installPluginsId, pushConfigId]); // install_plugins before push_config
+
+    const startContainerId = crypto.randomUUID();
+    nodes[startContainerId] = {
+      step: {
+        id: startContainerId,
+        name: 'start_container',
+        status: 'pending',
+        metadata: { nodeId, containerName },
+      },
+    };
+    deps.push([pushConfigId, startContainerId]); // push_config before start_container
+
+    const healthCheckId = crypto.randomUUID();
+    nodes[healthCheckId] = {
+      step: {
+        id: healthCheckId,
+        name: 'health_check',
+        status: 'pending',
+        metadata: { instanceId, nodeId, containerName, timeoutMs: 120_000 },
+      },
+    };
+    deps.push([startContainerId, healthCheckId]); // start_container before health_check
+
+    return { nodes, deps };
+  }
+  // ─────────────────────────────────────────────────────────────────
 
   // Classify mutations to determine which actions are needed
   let needsPluginInstall = false;
