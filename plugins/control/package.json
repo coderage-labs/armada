@@ -1,0 +1,47 @@
+{
+  "name": "@coderage-labs/armada-control-plugin",
+  "version": "0.1.0",
+  "description": "Armada control plugin for OpenClaw \u2014 operator-level management tools",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test dist/**/*.test.js"
+  },
+  "keywords": [
+    "openclaw",
+    "openclaw-plugin",
+    "armada",
+    "control",
+    "operator"
+  ],
+  "author": "Chris Kitch",
+  "license": "MIT",
+  "dependencies": {
+    "@coderage-labs/armada-plugin-shared": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.2"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/coderage-labs/armada.git",
+    "directory": "plugins/armada-control"
+  },
+  "files": [
+    "dist/",
+    "openclaw.plugin.json",
+    "README.md",
+    "LICENSE",
+    "package.json"
+  ],
+  "openclaw": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  }
+}
