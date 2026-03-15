@@ -55,8 +55,9 @@ export const installPluginsHandler: StepHandler = {
         );
         ctx.emit(`Plugin installed: ${plugin.name}`, { plugin: plugin.name });
       } catch (err: any) {
-        // Plugin install failure is non-fatal — warn and continue
-        ctx.emit(`Plugin install warning: ${plugin.name} — ${err.message}`, { plugin: plugin.name, warning: err.message });
+        // Plugin install failure is fatal — the instance won't boot without its plugin
+        ctx.emit(`Plugin install FAILED: ${plugin.name} — ${err.message}`, { plugin: plugin.name, error: err.message });
+        throw new Error(`Failed to install plugin ${plugin.name}: ${err.message}`);
       }
     }
   },

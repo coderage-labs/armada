@@ -111,6 +111,12 @@ async function handlePluginInstall(msg: CommandMessage): Promise<ResponseMessage
 
   // Always install latest unless a specific version is requested
   const pkg = version ? `${name}@${version}` : `${name}@latest`;
+
+  // Clear npm cache for this package to avoid stale metadata from previous failed installs
+  try {
+    await execFileAsync('npm', ['cache', 'clean', '--force'], { timeout: 15_000 });
+  } catch { /* best effort */ }
+
   const { stdout, stderr } = await execFileAsync('npm', ['install', pkg], {
     cwd: directory,
     timeout: 120_000,

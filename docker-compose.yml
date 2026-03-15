@@ -41,6 +41,7 @@ services:
       - armada-plugins:/data/armada/plugins:ro
     networks:
       - armada
+      - armada-net
     restart: unless-stopped
 
 volumes:
@@ -50,3 +51,6 @@ volumes:
 networks:
   armada:
     driver: bridge
+  armada-net:
+    name: armada-net
+    external: true

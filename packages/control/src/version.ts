@@ -21,6 +21,6 @@ const pkg = findPackageJson(__dirname);
 
 export const CONTROL_VERSION = pkg.version;
 export const PROTOCOL_VERSION = ARMADA_PROTOCOL_VERSION;
-export const MIN_NODE_VERSION = '0.4.0';
-export const MIN_AGENT_PLUGIN_VERSION = '0.7.0';
-export const AGENT_PLUGIN_VERSION = '0.9.1';
+export const MIN_NODE_VERSION = '0.1.0';
+export const MIN_AGENT_PLUGIN_VERSION = '0.1.0';
+export const AGENT_PLUGIN_VERSION = '0.1.1';

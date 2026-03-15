@@ -31,7 +31,7 @@ export const healthCheckHandler: StepHandler = {
       await new Promise(r => setTimeout(r, 3000));
       while (Date.now() - start < timeoutMs) {
         try {
-          const probe = await node.relayRequest(containerName, 'GET', '/api/health') as any;
+          const probe = await node.relayRequest(containerName, 'GET', '/health') as any;
           if (probe?.status >= 200 && probe?.status < 500) {
             return { source: 'probe', data: { status: probe.status } };
           }
