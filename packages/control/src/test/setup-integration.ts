@@ -97,11 +97,41 @@ export interface TestContext {
 }
 
 export async function createTestContext(): Promise<TestContext> {
-  // Set auth token env BEFORE anything touches auth middleware
-  process.env.ARMADA_API_TOKEN = TEST_TOKEN;
   process.env.ARMADA_HOOKS_TOKEN = 'test-hooks-token';
 
   setupTestDb();
+
+  // Seed a test user + auth token in the DB so auth middleware can find them
+  const { createHash, randomUUID } = await import('node:crypto');
+  const { usersRepo } = await import('../repositories/user-repo.js');
+  const { authTokenRepo } = await import('../repositories/auth-token-repo.js');
+
+  const user = usersRepo.create({
+    name: 'test-admin',
+    displayName: 'Test Admin',
+    role: 'owner',
+    type: 'human',
+  });
+  const userId = user.id;
+
+  const tokenHash = createHash('sha256').update(TEST_TOKEN).digest('hex');
+  authTokenRepo.create({
+    id: randomUUID(),
+    tokenHash,
+    userId,
+    label: 'test-api-token',
+    scopes: ['*'],
+  });
+
+  // Also seed the hooks token
+  const hooksHash = createHash('sha256').update('test-hooks-token').digest('hex');
+  authTokenRepo.create({
+    id: randomUUID(),
+    tokenHash: hooksHash,
+    userId,
+    label: 'test-hooks-token',
+    scopes: ['*'],
+  });
 
   // Seed default plugins so plugin library routes work
   const { pluginManager } = await import('../services/plugin-manager.js');

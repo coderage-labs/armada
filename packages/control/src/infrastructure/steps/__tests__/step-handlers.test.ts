@@ -451,16 +451,19 @@ describe('install-plugins handler', () => {
       ],
     });
 
-    const promise = installPluginsHandler.execute(ctx as any);
+    // Attach rejection handler BEFORE advancing timers so the rejection
+    // doesn't escape as an unhandled promise rejection.
+    const result = installPluginsHandler.execute(ctx as any).then(
+      () => ({ ok: true as const }),
+      (e: Error) => ({ ok: false as const, error: e }),
+    );
     await vi.runAllTimersAsync();
+    const outcome = await result;
     // All plugins are attempted, but the step fails because one couldn't install
-    let error: Error | undefined;
-    try {
-      await promise;
-    } catch (e: any) {
-      error = e;
+    expect(outcome.ok).toBe(false);
+    if (!outcome.ok) {
+      expect(outcome.error.message).toMatch(/Failed to install 1 plugin/);
     }
-    expect(error?.message).toMatch(/Failed to install 1 plugin/);
     // 3 retry attempts for failing-plugin + 1 successful call for ok-plugin
     expect(node.installPlugin).toHaveBeenCalledTimes(4);
   });
