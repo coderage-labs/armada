@@ -12,7 +12,7 @@ services:
       - ARMADA_API_URL=${ARMADA_API_URL:-http://armada-control:3001}
       - ARMADA_DB_PATH=/data/armada.db
       - ARMADA_PLUGINS_PATH=/data/plugins
-      - ARMADA_NETWORK_NAME=${ARMADA_NETWORK_NAME:-armada-net}
+      #- ARMADA_NETWORK_NAME=armada-net  # override only if your network has a different name
     volumes:
       - armada-data:/data
       - armada-plugins:/data/plugins
@@ -47,4 +47,4 @@ volumes:
 networks:
   armada-net:
     name: armada-net
-    external: true
+    driver: bridge

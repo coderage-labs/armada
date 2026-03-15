@@ -57,8 +57,7 @@ else
   source "$ARMADA_DIR/.env"
 fi
 
-# Create the shared network (instances will also join this)
-docker network create armada-net 2>/dev/null || true
+# Network is created by docker compose (name: armada-net) — no manual creation needed
 
 # Create host data directory for node agent bind mount
 DATA_DIR="$ARMADA_DIR/data"
@@ -123,7 +122,7 @@ volumes:
 networks:
   armada-net:
     name: armada-net
-    external: true
+    driver: bridge
 COMPOSE
 
 echo ""
