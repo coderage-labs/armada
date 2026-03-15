@@ -415,7 +415,7 @@ function ProviderEditDialog({ p, open, onOpenChange, onRefresh, canMutate, stage
                 <div>
                   <p className="text-sm font-medium text-zinc-200">Automatic Failover</p>
                   <p className="text-xs text-zinc-500 mt-0.5">
-                    When enabled, armada generates fallback config so OpenClaw switches to the next-priority key on rate-limit or billing errors.
+                    When enabled, Armada generates fallback config so OpenClaw switches to the next-priority key on rate-limit or billing errors.
                   </p>
                 </div>
                 <Switch

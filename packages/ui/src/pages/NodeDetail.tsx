@@ -525,7 +525,7 @@ export default function NodeDetail() {
 
       {stats && (!stats.containers || (Array.isArray(stats.containers) && stats.containers.length === 0)) && (
         <div className="text-center py-8 text-zinc-500 text-sm">
-          No armada containers running on this node
+          No Armada containers running on this node
         </div>
       )}
 

@@ -223,7 +223,7 @@ export default function Settings() {
               </div>
               <p className="text-sm text-zinc-400">
                 Automatically clean up workspace data for deleted agents after this period.
-                Workspaces for stopped agents are preserved for reuse. The armada checks daily and removes
+                Workspaces for stopped agents are preserved for reuse. Armada checks daily and removes
                 unclaimed workspace directories from nodes.
               </p>
 

@@ -181,7 +181,7 @@ export default function SetupWizard({ onComplete }: Props) {
                 Welcome to Armada
               </h1>
               <p style={{ color: '#94a3b8', fontSize: '14px', margin: 0, lineHeight: '1.5' }}>
-                Let's set up your armada control plane. You'll create an owner account
+                Let's set up your Armada control plane. You'll create an owner account
                 and secure it with a passkey.
               </p>
             </div>
@@ -352,8 +352,8 @@ export default function SetupWizard({ onComplete }: Props) {
               </h2>
               <p style={{ color: '#94a3b8', fontSize: '13px', margin: 0, lineHeight: '1.5' }}>
                 {createdUser
-                  ? `Welcome, ${createdUser.displayName}. Your armada control plane is ready.`
-                  : 'Your armada control plane is ready.'}
+                  ? `Welcome, ${createdUser.displayName}. Your Armada control plane is ready.`
+                  : 'Your Armada control plane is ready.'}
               </p>
             </div>
 

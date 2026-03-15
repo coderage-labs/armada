@@ -333,7 +333,7 @@ export default function Notifications() {
       <PageHeader
         icon={Bell}
         title="Notifications"
-        subtitle="Configure where armada alerts are delivered"
+        subtitle="Configure where Armada alerts are delivered"
         color="violet"
       >
         <Button

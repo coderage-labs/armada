@@ -302,7 +302,7 @@ export default function Nodes() {
 
   return (
     <div className="space-y-6">
-      <PageHeader icon={Monitor} title="Nodes" subtitle="Compute nodes in your armada">
+      <PageHeader icon={Monitor} title="Nodes" subtitle="Compute nodes in your Armada">
         {canMutate && (
           <Button
             onClick={handleAdd}
@@ -382,7 +382,7 @@ export default function Nodes() {
       >
         <div className="space-y-3 text-sm">
           <p className="text-zinc-300">
-            Remove <span className="font-medium text-zinc-100">"{confirmRemove?.hostname}"</span> from the armada?
+            Remove <span className="font-medium text-zinc-100">"{confirmRemove?.hostname}"</span> from the Armada?
           </p>
           {removeImpact && (removeImpact.instances.length > 0 || removeImpact.agents.length > 0) ? (
             <div className="space-y-2">

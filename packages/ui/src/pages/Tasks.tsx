@@ -1365,7 +1365,7 @@ export default function Tasks() {
     <div className="space-y-6 h-full flex flex-col">
       {/* Header */}
       <div className="shrink-0">
-        <PageHeader icon={Zap} title="Task Activity" subtitle="Real-time armada task monitoring & network topology">
+        <PageHeader icon={Zap} title="Task Activity" subtitle="Real-time Armada task monitoring & network topology">
           <Button
             onClick={() => setShowSendModal(true)}
             className="bg-violet-600 hover:bg-violet-700 text-white text-sm px-4 h-9 flex items-center gap-2"

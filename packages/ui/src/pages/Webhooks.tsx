@@ -594,7 +594,7 @@ function OutboundWebhooks({ canMutate }: { canMutate: boolean }) {
             Outbound Webhooks
           </h2>
           <p className="text-xs text-zinc-500 mt-0.5">
-            Send armada events to external URLs when things happen.
+            Send Armada events to external URLs when things happen.
           </p>
         </div>
         {canMutate && (
@@ -683,7 +683,7 @@ function OutboundWebhooks({ canMutate }: { canMutate: boolean }) {
         <EmptyState
           icon={Bell}
           title="No webhooks configured"
-          description="Add a webhook to receive notifications when armada events occur"
+          description="Add a webhook to receive notifications when Armada events occur"
           action={canMutate ? { label: '+ Add Webhook', onClick: () => setShowForm(true) } : undefined}
         />
       )}
@@ -1156,7 +1156,7 @@ function InboundWebhooksSection({ canMutate }: { canMutate: boolean }) {
         <EmptyState
           icon={WebhookIcon}
           title="No inbound webhooks configured"
-          description="Create one to let external services trigger armada actions"
+          description="Create one to let external services trigger Armada actions"
           action={canMutate ? { label: '+ Add Inbound Webhook', onClick: () => setShowForm(true) } : undefined}
         />
       )}
@@ -1184,7 +1184,7 @@ export default function WebhooksPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader icon={Bell} title="Webhooks" subtitle="Configure webhooks to send and receive armada events" />
+      <PageHeader icon={Bell} title="Webhooks" subtitle="Configure webhooks to send and receive Armada events" />
 
       <Tabs defaultValue="outbound">
         <TabsList>

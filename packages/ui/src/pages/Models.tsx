@@ -515,7 +515,7 @@ export default function Models() {
 
   return (
     <div className="space-y-6">
-      <PageHeader icon={Cpu} title="Model Registry" subtitle="Manage AI models available for armada agents">
+      <PageHeader icon={Cpu} title="Model Registry" subtitle="Manage AI models available for Armada agents">
         <div className="flex items-center gap-2">
           <Select value={period} onValueChange={(v) => setPeriod(v as UsagePeriod)}>
             <SelectTrigger className="w-28 h-9 text-sm bg-zinc-800 border-zinc-700">

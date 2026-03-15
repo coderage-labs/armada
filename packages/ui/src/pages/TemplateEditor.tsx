@@ -757,7 +757,7 @@ export default function TemplateEditor() {
 
         <TabsContent value="Contacts" className="rounded-lg border border-zinc-800 bg-zinc-800/50 p-6 mt-0">
           <div className="space-y-4">
-            <p className="text-sm text-zinc-400 mb-2">Define which other armada instances this agent can communicate with</p>
+            <p className="text-sm text-zinc-400 mb-2">Define which other Armada instances this agent can communicate with</p>
             {form.contacts.map((c, i) => (
               <div key={i} className="rounded-lg border border-zinc-800 bg-zinc-800/50 p-4 space-y-3">
                 <div className="flex items-center gap-3">

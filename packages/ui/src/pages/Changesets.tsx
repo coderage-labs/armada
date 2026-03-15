@@ -258,7 +258,7 @@ export default function Changesets() {
       <PageHeader
         icon={GitBranch}
         title="Changesets"
-        subtitle="Declarative config changes across armada instances"
+        subtitle="Declarative config changes across Armada instances"
       />
 
       {/* Filters */}

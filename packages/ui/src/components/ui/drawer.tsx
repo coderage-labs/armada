@@ -44,7 +44,7 @@ const DrawerContent = React.forwardRef<
     >
       {/* drag handle */}
       <div className="mx-auto mt-3 h-1.5 w-12 rounded-full bg-zinc-700 flex-shrink-0" />
-      <div className="flex-1 overflow-y-auto p-6">{children}</div>
+      <div className="flex-1 overflow-y-auto px-4 pb-4">{children}</div>
     </DrawerPrimitive.Content>
   </DrawerPortal>
 ));

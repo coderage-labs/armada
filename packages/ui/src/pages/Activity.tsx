@@ -214,7 +214,7 @@ export default function Activity() {
                   <EmptyState
                     icon={ActivityIcon}
                     title="No activity events found"
-                    description="Events will appear here as armada operations occur"
+                    description="Events will appear here as Armada operations occur"
                   />
                 </TableCell>
               </TableRow>

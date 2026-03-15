@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Check, Copy, X } from 'lucide-react';
+import { Check, Copy } from 'lucide-react';
 import { useSSEAll } from '../providers/SSEProvider';
 import { Button } from './ui/button';
 import { ResponsiveDialog as Dialog, ResponsiveDialogContent as DialogContent, ResponsiveDialogHeader as DialogHeader, ResponsiveDialogTitle as DialogTitle, ResponsiveDialogDescription as DialogDescription } from './ui/responsive-dialog';
@@ -62,19 +62,13 @@ export default function NodeInstallModal({ nodeId, installToken, onClose }: Node
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-2xl p-0 overflow-hidden" showClose={false}>
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-700">
-          <DialogHeader className="mb-0 space-y-0">
-            <DialogTitle>Node Registered</DialogTitle>
-            <DialogDescription>Run one of the commands below on your target machine</DialogDescription>
-          </DialogHeader>
-          <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 flex-shrink-0">
-            <X className="w-5 h-5" />
-          </Button>
-        </div>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Node Registered</DialogTitle>
+          <DialogDescription>Run one of the commands below on your target machine</DialogDescription>
+        </DialogHeader>
 
-        <div className="p-6 space-y-5">
+        <div className="space-y-5">
           {/* Connection status */}
           <div className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${
             connected
@@ -130,7 +124,7 @@ export default function NodeInstallModal({ nodeId, installToken, onClose }: Node
           </p>
         </div>
 
-        <div className="flex justify-end px-6 py-4 border-t border-zinc-700">
+        <div className="flex justify-end pt-4">
           <Button variant="outline" size="sm" onClick={onClose}>
             {connected ? 'Done' : 'Close'}
           </Button>

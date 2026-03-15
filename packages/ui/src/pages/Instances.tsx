@@ -477,7 +477,7 @@ export default function Instances() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <PageHeader icon={Layers} title="Instances" subtitle="OpenClaw containers hosting your armada agents">
+      <PageHeader icon={Layers} title="Instances" subtitle="OpenClaw containers hosting your Armada agents">
         {canMutate && (
           <Button
             onClick={() => setDialogOpen(true)}

@@ -409,7 +409,7 @@ function UserDialog({
                       })}
                       className="w-full"
                     />
-                    <p className="text-xs text-zinc-600 mt-1">How the armada reaches this operator</p>
+                    <p className="text-xs text-zinc-600 mt-1">How Armada reaches this operator</p>
                   </div>
                   <div>
                     <label className="block text-xs text-zinc-500 mb-1">Hooks Token</label>
