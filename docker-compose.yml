@@ -35,6 +35,7 @@ services:
       - "8080:8080"
     environment:
       - ARMADA_NODE_TOKEN=${ARMADA_NODE_TOKEN:-}
+      - ARMADA_CONTROL_URL=ws://armada-control:3001/api/nodes/ws
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - armada-volumes:/data/armada/volumes

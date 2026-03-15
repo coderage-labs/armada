@@ -12,7 +12,7 @@ export function runSeed(db: Database.Database): void {
   seedDefaultProject(db);
   seedModelProviders(db);
   // Model registry no longer seeded — users manage their own models via the UI
-  seedDefaultUsers(db);
+  // No default users seeded — the setup wizard handles first user creation
 }
 
 // ── Role metadata ──────────────────────────────────────────────────────────
@@ -148,35 +148,4 @@ function seedModelRegistry(db: Database.Database): void {
   }
 }
 
-// ── Default users ──────────────────────────────────────────────────────────
 
-function seedDefaultUsers(db: Database.Database): void {
-  const insert = db.prepare(`
-    INSERT OR IGNORE INTO users (id, name, display_name, type, role, linked_accounts_json, notifications_json)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  insert.run(
-    crypto.randomUUID(),
-    'admin',
-    'Chris',
-    'human',
-    'owner',
-    JSON.stringify({}),
-    JSON.stringify({
-      channels: ['telegram'],
-      telegram: { chatId: '' },
-      preferences: { gates: true, completions: true, failures: true },
-    }),
-  );
-
-  insert.run(
-    crypto.randomUUID(),
-    'robin',
-    'Robin',
-    'operator',
-    'operator',
-    JSON.stringify({ callbackUrl: 'http://openclaw-7q0i-openclaw-1:18789', hooksToken: 'LGWarLH9gFdC39pwU7Nw909eoG' }),
-    JSON.stringify({ channels: [], preferences: { gates: true, completions: true, failures: true } }),
-  );
-}
