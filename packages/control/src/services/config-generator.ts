@@ -7,7 +7,7 @@
 
 import crypto from 'node:crypto';
 import { getDrizzle } from '../db/drizzle.js';
-import { modelProviders, providerApiKeys, modelRegistry, templates, agents } from '../db/drizzle-schema.js';
+import { modelProviders, providerApiKeys, modelRegistry, templates, agents, authTokens } from '../db/drizzle-schema.js';
 import { instancesRepo, templatesRepo } from '../repositories/index.js';
 import { eq } from 'drizzle-orm';
 import { resolveTemplateModel } from './model-resolver.js';
@@ -269,7 +269,25 @@ export function generateInstanceConfig(instanceId: string): GeneratedConfig {
 
   // Configure armada-agent plugin for health reporting
   const controlPlaneUrl = process.env.ARMADA_API_URL || 'http://armada-control:3001';
-  const armadaApiToken = '';
+
+  // Generate a scoped API token for this instance so the plugin can report back
+  const instanceTokenId = crypto.randomUUID();
+  const instanceToken = crypto.randomBytes(24).toString('hex');
+  const tokenHash = crypto.createHash('sha256').update(instanceToken).digest('hex');
+  try {
+    const db = getDrizzle();
+    // Upsert: delete any old token for this instance, then create a fresh one
+    db.delete(authTokens).where(eq(authTokens.label, `instance:${instanceId}`)).run();
+    db.insert(authTokens).values({
+      id: instanceTokenId,
+      tokenHash,
+      label: `instance:${instanceId}`,
+      scopes: JSON.stringify(['instances:write', 'agents:read', 'agents:write', 'tasks:read', 'tasks:write']),
+    }).run();
+  } catch (err: any) {
+    console.warn('[config-generator] Failed to create instance token:', err.message);
+  }
+  const armadaApiToken = instanceToken;
   config.plugins = {
     load: {
       // Individual plugin paths inside the instance container — extensions/ is bind-mounted from the node's shared plugins dir
@@ -284,8 +302,8 @@ export function generateInstanceConfig(instanceId: string): GeneratedConfig {
           armadaApiToken,
           // Route plugin→control comms through the node agent gateway proxy.
           // Instances on remote nodes can't reach the control plane directly,
-          // but the node agent (armada-node-agent:3002) bridges them via its WS tunnel.
-          proxyUrl: process.env.ARMADA_AGENT_GATEWAY_URL || 'http://armada-node-agent:3002',
+          // but the node agent (armada-node:3002) bridges them via its WS tunnel.
+          proxyUrl: process.env.ARMADA_AGENT_GATEWAY_URL || 'http://armada-node:3002',
         },
       },
     },
