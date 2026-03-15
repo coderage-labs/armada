@@ -65,11 +65,9 @@ export function getOrigin(req?: Request): string {
   if (req) {
     const proto = (req.headers['x-forwarded-proto'] as string) || req.protocol || 'http';
     const host = (req.headers['x-forwarded-host'] as string) || req.get('host') || 'localhost:3001';
-    const origin = `${proto}://${host}`;
-    if (!host.startsWith('localhost') && !host.startsWith('127.0.0.1')) {
-      settingsRepo.set('origin', origin);
-    }
-    return origin;
+    // Return detected origin for this request but don't auto-store it.
+    // Origin is only persisted via the explicit confirm-url endpoint.
+    return `${proto}://${host}`;
   }
   return 'http://localhost:3001';
 }
