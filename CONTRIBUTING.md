@@ -44,7 +44,8 @@ plugins/
 1. Fork the repo and create a feature branch
 2. Make your changes
 3. Run `npm test` to ensure all tests pass
-4. Open a PR against `main`
+4. **Update documentation** — every feature or behavioural change must include doc updates (README, `docs/`, inline comments, spec files). If it changes how something works, the docs should reflect it before the PR is opened.
+5. Open a PR against `main`
 
 ## Code Style
 
