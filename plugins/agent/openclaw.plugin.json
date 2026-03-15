@@ -1,0 +1,73 @@
+{
+  "id": "armada-agent",
+  "kind": "tools",
+  "name": "Armada Agent",
+  "description": "Armada agent plugin \u2014 managed team communication with ACL, status reporting, and maintenance",
+  "version": "0.1.0",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "org": {
+        "type": "string",
+        "description": "Organisation identifier"
+      },
+      "instanceName": {
+        "type": "string",
+        "description": "This instance's name"
+      },
+      "role": {
+        "type": "string",
+        "description": "This instance's role (e.g. development, research, project-manager)"
+      },
+      "hooksToken": {
+        "type": "string",
+        "description": "Shared org-level hooks token"
+      },
+      "contacts": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            },
+            "role": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "Allowed contacts \u2014 ACL-enforced list of instances this agent can communicate with"
+      },
+      "idleTimeoutMs": {
+        "type": "number",
+        "description": "Idle timeout in ms before task is abandoned (default 180000)"
+      },
+      "hardTimeoutMs": {
+        "type": "number",
+        "description": "Hard timeout in ms before task is force-completed (default 1800000)"
+      },
+      "armadaApiUrl": {
+        "type": "string",
+        "description": "Armada control plane API URL for task reporting"
+      },
+      "armadaApiToken": {
+        "type": "string",
+        "description": "Armada control plane API auth token"
+      },
+      "proxyUrl": {
+        "type": "string",
+        "description": "Node agent proxy URL \u2014 preferred over armadaApiUrl for remote nodes"
+      },
+      "projects": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Project names this agent belongs to"
+      }
+    }
+  }
+}
