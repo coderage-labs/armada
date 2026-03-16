@@ -16,6 +16,7 @@
 import type { ArmadaUser } from '@coderage-labs/armada-shared';
 import { usersRepo, userProjectsRepo, notificationChannelRepo } from '../repositories/index.js';
 import { sendGateNotification, sendPlainNotification } from './telegram-bot.js';
+import { sendSlackGateNotification, sendSlackNotification } from './slack-bot.js';
 import { getDrizzle } from '../db/drizzle.js';
 import { workflowStepRuns } from '../db/drizzle-schema.js';
 import { and, eq, sql } from 'drizzle-orm';
@@ -212,6 +213,18 @@ async function deliverToUser(
     );
   }
 
+  // Slack — system channel must be enabled + user must have a linked identity
+  const slackId = userChannels.slack?.platformId;
+  if (enabledTypes.has('slack') && slackId) {
+    const isGate = payload.event === 'workflow.gate';
+    const slackMessage = formatForSlack(payload);
+    if (isGate && payload.runId && payload.stepId) {
+      deliveries.push(sendSlackGateNotification(slackId, slackMessage, payload.runId, payload.stepId));
+    } else {
+      deliveries.push(sendSlackNotification(slackId, slackMessage));
+    }
+  }
+
   // Callback URL — operator users, independent of channel system
   // This is always attempted if configured (no system channel check)
   if (user.linkedAccounts?.callbackUrl && user.linkedAccounts?.hooksToken) {
@@ -225,7 +238,6 @@ async function deliverToUser(
   }
 
   // Future channels — same pattern:
-  // if (enabledTypes.has('slack') && userChannels.slack?.platformId) { ... }
   // if (enabledTypes.has('email') && userChannels.email?.platformId) { ... }
 
   await Promise.allSettled(deliveries);
@@ -233,6 +245,27 @@ async function deliverToUser(
 }
 
 // ── Message formatting ──────────────────────────────────────────────
+
+/** Format a notification payload for Slack using mrkdwn */
+function formatForSlack(payload: Record<string, any>): string {
+  const { event, workflowName, stepId, runId, previousOutput } = payload;
+
+  if (event === 'workflow.gate') {
+    let msg = `⏸️ Workflow *${workflowName}* paused at gate *${stepId}*\n\n\`${runId}\``;
+    if (previousOutput) {
+      const maxPreview = 3800;
+      const preview = previousOutput.length > maxPreview
+        ? previousOutput.slice(0, maxPreview) + '...'
+        : previousOutput;
+      msg += `\n\n*Previous step output:*\n\`\`\`${preview}\`\`\``;
+    }
+    return msg;
+  }
+
+  const status = event?.replace('workflow.', '') ?? 'unknown';
+  const emoji = status === 'completed' ? '✅' : '❌';
+  return `${emoji} Workflow *${workflowName}* ${status}\n\n\`${runId}\``;
+}
 
 /** Escape HTML special chars for Telegram parse_mode: 'HTML' */
 function escapeHtml(text: string): string {

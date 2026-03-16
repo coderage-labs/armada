@@ -16,6 +16,7 @@
   "dependencies": {
     "@coderage-labs/armada-shared": "*",
     "@simplewebauthn/server": "^11.0.0",
+    "@slack/bolt": "^4.6.0",
     "@types/bcrypt": "^6.0.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/cookie-parser": "^1.4.10",

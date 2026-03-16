@@ -9,6 +9,7 @@ import { startHealthMonitor, stopHealthMonitor } from './services/health-monitor
 import { startWorkspaceRetention, stopWorkspaceRetention } from './services/workspace-retention.js';
 import { startGithubSyncScheduler, stopGithubSyncScheduler } from './services/github-sync.js';
 import { initTelegramBot, stopTelegramBot } from './services/telegram-bot.js';
+import { initSlackBot } from './services/slack-bot.js';
 import { registerAllProviders } from './services/integrations/index.js';
 import { startVersionChecker, stopVersionChecker } from './services/version-checker.js';
 import { startStuckDetector, stopStuckDetector } from './services/stuck-detector.js';
@@ -136,6 +137,9 @@ async function start() {
 
   // ── Telegram bot ───────────────────────────────────────────────────
   await initTelegramBot();
+
+  // ── Slack bot ───────────────────────────────────────────────────────
+  initSlackBot();
 
   // Cleanup on shutdown
   const shutdown = async () => {
