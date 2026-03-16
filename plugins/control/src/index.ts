@@ -41,6 +41,8 @@ interface armadaAgent {
   role?: string;
   containerId?: string;
   containerState?: string;
+  instanceName?: string;
+  instanceId?: string;
   port?: number;
 }
 
@@ -172,7 +174,13 @@ async function fetchAgents(): Promise<armadaAgent[]> {
 }
 
 function agentToUrl(agent: armadaAgent): string {
-  return `http://armada-${agent.name}:18789`;
+  // Multi-agent instances: container is named armada-instance-{instanceName}
+  // Single-agent instances would be armada-{agentName}, but we use instance naming
+  const containerHost = agent.instanceName
+    ? `armada-instance-${agent.instanceName}`
+    : `armada-${agent.name}`;
+  const port = agent.port || 18789;
+  return `http://${containerHost}:${port}`;
 }
 
 async function armadaApiGet(path: string, format: 'json' | 'text' = 'json'): Promise<any> {
@@ -567,8 +575,9 @@ export default function register(api: any) {
           const available = agents.map(a => `${a.name} (${a.status})`).join(', ');
           return { error: `Unknown instance: ${args.target}. Available: ${available || 'none'}` };
         }
-        if (agent.containerState !== 'running') {
-          return { error: `${args.target} is not running (state: ${agent.containerState})` };
+        const agentState = agent.containerState || agent.status;
+        if (agentState !== 'running') {
+          return { error: `${args.target} is not running (state: ${agentState})` };
         }
 
         const taskId = generateId();
@@ -615,6 +624,7 @@ export default function register(api: any) {
           message: args.message,
           callbackUrl: _config!.callbackUrl ? `${_config!.callbackUrl}/armada/result` : '',
           hooksToken: _config!.hooksToken,
+          targetAgent: agent.name,
           ...(args.project ? { project: args.project } : {}),
         }, _logger);
 
@@ -657,7 +667,7 @@ export default function register(api: any) {
     parameters: { type: 'object', properties: {} },
     execute: async () => {
       const agents = await fetchAgents();
-      return { instances: agents.filter(a => a.containerState === 'running').map(a => ({ name: a.name, role: a.role, url: agentToUrl(a) })) };
+      return { instances: agents.filter(a => (a.containerState || a.status) === 'running').map(a => ({ name: a.name, role: a.role, url: agentToUrl(a) })) };
     },
   });
 
@@ -681,7 +691,7 @@ export default function register(api: any) {
       const agents = await fetchAgents();
       const agent = agents.find(a => a.name.toLowerCase() === args.target.toLowerCase());
       if (!agent) return { error: `Unknown agent: ${args.target}` };
-      if (agent.containerState !== 'running') return { error: `${args.target} is not running` };
+      if ((agent.containerState || agent.status) !== 'running') return { error: `${args.target} is not running` };
 
       // Find taskId — use provided or find the most recent active task for this agent
       let taskId = args.taskId;

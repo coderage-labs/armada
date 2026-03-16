@@ -55,7 +55,7 @@ export function requireScope(...scopes: Scope[]): any {
       ? caller.scopes
       : getScopesForRole(caller.role);
     
-    const missing = scopes.filter(s => !userScopes.includes(s));
+    const missing = userScopes.includes('*' as any) ? [] : scopes.filter(s => !userScopes.includes(s));
     if (missing.length > 0) {
       res.status(403).json({ error: 'Insufficient permissions', required: scopes, missing });
       return;
