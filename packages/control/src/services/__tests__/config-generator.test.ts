@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { buildControlUiConfig } from '../config-generator.js';
 
 /**
  * Normalize model IDs by stripping dated suffixes (e.g., -20250514).
@@ -33,5 +34,33 @@ describe('normalizeModelId', () => {
     // Should not strip non-8-digit suffixes
     expect(normalizeModelId('model-123')).toBe('model-123');
     expect(normalizeModelId('model-2025')).toBe('model-2025');
+  });
+});
+
+describe('buildControlUiConfig', () => {
+  it('returns dangerouslyAllowHostHeaderOriginFallback when no origins are provided', () => {
+    const config = buildControlUiConfig();
+    expect(config).toEqual({ dangerouslyAllowHostHeaderOriginFallback: true });
+    expect(config).not.toHaveProperty('allowedOrigins');
+  });
+
+  it('returns dangerouslyAllowHostHeaderOriginFallback when an empty origins array is provided', () => {
+    // OpenClaw rejects allowedOrigins: [] as "not configured" — must use fallback instead
+    const config = buildControlUiConfig([]);
+    expect(config).toEqual({ dangerouslyAllowHostHeaderOriginFallback: true });
+    expect(config).not.toHaveProperty('allowedOrigins');
+  });
+
+  it('returns allowedOrigins (without fallback flag) when origins are provided', () => {
+    const origins = ['https://app.example.com', 'https://staging.example.com'];
+    const config = buildControlUiConfig(origins);
+    expect(config).toEqual({ allowedOrigins: origins });
+    expect(config).not.toHaveProperty('dangerouslyAllowHostHeaderOriginFallback');
+  });
+
+  it('returns allowedOrigins for a single origin', () => {
+    const config = buildControlUiConfig(['https://app.example.com']);
+    expect(config).toEqual({ allowedOrigins: ['https://app.example.com'] });
+    expect(config).not.toHaveProperty('dangerouslyAllowHostHeaderOriginFallback');
   });
 });
