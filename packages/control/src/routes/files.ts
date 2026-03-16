@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireScope } from '../middleware/scopes.js';
 import { getNodeClient } from '../infrastructure/node-client.js';
+import { registerToolDef } from '../utils/tool-registry.js';
 
 const router = Router();
 
@@ -116,6 +117,34 @@ router.get('/list/:agent', async (req, res) => {
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// ── Tool definitions ─────────────────────────────────────────────────
+
+registerToolDef({
+  name: 'armada_transfer',
+  description: 'Transfer a file from one agent\'s workspace to another. The file is copied via the node agent — works across machines.',
+  method: 'POST',
+  path: '/api/files/transfer',
+  parameters: [
+    { name: 'fromAgent', type: 'string', description: 'Source agent name', required: true },
+    { name: 'path', type: 'string', description: 'File path in source agent workspace', required: true },
+    { name: 'toAgent', type: 'string', description: 'Destination agent name', required: true },
+    { name: 'destPath', type: 'string', description: 'Destination path in target workspace (optional, defaults to shared-files/)' },
+  ],
+  scope: 'agents:write',
+});
+
+registerToolDef({
+  name: 'armada_share',
+  description: 'Share a file from an agent\'s workspace. Returns a ref that can be used to download or deliver the file.',
+  method: 'POST',
+  path: '/api/files/share',
+  parameters: [
+    { name: 'agent', type: 'string', description: 'Agent name', required: true },
+    { name: 'path', type: 'string', description: 'File path in agent workspace', required: true },
+  ],
+  scope: 'agents:write',
 });
 
 export default router;
