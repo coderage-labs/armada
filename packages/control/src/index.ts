@@ -10,6 +10,7 @@ import { startWorkspaceRetention, stopWorkspaceRetention } from './services/work
 import { startGithubSyncScheduler, stopGithubSyncScheduler } from './services/github-sync.js';
 import { initTelegramBot, stopTelegramBot } from './services/telegram-bot.js';
 import { initSlackBot } from './services/slack-bot.js';
+import { initDiscordBot } from './services/discord-bot.js';
 import { registerAllProviders } from './services/integrations/index.js';
 import { startVersionChecker, stopVersionChecker } from './services/version-checker.js';
 import { startStuckDetector, stopStuckDetector } from './services/stuck-detector.js';
@@ -140,6 +141,9 @@ async function start() {
 
   // ── Slack bot ───────────────────────────────────────────────────────
   initSlackBot();
+
+  // ── Discord bot ─────────────────────────────────────────────────────
+  initDiscordBot();
 
   // Cleanup on shutdown
   const shutdown = async () => {

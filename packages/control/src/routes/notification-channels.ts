@@ -24,7 +24,7 @@ registerToolDef({
     { name: 'type', type: 'string', description: 'Channel type: telegram | slack | discord | email', required: true },
     { name: 'name', type: 'string', description: 'Display name for this channel', required: true },
     { name: 'enabled', type: 'boolean', description: 'Whether the channel is enabled', required: false },
-    { name: 'config', type: 'string', description: 'Channel-specific config as JSON. Examples: Telegram: { "token": "...", "chat_id": "..." } (chat_id is fallback only — per-user delivery uses each user\'s own notification preferences). Slack: { "token": "xoxb-...", "signingSecret": "...", "appToken": "xapp-..." } (appToken optional, enables Socket Mode — no public URL needed). Discord/other: { "webhook_url": "..." }', required: true },
+    { name: 'config', type: 'string', description: 'Channel-specific config as JSON. Examples: Telegram: { "token": "...", "chat_id": "..." } (chat_id is fallback only — per-user delivery uses each user\'s own notification preferences). Slack: { "token": "xoxb-...", "signingSecret": "...", "appToken": "xapp-..." } (appToken optional, enables Socket Mode — no public URL needed). Discord: { "token": "Bot token from Discord Developer Portal" }', required: true },
   ],
     scope: 'system:write',
 });

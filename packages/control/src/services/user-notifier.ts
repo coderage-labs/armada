@@ -17,6 +17,7 @@ import type { ArmadaUser } from '@coderage-labs/armada-shared';
 import { usersRepo, userProjectsRepo, notificationChannelRepo } from '../repositories/index.js';
 import { sendGateNotification, sendPlainNotification } from './telegram-bot.js';
 import { sendSlackGateNotification, sendSlackNotification } from './slack-bot.js';
+import { sendDiscordGateNotification, sendDiscordNotification } from './discord-bot.js';
 import { getDrizzle } from '../db/drizzle.js';
 import { workflowStepRuns } from '../db/drizzle-schema.js';
 import { and, eq, sql } from 'drizzle-orm';
@@ -222,6 +223,17 @@ async function deliverToUser(
       deliveries.push(sendSlackGateNotification(slackId, slackMessage, payload.runId, payload.stepId));
     } else {
       deliveries.push(sendSlackNotification(slackId, slackMessage));
+    }
+  }
+
+  // Discord — system channel must be enabled + user must have a linked identity
+  const discordId = userChannels.discord?.platformId;
+  if (enabledTypes.has('discord') && discordId) {
+    const isGate = payload.event === 'workflow.gate';
+    if (isGate && payload.runId && payload.stepId) {
+      deliveries.push(sendDiscordGateNotification(discordId, message, payload.runId, payload.stepId));
+    } else {
+      deliveries.push(sendDiscordNotification(discordId, message));
     }
   }
 
