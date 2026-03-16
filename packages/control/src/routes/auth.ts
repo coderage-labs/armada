@@ -53,9 +53,7 @@ router.get('/tokens', (req, res) => {
     return;
   }
 
-  const tokens = caller.role === 'owner'
-    ? authTokenRepo.listAll()
-    : authTokenRepo.listByUser(caller.id);
+  const tokens = authTokenRepo.listByUser(caller.id);
 
   res.json(tokens);
 });
