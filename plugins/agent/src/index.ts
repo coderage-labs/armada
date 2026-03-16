@@ -1415,7 +1415,8 @@ export default function register(api: any) {
         },
         body: JSON.stringify({
           instanceName: _config.instanceName,
-          activeTasks: [...inboundContexts.values()].map(ctx => ctx.taskId).filter(Boolean),
+          activeTasks: inboundContexts.size,
+          activeTaskIds: [...inboundContexts.values()].map(ctx => ctx.taskId).filter(Boolean),
           version: _openclawVersion,
           pluginVersions: _pluginVersions,
           skillVersions: _skillVersions,
