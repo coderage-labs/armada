@@ -62,7 +62,7 @@ export async function handleGatewayProxyCommand(msg: CommandMessage): Promise<Re
 
   // Forward safe request headers from the original instance request
   for (const [key, value] of Object.entries(reqHeaders ?? {})) {
-    if (!hopByHop.has(key.toLowerCase()) && key.toLowerCase() !== 'authorization') {
+    if (!hopByHop.has(key.toLowerCase()) && key.toLowerCase() !== 'authorization' && key.toLowerCase() !== 'content-length') {
       forwardHeaders[key] = value;
     }
   }
