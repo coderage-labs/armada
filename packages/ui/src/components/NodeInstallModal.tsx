@@ -42,7 +42,7 @@ function CopyButton({ text }: { text: string }) {
 export default function NodeInstallModal({ nodeId, installToken, onClose }: NodeInstallModalProps) {
   const [connected, setConnected] = useState(false);
 
-  const curlCommand = `curl -fsSL ${ARMADA_ORIGIN}/install | sh -s -- --token ${installToken}`;
+  const curlCommand = `curl -fsSL ${ARMADA_ORIGIN}/install/${installToken} | bash`;
   const dockerCommand = `docker run -d --name armada-node --restart unless-stopped \\
   --memory=256m --memory-swap=512m --cpus=0.5 \\
   -v /var/run/docker.sock:/var/run/docker.sock \\
