@@ -36,9 +36,7 @@ jobs:
   publish-control-image:
     needs: release-please
     if: |
-      needs.release-please.outputs['armada-control--release_created'] == 'true' ||
-      needs.release-please.outputs['ui--release_created'] == 'true' ||
-      needs.release-please.outputs['armada--release_created'] == 'true' ||
+      needs.release-please.outputs.releases_created == 'true' ||
       inputs.force_publish == true
     runs-on: ubuntu-latest
     permissions:
@@ -66,8 +64,7 @@ jobs:
   publish-armada-node-image:
     needs: release-please
     if: |
-      needs.release-please.outputs['armada-node--release_created'] == 'true' ||
-      needs.release-please.outputs['armada--release_created'] == 'true' ||
+      needs.release-please.outputs.releases_created == 'true' ||
       inputs.force_publish == true
     runs-on: ubuntu-latest
     permissions:
@@ -94,7 +91,7 @@ jobs:
 
   publish-armada-shared:
     needs: release-please
-    if: needs.release-please.outputs['armada-shared--release_created'] == 'true' || inputs.force_publish == true
+    if: needs.release-please.outputs.releases_created == 'true' || inputs.force_publish == true
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -112,7 +109,7 @@ jobs:
 
   publish-armada-control:
     needs: release-please
-    if: needs.release-please.outputs['armada-control-plugin--release_created'] == 'true' || inputs.force_publish == true
+    if: needs.release-please.outputs.releases_created == 'true' || inputs.force_publish == true
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -131,7 +128,7 @@ jobs:
 
   publish-armada-agent:
     needs: release-please
-    if: needs.release-please.outputs['armada-agent-plugin--release_created'] == 'true' || inputs.force_publish == true
+    if: needs.release-please.outputs.releases_created == 'true' || inputs.force_publish == true
     runs-on: ubuntu-latest
     permissions:
       contents: read
