@@ -373,6 +373,23 @@ const migrations: Migration[] = [
       'ALTER TABLE workflow_step_runs ADD COLUMN retry_config TEXT DEFAULT NULL',
     ],
   },
+
+  // ── notification_channels (#512) ──────────────────────────────────
+  {
+    version: 31,
+    description: 'Create notification_channels table (#512)',
+    sql: [
+      `CREATE TABLE IF NOT EXISTS notification_channels (
+        id         TEXT PRIMARY KEY,
+        type       TEXT NOT NULL,
+        name       TEXT NOT NULL,
+        enabled    INTEGER NOT NULL DEFAULT 1,
+        config     TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+        updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+      )`,
+    ],
+  },
 ];
 
 /**

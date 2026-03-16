@@ -583,6 +583,18 @@ export function createTables(db: Database.Database): void {
       workspace_deleted INTEGER NOT NULL DEFAULT 0
     );
 
+    -- ── Notification channels (#512) ─────────────────────────────────────
+
+    CREATE TABLE IF NOT EXISTS notification_channels (
+      id         TEXT PRIMARY KEY,
+      type       TEXT NOT NULL,
+      name       TEXT NOT NULL,
+      enabled    INTEGER NOT NULL DEFAULT 1,
+      config     TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+    );
+
     -- ── Schema version tracking ───────────────────────────────────────────
 
     CREATE TABLE IF NOT EXISTS schema_version (
