@@ -9,3 +9,5 @@ packages/ui/e2e/.auth/
 armada.db
 *.db-shm
 *.db-wal
+armada.db-shm
+armada.db-wal
