@@ -152,7 +152,7 @@ registerToolDef({
 registerToolDef({
   name: 'armada_workflow_run_context',
   description: 'Get the full workflow context for a run — all steps, their outputs, agents, and rework history. Agents use this to inspect the workflow state.',
-  method: 'GET', path: '/api/workflow-runs/:runId/context',
+  method: 'GET', path: '/api/workflows/runs/:runId/context',
   parameters: [{ name: 'runId', type: 'string', description: 'Run ID', required: true }],
     scope: 'workflows:read',
 });
@@ -160,7 +160,7 @@ registerToolDef({
 registerToolDef({
   name: 'armada_workflow_run_rework',
   description: 'Request rework on a previously completed step. The requesting step is paused, the target step is reset and re-dispatched with feedback.',
-  method: 'POST', path: '/api/workflow-runs/:runId/rework',
+  method: 'POST', path: '/api/workflows/runs/:runId/rework',
   parameters: [
     { name: 'runId', type: 'string', description: 'Run ID', required: true },
     { name: 'requestingStepId', type: 'string', description: 'Step ID requesting the rework (must be running)', required: true },
