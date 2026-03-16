@@ -230,8 +230,8 @@ export function createAgentRoutes(nodeManager: NodeManager): Router {
   // POST /api/agents/:name/heartbeat → agentManager.heartbeat()
   router.post('/:name/heartbeat', requireScope('agents:write'), (req, res, next) => {
     try {
-      const { taskCount, memoryMb, uptimeMs } = req.body as Partial<HeartbeatMeta>;
-      agentManager.heartbeat(req.params.name, { taskCount, memoryMb, uptimeMs });
+      const { taskCount, memoryMb, uptimeMs, activeTasks } = req.body as Partial<HeartbeatMeta> & { activeTasks?: number };
+      agentManager.heartbeat(req.params.name, { taskCount: taskCount ?? activeTasks, memoryMb, uptimeMs });
       res.json({ status: 'ok' });
     } catch (err: any) {
       if (err.statusCode) return res.status(err.statusCode).json({ error: err.message });
