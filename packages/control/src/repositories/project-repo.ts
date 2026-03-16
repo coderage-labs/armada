@@ -172,6 +172,7 @@ export const userProjectsRepo = {
         avatarVersion: users.avatarVersion,
         linkedAccountsJson: users.linkedAccountsJson,
         notificationsJson: users.notificationsJson,
+        channelsJson: users.channelsJson,
         createdAt: users.createdAt,
         passwordHash: users.passwordHash,
       })

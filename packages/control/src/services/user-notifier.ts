@@ -246,7 +246,7 @@ async function deliverToUser(
   // Webhook — user must have webhook config; independent of channel system
   const webhookUrl = user.notifications?.webhook?.url;
   if (webhookUrl) {
-    deliveries.push(sendWebhook(webhookUrl, user.notifications?.webhook?.secret, payload));
+    deliveries.push(sendWebhook(webhookUrl, (user.notifications?.webhook as any)?.secret, payload));
   }
 
   // Future channels — same pattern:

@@ -111,7 +111,7 @@ export function initDiscordBot(): void {
         await interaction.update({ content: `✅ Gate **${stepId}** approved by ${user.displayName}`, components: [] });
       } else if (action === 'gate_reject') {
         const { rejectGate } = await import('./workflow-engine.js');
-        rejectGate(runId, stepId, 'Rejected via Discord', user.id);
+        rejectGate(runId, stepId, `Rejected via Discord by ${user.displayName}`);
         await interaction.update({ content: `❌ Gate **${stepId}** rejected by ${user.displayName}`, components: [] });
       }
     } catch (err: any) {
