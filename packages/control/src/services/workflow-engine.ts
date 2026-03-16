@@ -725,6 +725,57 @@ export async function rejectGate(runId: string, stepId: string, reason?: string)
   const workflow = parseWorkflow(workflowRow);
   const stepDef = workflow.steps.find(s => s.id === stepId);
 
+  // Check for loopUntilApproved — loop back to target step instead of failing
+  if (stepDef?.loopUntilApproved && stepDef.loopBackToStep) {
+    const loopTargetId = stepDef.loopBackToStep;
+    const loopTargetDef = workflow.steps.find(s => s.id === loopTargetId);
+    if (!loopTargetDef) {
+      console.error(`[workflow-engine] loopBackToStep "${loopTargetId}" not found in workflow`);
+    } else {
+      console.log(`[workflow-engine] Gate "${stepId}" rejected — looping back to "${loopTargetId}" (reason: ${reason || 'none'})`);
+
+      // Reset the gate step to pending
+      const currentState: RetryState = JSON.parse(stepRun.retry_config || '{"retryCount":0,"loopIteration":0}');
+      const newState: RetryState = { retryCount: 0, loopIteration: currentState.loopIteration + 1 };
+      db.run(sql`
+        UPDATE workflow_step_runs
+        SET status = 'pending', output = NULL, task_id = NULL, agent_name = NULL,
+            started_at = NULL, completed_at = NULL, retry_config = ${JSON.stringify(newState)}
+        WHERE id = ${stepRun.id}
+      `);
+
+      // Reset the loop target step
+      const loopTargetRun = db.get(sql`
+        SELECT * FROM workflow_step_runs WHERE run_id = ${runId} AND step_id = ${loopTargetId}
+      `) as any;
+      if (loopTargetRun) {
+        db.run(sql`
+          UPDATE workflow_step_runs
+          SET status = 'pending', output = NULL, task_id = NULL, agent_name = NULL,
+              started_at = NULL, completed_at = NULL
+          WHERE id = ${loopTargetRun.id}
+        `);
+      }
+
+      // Inject rejection feedback into context for the loop target
+      const context = { ...run.context } as any;
+      context[`${loopTargetId}_reworkFeedback`] = reason || 'Gate rejected — please revise.';
+      context[`${loopTargetId}_previousOutput`] = context[loopTargetId]?.output;
+      delete context[loopTargetId];
+      delete context[stepId];
+      db.update(workflowRuns).set({ contextJson: JSON.stringify(context), status: 'running' }).where(eq(workflowRuns.id, runId)).run();
+
+      // Re-dispatch the loop target step
+      const freshRun = getRunById(runId)!;
+      const freshStepRuns = getStepRunsForRun(runId);
+      const freshLoopStep = freshStepRuns.find(sr => sr.stepId === loopTargetId);
+      if (freshLoopStep) {
+        await dispatchStep(freshRun, workflow, loopTargetDef, freshLoopStep);
+      }
+      return;
+    }
+  }
+
   if (!stepDef?.optional) {
     db.run(sql`UPDATE workflow_runs SET status = 'failed', completed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ${runId}`);
 
