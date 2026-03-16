@@ -390,6 +390,22 @@ const migrations: Migration[] = [
       )`,
     ],
   },
+
+  // ── notification channel linking (#63) ────────────────────────────
+  {
+    version: 32,
+    description: 'Add unique constraint on notification_channels.type (#63)',
+    sql: [
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_notification_channels_type ON notification_channels(type)',
+    ],
+  },
+  {
+    version: 33,
+    description: 'Add channels_json column to users table (#63)',
+    sql: [
+      "ALTER TABLE users ADD COLUMN channels_json TEXT NOT NULL DEFAULT '{}'",
+    ],
+  },
 ];
 
 /**

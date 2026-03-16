@@ -65,6 +65,16 @@ export const templateModelSchema = z.object({
 
 export const stringArraySchema = z.array(z.string());
 
+// ── Channel identity (linking) ─────────────────────────────────────
+
+export const channelIdentitySchema = z.object({
+  platformId: z.string(),
+  verified: z.boolean(),
+  linkedAt: z.string(),
+});
+
+export const userChannelsSchema = z.record(z.string(), channelIdentitySchema);
+
 // ── User JSON fields ───────────────────────────────────────────────
 
 export const linkedAccountsSchema = z.object({

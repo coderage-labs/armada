@@ -517,6 +517,13 @@ export interface ArmadaUser {
   avatarGenerating?: boolean;
   avatarVersion?: number;
   linkedAccounts: { telegram?: string; github?: string; email?: string; callbackUrl?: string; hooksToken?: string };
+  channels?: {
+    [type: string]: {
+      platformId: string;
+      verified: boolean;
+      linkedAt: string;
+    };
+  };
   notifications: {
     channels: string[];
     telegram?: { chatId: string };

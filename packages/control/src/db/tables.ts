@@ -314,6 +314,7 @@ export function createTables(db: Database.Database): void {
       password_hash        TEXT DEFAULT NULL,
       linked_accounts_json TEXT NOT NULL DEFAULT '{}',
       notifications_json   TEXT NOT NULL DEFAULT '{}',
+      channels_json        TEXT NOT NULL DEFAULT '{}',
       created_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
     );
 
@@ -594,6 +595,7 @@ export function createTables(db: Database.Database): void {
       created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
       updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
     );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_notification_channels_type ON notification_channels(type);
 
     -- ── Schema version tracking ───────────────────────────────────────────
 
