@@ -420,4 +420,75 @@ describe('ChangesetService', () => {
 
     await expect(service.apply(created.id)).rejects.toThrow(/not approved/);
   });
+
+  // 11. rebuildSteps handles pending instance create mutations (regression test for #21)
+  it('rebuildSteps includes instances from pending create mutations (not yet committed to DB)', () => {
+    seedNode();
+    const service = createChangesetService();
+
+    // Create a draft changeset manually
+    const changesetId = 'cs-test-rebuild';
+    getDrizzle().insert(changesets).values({
+      id: changesetId,
+      status: 'draft',
+      changesJson: '[]',
+      planJson: JSON.stringify({
+        instanceOps: [],
+        order: 'sequential',
+        concurrency: 1,
+        totalInstances: 0,
+        totalChanges: 0,
+        totalRestarts: 0,
+        estimatedDuration: 0,
+      }),
+    }).run();
+
+    // Add a pending instance create mutation (instance not in DB yet)
+    const newInstanceId = 'inst-new-create';
+    getDrizzle().insert(pendingMutations).values({
+      id: 'mut-inst-create',
+      changesetId,
+      entityType: 'instance',
+      entityId: newInstanceId,
+      action: 'create',
+      payloadJson: JSON.stringify({
+        name: 'fresh-instance',
+        nodeId: 'test-node',
+        capacity: 5,
+      }),
+    }).run();
+
+    // Add a pending agent create mutation for the new instance
+    getDrizzle().insert(pendingMutations).values({
+      id: 'mut-agent-create',
+      changesetId,
+      entityType: 'agent',
+      entityId: 'agent-new',
+      action: 'create',
+      payloadJson: JSON.stringify({
+        name: 'fresh-agent',
+        instanceId: newInstanceId,
+        templateId: 'tmpl-1',
+      }),
+    }).run();
+
+    // Rebuild steps — should discover the new instance from the pending mutation
+    service.rebuildSteps(changesetId);
+
+    // Verify the changeset plan includes the new instance
+    const updated = service.get(changesetId);
+    expect(updated).toBeTruthy();
+    expect(updated!.plan.instanceOps).toHaveLength(1);
+    expect(updated!.plan.instanceOps[0]!.instanceId).toBe(newInstanceId);
+    expect(updated!.plan.instanceOps[0]!.instanceName).toBe('fresh-instance');
+
+    // Verify the steps include container bootstrap sequence
+    const stepNames = updated!.plan.instanceOps[0]!.steps.map((s: any) => s.name);
+    expect(stepNames).toContain('pull_image');
+    expect(stepNames).toContain('create_container');
+    expect(stepNames).toContain('install_plugins');
+    expect(stepNames).toContain('push_config');
+    expect(stepNames).toContain('start_container');
+    expect(stepNames).toContain('health_check');
+  });
 });

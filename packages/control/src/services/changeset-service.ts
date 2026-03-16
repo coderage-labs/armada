@@ -437,6 +437,12 @@ export function createChangesetService(): ChangesetService {
       const inst = instancesRepo.getById(m.entityId!);
       if (inst && !instanceMap.has(inst.id)) {
         instanceMap.set(inst.id, { instanceId: inst.id, instanceName: inst.name });
+      } else if (!inst && m.action === 'create' && m.payload) {
+        // New instance not yet committed — use data from the mutation payload
+        const id = m.entityId!;
+        if (!instanceMap.has(id)) {
+          instanceMap.set(id, { instanceId: id, instanceName: m.payload.name || id });
+        }
       }
     }
 
