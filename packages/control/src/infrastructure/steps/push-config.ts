@@ -69,7 +69,7 @@ export const pushConfigHandler: StepHandler = {
     ctx.emit(`Writing auth-profiles.json for ${agents.length} agent(s)`, { instanceId, agentCount: agents.length });
 
     for (const agent of agents) {
-      const authProfilesPath = `agents/${agent.name}/agent/auth-profiles.json`;
+      const authProfilesPath = `armada/instances/${instanceName}/agents/${agent.name}/agent/auth-profiles.json`;
       await withRetry(
         () => node.writeInstanceFile(instanceName, authProfilesPath, JSON.stringify(authProfiles, null, 2)),
         {
