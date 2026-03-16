@@ -31,3 +31,5 @@ export { pendingMutationRepo } from './pending-mutation-repo.js';
 export type { PendingMutation } from './pending-mutation-repo.js';
 export { usageRepo } from './usage-repo.js';
 export type { UsageEntry, UsageTotals, UsageByDimension, UsagePeriod } from './usage-repo.js';
+export { notificationChannelRepo } from './notification-channel-repo.js';
+export type { NotificationChannel, NotificationChannelType } from './notification-channel-repo.js';
