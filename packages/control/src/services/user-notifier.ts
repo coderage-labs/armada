@@ -2,13 +2,19 @@
  * User Notifier — sends notifications to users based on their preferences.
  *
  * Delivery channels:
- * - Telegram: via grammy bot instance (requires TELEGRAM_BOT_TOKEN env var)
+ * - Telegram: via grammy bot instance (requires system channel to be configured + enabled)
  * - Callback URL: HTTP POST to operator's OpenClaw hooks endpoint (for operator-type users like Robin)
  * - Webhook: HTTP POST to configured webhook URL
+ *
+ * Delivery rules:
+ * 1. System channel must be configured and enabled (notificationChannelRepo.getEnabled())
+ * 2. User must have a linked identity for that channel (user.channels)
+ * 3. User preferences must allow it
+ * 4. Not in quiet hours (for non-critical notifications like completions)
  */
 
 import type { ArmadaUser } from '@coderage-labs/armada-shared';
-import { usersRepo, userProjectsRepo } from '../repositories/index.js';
+import { usersRepo, userProjectsRepo, notificationChannelRepo } from '../repositories/index.js';
 import { sendGateNotification, sendPlainNotification } from './telegram-bot.js';
 import { getDrizzle } from '../db/drizzle.js';
 import { workflowStepRuns } from '../db/drizzle-schema.js';
@@ -41,12 +47,44 @@ export interface NotifyCompletionOptions {
   projectId: string;
 }
 
+// ── Quiet hours ─────────────────────────────────────────────────────
+
+/**
+ * Returns true if the current time falls within the user's configured quiet hours.
+ * Handles overnight ranges (e.g. 23:00 → 08:00).
+ */
+export function isInQuietHours(user: ArmadaUser): boolean {
+  const quiet = user.notifications?.preferences?.quietHours;
+  if (!quiet?.start || !quiet?.end) return false;
+
+  const tz = (quiet as any).tz || 'UTC';
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: tz,
+  });
+  const currentTime = formatter.format(new Date());
+
+  const start = quiet.start; // e.g. "23:00"
+  const end = quiet.end;     // e.g. "08:00"
+
+  // Handle overnight range (23:00 → 08:00)
+  if (start > end) {
+    return currentTime >= start || currentTime < end;
+  }
+  return currentTime >= start && currentTime < end;
+}
+
+// ── Public notification functions ───────────────────────────────────
+
 /**
  * Notify users when a manual gate is reached.
  * - Filtered by project assignment (falls back to all users if no assignments)
  * - Filtered by gatePolicy.notifyOnly if set
  * - operator users: always notified (unless excluded by gatePolicy)
  * - human users: only if notifications.preferences.gates === true
+ * - Gates are always delivered regardless of quiet hours (they require action)
  */
 export async function notifyGate(opts: NotifyGateOptions): Promise<void> {
   const { workflowName, stepId, runId, previousOutput, projectId, gatePolicy } = opts;
@@ -71,6 +109,8 @@ export async function notifyGate(opts: NotifyGateOptions): Promise<void> {
         (user.type === 'human' && user.notifications?.preferences?.gates === true);
 
       if (!shouldNotify) continue;
+
+      // Gates always deliver — they require human action, quiet hours do not apply
 
       const message = formatGateMessage(workflowName, stepId, runId, previousOutput);
       const telegramResult = await deliverToUser(user, message, {
@@ -105,6 +145,7 @@ export async function notifyGate(opts: NotifyGateOptions): Promise<void> {
  * - Filtered by project assignment (falls back to all users if no assignments)
  * - operator users: always notified
  * - human users: only if matching preference (completions/failures) is true
+ * - Completions/failures are skipped during quiet hours
  */
 export async function notifyCompletion(opts: NotifyCompletionOptions): Promise<void> {
   const { workflowName, runId, status, projectId } = opts;
@@ -125,6 +166,12 @@ export async function notifyCompletion(opts: NotifyCompletionOptions): Promise<v
 
       if (!shouldNotify) continue;
 
+      // Skip completions/failures during quiet hours — they are non-critical
+      if (isInQuietHours(user)) {
+        console.log(`[user-notifier] Skipping ${status} notification for ${user.name} — quiet hours`);
+        continue;
+      }
+
       const message = formatCompletionMessage(workflowName, runId, status);
       await deliverToUser(user, message, {
         event: `workflow.${status}`,
@@ -144,32 +191,42 @@ async function deliverToUser(
   message: string,
   payload: Record<string, any>,
 ): Promise<TelegramNotification | null> {
-  const channels = user.notifications?.channels || [];
-  let telegramResult: TelegramNotification | null = null;
+  // Get system-configured channels that are enabled
+  const enabledChannels = notificationChannelRepo.getEnabled();
+  const enabledTypes = new Set(enabledChannels.map(c => c.type));
 
+  const userChannels = user.channels || {};
+
+  let telegramResult: TelegramNotification | null = null;
   const deliveries: Promise<void>[] = [];
 
-  // Telegram delivery — prefer new user.channels field, fall back to legacy notifications.telegram.chatId
-  const telegramId = user.channels?.telegram?.platformId || user.notifications?.telegram?.chatId;
-  if (channels.includes('telegram') && telegramId) {
+  // Telegram — system channel must be enabled + user must have a linked identity
+  // Backwards compat: fall back to legacy notifications.telegram.chatId
+  const telegramId = userChannels.telegram?.platformId || user.notifications?.telegram?.chatId;
+  if (enabledTypes.has('telegram') && telegramId) {
     const isGate = payload.event === 'workflow.gate';
-    const chatId = telegramId;
     deliveries.push(
-      sendTelegram(chatId, message, isGate, payload.runId, payload.stepId).then(msgId => {
-        if (msgId !== null) telegramResult = { chatId, messageId: msgId };
+      sendTelegram(telegramId, message, isGate, payload.runId, payload.stepId).then(msgId => {
+        if (msgId !== null) telegramResult = { chatId: telegramId, messageId: msgId };
       })
     );
   }
 
-  // Callback URL delivery (operator users — always delivers if configured, independent of channels array)
+  // Callback URL — operator users, independent of channel system
+  // This is always attempted if configured (no system channel check)
   if (user.linkedAccounts?.callbackUrl && user.linkedAccounts?.hooksToken) {
     deliveries.push(sendCallback(user.linkedAccounts.callbackUrl, user.linkedAccounts.hooksToken, payload));
   }
 
-  // Webhook delivery
-  if (channels.includes('webhook') && user.notifications?.webhook?.url) {
-    deliveries.push(sendWebhook(user.notifications.webhook.url, undefined, payload));
+  // Webhook — user must have webhook config; independent of channel system
+  const webhookUrl = user.notifications?.webhook?.url;
+  if (webhookUrl) {
+    deliveries.push(sendWebhook(webhookUrl, user.notifications?.webhook?.secret, payload));
   }
+
+  // Future channels — same pattern:
+  // if (enabledTypes.has('slack') && userChannels.slack?.platformId) { ... }
+  // if (enabledTypes.has('email') && userChannels.email?.platformId) { ... }
 
   await Promise.allSettled(deliveries);
   return telegramResult;
