@@ -11,6 +11,7 @@
 
 import { Bot, InlineKeyboard } from 'grammy';
 import { usersRepo } from '../repositories/index.js';
+import { notificationChannelRepo } from '../repositories/notification-channel-repo.js';
 import {
   approveGate,
   rejectGate,
@@ -22,8 +23,6 @@ import {
 function escapeHtml(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
-
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
 let bot: Bot | null = null;
 let isPolling = false;
@@ -50,12 +49,31 @@ function gateKeyboard(runId: string, stepId: string): InlineKeyboard {
 }
 
 /**
+ * Resolve the Telegram bot token.
+ * Prefers the first enabled Telegram notification channel's config.token,
+ * falls back to TELEGRAM_BOT_TOKEN env var for backwards compatibility.
+ */
+function resolveBotToken(): string | undefined {
+  try {
+    const channels = notificationChannelRepo.findAll();
+    const telegramChannel = channels.find(c => c.type === 'telegram' && c.enabled && c.config?.token);
+    if (telegramChannel) {
+      return telegramChannel.config.token as string;
+    }
+  } catch {
+    // DB may not be ready yet — fall through to env var
+  }
+  return process.env.TELEGRAM_BOT_TOKEN;
+}
+
+/**
  * Initialize the Telegram bot.
- * Only starts if TELEGRAM_BOT_TOKEN is set.
+ * Only starts if a bot token is available (from notification channel config or env var).
  */
 export async function initTelegramBot(): Promise<void> {
+  const TELEGRAM_BOT_TOKEN = resolveBotToken();
   if (!TELEGRAM_BOT_TOKEN) {
-    console.log('⏭️  Skipping Telegram bot (TELEGRAM_BOT_TOKEN not set)');
+    console.log('⏭️  Skipping Telegram bot (no bot token configured)');
     return;
   }
 
