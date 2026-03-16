@@ -149,10 +149,11 @@ async function deliverToUser(
 
   const deliveries: Promise<void>[] = [];
 
-  // Telegram delivery
-  if (channels.includes('telegram') && user.notifications?.telegram?.chatId) {
+  // Telegram delivery — prefer new user.channels field, fall back to legacy notifications.telegram.chatId
+  const telegramId = user.channels?.telegram?.platformId || user.notifications?.telegram?.chatId;
+  if (channels.includes('telegram') && telegramId) {
     const isGate = payload.event === 'workflow.gate';
-    const chatId = user.notifications.telegram.chatId;
+    const chatId = telegramId;
     deliveries.push(
       sendTelegram(chatId, message, isGate, payload.runId, payload.stepId).then(msgId => {
         if (msgId !== null) telegramResult = { chatId, messageId: msgId };

@@ -18,6 +18,7 @@ import {
   retryStep,
   getGateUpstreamSteps,
 } from './workflow-engine.js';
+import { createLinkingCode, getPendingCode } from './linking-service.js';
 
 /** Escape HTML special chars for Telegram parse_mode: 'HTML' */
 function escapeHtml(text: string): string {
@@ -80,9 +81,95 @@ export async function initTelegramBot(): Promise<void> {
   try {
     bot = new Bot(TELEGRAM_BOT_TOKEN);
 
-    // Handle /start command
+    // Handle /start command — linking flow
     bot.command('start', async (ctx) => {
-      await ctx.reply('Armada bot ready 🤖');
+      const telegramUserId = ctx.from?.id.toString();
+      if (!telegramUserId) return;
+
+      const users = usersRepo.getAll();
+      const linked = users.find(u =>
+        u.channels?.telegram?.platformId === telegramUserId ||
+        u.linkedAccounts?.telegram === telegramUserId,
+      );
+
+      if (linked) {
+        await ctx.reply(`✅ You're linked as <b>${escapeHtml(linked.displayName)}</b>. You'll receive notifications here.`, {
+          parse_mode: 'HTML',
+        });
+        return;
+      }
+
+      // Check for an existing pending code first (avoid generating a new one on every /start)
+      const existingCode = getPendingCode('telegram', telegramUserId);
+      const code = existingCode ?? createLinkingCode('telegram', telegramUserId);
+
+      await ctx.reply(
+        '👋 Welcome! To link your Telegram to Armada, enter this code on your Account page:\n\n' +
+        `<code>${code}</code>\n\n` +
+        'This code expires in 10 minutes.',
+        { parse_mode: 'HTML' },
+      );
+    });
+
+    // /link is an alias for /start (in case the user sends /link instead)
+    bot.command('link', async (ctx) => {
+      const telegramUserId = ctx.from?.id.toString();
+      if (!telegramUserId) return;
+
+      const users = usersRepo.getAll();
+      const linked = users.find(u =>
+        u.channels?.telegram?.platformId === telegramUserId ||
+        u.linkedAccounts?.telegram === telegramUserId,
+      );
+
+      if (linked) {
+        await ctx.reply(`✅ You're linked as <b>${escapeHtml(linked.displayName)}</b>. You'll receive notifications here.`, {
+          parse_mode: 'HTML',
+        });
+        return;
+      }
+
+      const existingCode = getPendingCode('telegram', telegramUserId);
+      const code = existingCode ?? createLinkingCode('telegram', telegramUserId);
+
+      await ctx.reply(
+        '👋 Welcome! To link your Telegram to Armada, enter this code on your Account page:\n\n' +
+        `<code>${code}</code>\n\n` +
+        'This code expires in 10 minutes.',
+        { parse_mode: 'HTML' },
+      );
+    });
+
+    // Handle /status command
+    bot.command('status', async (ctx) => {
+      const telegramUserId = ctx.from?.id.toString();
+      if (!telegramUserId) return;
+
+      const users = usersRepo.getAll();
+      const user = users.find(u =>
+        u.channels?.telegram?.platformId === telegramUserId ||
+        u.linkedAccounts?.telegram === telegramUserId,
+      );
+
+      if (user) {
+        await ctx.reply(
+          `✅ Linked as <b>${escapeHtml(user.displayName)}</b> (${escapeHtml(user.name)})`,
+          { parse_mode: 'HTML' },
+        );
+      } else {
+        await ctx.reply('❌ Not linked. Send /start to link your account.');
+      }
+    });
+
+    // Handle /help command
+    bot.command('help', async (ctx) => {
+      await ctx.reply(
+        '🤖 <b>Armada Bot</b>\n\n' +
+        '/start — Link your Telegram account\n' +
+        '/status — Check your linked account\n' +
+        '/help — Show this message',
+        { parse_mode: 'HTML' },
+      );
     });
 
     // Handle callback queries (approve/reject/retry buttons)
@@ -104,9 +191,13 @@ export async function initTelegramBot(): Promise<void> {
 
       const action = parts[1];
 
-      // Auth: verify the Telegram user ID matches a user's linkedAccounts.telegram
+      // Auth: verify the Telegram user ID matches a linked Armada user
+      // Check both new user.channels field and legacy linkedAccounts.telegram for backwards compat
       const users = usersRepo.getAll();
-      const user = users.find(u => u.linkedAccounts?.telegram === telegramUserId);
+      const user = users.find(u =>
+        u.channels?.telegram?.platformId === telegramUserId ||
+        u.linkedAccounts?.telegram === telegramUserId,
+      );
 
       if (!user) {
         await ctx.answerCallbackQuery({ text: 'Unauthorized' });
