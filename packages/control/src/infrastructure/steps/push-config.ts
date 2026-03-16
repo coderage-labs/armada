@@ -2,8 +2,9 @@
 // params: { instanceId, configVersion, nodeId, containerName }
 
 import type { StepHandler } from '../step-registry.js';
-import { generateInstanceConfig } from '../../services/config-generator.js';
+import { generateInstanceConfig, generateAuthProfiles } from '../../services/config-generator.js';
 import { withRetry } from './retry.js';
+import { agentsRepo } from '../../repositories/index.js';
 
 export const pushConfigHandler: StepHandler = {
   name: 'push_config',
@@ -60,5 +61,28 @@ export const pushConfigHandler: StepHandler = {
       containerName,
       configVersion,
     });
+
+    // ── Write auth-profiles.json for each agent (#34) ──────────────────
+    const authProfiles = generateAuthProfiles();
+    const agents = agentsRepo.getAll().filter(a => a.instanceId === instanceId);
+
+    ctx.emit(`Writing auth-profiles.json for ${agents.length} agent(s)`, { instanceId, agentCount: agents.length });
+
+    for (const agent of agents) {
+      const authProfilesPath = `agents/${agent.name}/agent/auth-profiles.json`;
+      await withRetry(
+        () => node.writeInstanceFile(instanceName, authProfilesPath, JSON.stringify(authProfiles, null, 2)),
+        {
+          onRetry: (attempt, err) =>
+            ctx.emit(`Auth profiles write retry ${attempt} for ${agent.name}: ${err.message}`, {
+              instanceId,
+              agentName: agent.name,
+              attempt,
+            }),
+        },
+      );
+    }
+
+    ctx.emit(`Auth profiles written for ${agents.length} agent(s)`, { instanceId, agentCount: agents.length });
   },
 };
