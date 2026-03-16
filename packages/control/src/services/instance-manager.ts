@@ -422,9 +422,10 @@ class InstanceManagerImpl implements InstanceManager {
     }
 
     // Update lastProgressAt for active tasks reported by the agent
-    if (Array.isArray(activeTasks)) {
+    const taskIds = (payload as any).activeTaskIds ?? (Array.isArray(activeTasks) ? activeTasks : []);
+    if (taskIds.length > 0) {
       const progressNow = new Date().toISOString();
-      for (const taskId of activeTasks) {
+      for (const taskId of taskIds) {
         try { tasksRepo.update(taskId, { lastProgressAt: progressNow }); } catch (err: any) { console.warn('[instance-manager] Failed to update task lastProgressAt:', err.message); }
       }
     }
