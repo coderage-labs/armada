@@ -485,6 +485,7 @@ registerToolDef({
     { name: 'type', type: 'string', description: 'Task type for routing and display', enum: ['code_change', 'review', 'research', 'deployment', 'test', 'generic'] },
     { name: 'payload', type: 'string', description: 'Structured task payload as JSON (type-specific metadata)' },
   ],
+  scope: 'tasks:write',
 });
 
 registerToolDef({
@@ -497,6 +498,7 @@ registerToolDef({
     { name: 'status', type: 'string', description: 'New status', enum: ['pending', 'running', 'completed', 'failed', 'blocked'] },
     { name: 'result', type: 'string', description: 'Task result text' },
   ],
+  scope: 'tasks:write',
 });
 
 registerToolDef({
@@ -507,6 +509,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Task ID', required: true },
   ],
+  scope: 'tasks:write',
 });
 
 registerToolDef({
@@ -529,6 +532,7 @@ registerToolDef({
     { name: 'author', type: 'string', description: 'Author name (user or agent)', required: true },
     { name: 'content', type: 'string', description: 'Comment text', required: true },
   ],
+  scope: 'tasks:write',
 });
 
 registerToolDef({
@@ -540,6 +544,7 @@ registerToolDef({
     { name: 'id', type: 'string', description: 'Task ID', required: true },
     { name: 'commentId', type: 'string', description: 'Comment ID to delete', required: true },
   ],
+  scope: 'tasks:write',
 });
 
 export default router;

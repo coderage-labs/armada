@@ -29,6 +29,7 @@ registerToolDef({
     { name: 'name', type: 'string', description: 'Agent name', required: true },
     { name: 'skill', type: 'string', description: 'Skill name to install', required: true },
   ],
+  scope: 'skills:write',
 });
 
 registerToolDef({
@@ -39,6 +40,7 @@ registerToolDef({
     { name: 'name', type: 'string', description: 'Agent name', required: true },
     { name: 'skill', type: 'string', description: 'Skill name to remove', required: true },
   ],
+  scope: 'skills:write',
 });
 
 registerToolDef({
@@ -48,6 +50,7 @@ registerToolDef({
   parameters: [
     { name: 'name', type: 'string', description: 'Agent name', required: true },
   ],
+  scope: 'skills:write',
 });
 
 registerToolDef({
@@ -57,6 +60,7 @@ registerToolDef({
   parameters: [
     { name: 'skill', type: 'string', description: 'Skill name or clawhub package to install', required: true },
   ],
+  scope: 'skills:write',
 });
 
 registerToolDef({
@@ -66,6 +70,7 @@ registerToolDef({
   parameters: [
     { name: 'skill', type: 'string', description: 'Skill name to update', required: true },
   ],
+  scope: 'skills:write',
 });
 
 export function createSkillRoutes(nodeManager: NodeManager): Router {

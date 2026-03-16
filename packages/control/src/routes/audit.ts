@@ -17,6 +17,7 @@ registerToolDef({
     { name: 'limit', type: 'number', description: 'Max entries to return (default 50, max 200)' },
     { name: 'offset', type: 'number', description: 'Offset for pagination' },
   ],
+  scope: 'audit:read',
 });
 
 const router = Router();

@@ -23,6 +23,7 @@ registerToolDef({
   parameters: [
     { name: 'name', type: 'string', description: 'Agent name to sync', required: true },
   ],
+    scope: 'templates:write',
 });
 
 const PLUGINS_PATH = '/data/.openclaw/extensions';

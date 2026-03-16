@@ -26,6 +26,7 @@ registerToolDef({
     { name: 'enabled', type: 'boolean', description: 'Whether the channel is enabled', required: false },
     { name: 'config', type: 'string', description: 'Channel-specific config as JSON (e.g. { "token": "...", "chat_id": "..." } for Telegram, { "webhook_url": "..." } for Slack/Discord)', required: true },
   ],
+    scope: 'system:write',
 });
 
 registerToolDef({
@@ -39,6 +40,7 @@ registerToolDef({
     { name: 'enabled', type: 'boolean', description: 'Enable or disable', required: false },
     { name: 'config', type: 'string', description: 'Channel-specific config as JSON', required: false },
   ],
+    scope: 'system:write',
 });
 
 registerToolDef({
@@ -49,6 +51,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Channel ID', required: true },
   ],
+    scope: 'system:write',
 });
 
 registerToolDef({
@@ -59,6 +62,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Channel ID', required: true },
   ],
+    scope: 'system:write',
 });
 
 // ── Router ────────────────────────────────────────────────────────────

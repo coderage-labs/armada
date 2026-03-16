@@ -20,6 +20,7 @@ registerToolDef({
   description: 'List all models in the armada model registry.',
   method: 'GET', path: '/api/models',
   parameters: [],
+    scope: 'models:read',
 });
 
 registerToolDef({
@@ -29,6 +30,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Model ID', required: true },
   ],
+    scope: 'models:read',
 });
 
 registerToolDef({
@@ -45,6 +47,7 @@ registerToolDef({
     { name: 'maxTokens', type: 'number', description: 'Max tokens' },
     { name: 'costTier', type: 'string', description: 'Cost tier: cheap, standard, premium' },
   ],
+    scope: 'models:write',
 });
 
 registerToolDef({
@@ -62,6 +65,7 @@ registerToolDef({
     { name: 'maxTokens', type: 'number', description: 'Max tokens' },
     { name: 'costTier', type: 'string', description: 'Cost tier' },
   ],
+    scope: 'models:write',
 });
 
 registerToolDef({
@@ -71,6 +75,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Model ID to delete', required: true },
   ],
+    scope: 'models:write',
 });
 
 // GET /api/models

@@ -44,6 +44,7 @@ export function createAgentRoutes(nodeManager: NodeManager): Router {
       { name: 'templateId', type: 'string', description: 'Template ID to spawn from', required: true },
       { name: 'name', type: 'string', description: 'Agent name (lowercase, alphanumeric, hyphens)', required: true },
     ],
+    scope: 'agents:write',
   });
 
   registerToolDef({
@@ -54,6 +55,7 @@ export function createAgentRoutes(nodeManager: NodeManager): Router {
       { name: 'target', type: 'string', description: 'Agent name to redeploy, or "all" for every agent', required: true },
     ],
     supportsAll: true,
+    scope: 'agents:write',
   });
 
   registerToolDef({
@@ -63,6 +65,7 @@ export function createAgentRoutes(nodeManager: NodeManager): Router {
     parameters: [
       { name: 'target', type: 'string', description: 'Agent name to destroy', required: true },
     ],
+    scope: 'agents:write',
   });
 
   registerToolDef({
@@ -86,6 +89,7 @@ export function createAgentRoutes(nodeManager: NodeManager): Router {
       { name: 'memoryMb', type: 'number', description: 'Memory usage in MB' },
       { name: 'uptimeMs', type: 'number', description: 'Agent uptime in milliseconds' },
     ],
+    scope: 'agents:write',
   });
 
   registerToolDef({
@@ -96,6 +100,7 @@ export function createAgentRoutes(nodeManager: NodeManager): Router {
       { name: 'name', type: 'string', description: 'Agent name to nudge', required: true },
       { name: 'message', type: 'string', description: 'Custom nudge message (optional)' },
     ],
+    scope: 'agents:write',
   });
 
   registerToolDef({
@@ -105,6 +110,7 @@ export function createAgentRoutes(nodeManager: NodeManager): Router {
     parameters: [
       { name: 'name', type: 'string', description: 'Agent name', required: true },
     ],
+    scope: 'agents:write',
   });
 
   registerToolDef({
@@ -114,6 +120,7 @@ export function createAgentRoutes(nodeManager: NodeManager): Router {
     parameters: [
       { name: 'name', type: 'string', description: 'Agent name', required: true },
     ],
+    scope: 'agents:write',
   });
 
   registerToolDef({
@@ -125,6 +132,7 @@ export function createAgentRoutes(nodeManager: NodeManager): Router {
       { name: 'timeoutMs', type: 'number', description: 'Drain timeout in ms (default 60000)' },
       { name: 'reason', type: 'string', description: 'Maintenance reason (logged in activity)' },
     ],
+    scope: 'agents:write',
   });
 
   registerToolDef({

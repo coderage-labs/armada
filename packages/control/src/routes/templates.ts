@@ -19,6 +19,7 @@ registerToolDef({
   description: 'List all armada templates. Shows template ID, name, role, and model.',
   method: 'GET', path: '/api/templates',
   parameters: [],
+    scope: 'templates:read',
 });
 
 registerToolDef({
@@ -28,6 +29,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Template ID', required: true },
   ],
+    scope: 'templates:read',
 });
 
 registerToolDef({
@@ -43,6 +45,7 @@ registerToolDef({
     { name: 'soul', type: 'string', description: 'SOUL.md content — the agent personality' },
     { name: 'agents', type: 'string', description: 'AGENTS.md content — agent instructions' },
   ],
+    scope: 'templates:write',
 });
 
 registerToolDef({
@@ -59,6 +62,7 @@ registerToolDef({
     { name: 'soul', type: 'string', description: 'SOUL.md content' },
     { name: 'agents', type: 'string', description: 'AGENTS.md content' },
   ],
+    scope: 'templates:write',
 });
 
 registerToolDef({
@@ -68,6 +72,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Template ID to delete', required: true },
   ],
+    scope: 'templates:write',
 });
 
 // GET /api/templates
@@ -265,6 +270,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Template ID', required: true },
   ],
+    scope: 'templates:read',
 });
 
 registerToolDef({
@@ -274,6 +280,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Template ID', required: true },
   ],
+    scope: 'templates:write',
 });
 
 export default router;

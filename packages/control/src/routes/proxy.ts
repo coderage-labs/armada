@@ -72,6 +72,7 @@ registerToolDef({
     { name: 'types', type: 'string', description: 'Comma-separated issue type filter' },
     { name: 'cursor', type: 'string', description: 'Pagination cursor from previous response' },
   ],
+    scope: 'integrations:write',
 });
 
 router.post('/list', async (req, res, next) => {
@@ -115,6 +116,7 @@ registerToolDef({
     { name: 'project', type: 'string', description: 'Project ID or name', required: true },
     { name: 'issueKey', type: 'string', description: 'Issue key (e.g., FIX-123, owner/repo#45)', required: true },
   ],
+    scope: 'integrations:write',
 });
 
 router.post('/get', async (req, res, next) => {
@@ -150,6 +152,7 @@ registerToolDef({
     { name: 'issueKey', type: 'string', description: 'Issue key', required: true },
     { name: 'comment', type: 'string', description: 'Comment text', required: true },
   ],
+    scope: 'integrations:write',
 });
 
 router.post('/comment', requireScope('integrations:write'), async (req, res, next) => {
@@ -185,6 +188,7 @@ registerToolDef({
     { name: 'issueKey', type: 'string', description: 'Issue key', required: true },
     { name: 'status', type: 'string', description: 'Target status', required: true },
   ],
+    scope: 'integrations:write',
 });
 
 router.post('/transition', requireScope('integrations:write'), async (req, res, next) => {
@@ -220,6 +224,7 @@ registerToolDef({
     { name: 'query', type: 'string', description: 'Search query (JQL for Jira, query string for GitHub)', required: true },
     { name: 'cursor', type: 'string', description: 'Pagination cursor' },
   ],
+    scope: 'integrations:write',
 });
 
 router.post('/search', async (req, res, next) => {

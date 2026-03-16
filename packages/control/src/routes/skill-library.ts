@@ -33,6 +33,7 @@ registerToolDef({
     { name: 'version', type: 'string', description: 'Version', required: false },
     { name: 'description', type: 'string', description: 'Description of the skill', required: false },
   ],
+    scope: 'skills:write',
 });
 
 registerToolDef({
@@ -47,6 +48,7 @@ registerToolDef({
     { name: 'version', type: 'string', description: 'Version', required: false },
     { name: 'description', type: 'string', description: 'Description', required: false },
   ],
+    scope: 'skills:write',
 });
 
 registerToolDef({
@@ -56,6 +58,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Skill ID', required: true },
   ],
+    scope: 'skills:write',
 });
 
 registerToolDef({
@@ -74,6 +77,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Skill ID', required: true },
   ],
+    scope: 'skills:write',
 });
 
 // ── Routes ──────────────────────────────────────────────────────────

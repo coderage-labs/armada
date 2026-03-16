@@ -97,6 +97,7 @@ registerToolDef({
   parameters: [
     { name: 'status', type: 'string', description: 'Filter by status: running, completed, failed' },
   ],
+    scope: 'system:read',
 });
 
 registerToolDef({
@@ -107,6 +108,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', required: true, description: 'Operation ID' },
   ],
+    scope: 'system:read',
 });
 
 export { router as operationsRoutes };

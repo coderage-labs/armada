@@ -18,6 +18,7 @@ registerToolDef({
   method: 'GET',
   path: '/api/integrations',
   parameters: [],
+    scope: 'integrations:read',
 });
 
 registerToolDef({
@@ -32,6 +33,7 @@ registerToolDef({
     { name: 'authConfig', type: 'string', description: 'Auth config JSON', required: true },
     { name: 'capabilities', type: 'string', description: 'JSON array of capabilities (issues, vcs)', required: true },
   ],
+    scope: 'integrations:write',
 });
 
 registerToolDef({
@@ -42,6 +44,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Integration ID', required: true },
   ],
+    scope: 'integrations:read',
 });
 
 registerToolDef({
@@ -57,6 +60,7 @@ registerToolDef({
     { name: 'status', type: 'string', description: 'Status (active, error, expired)' },
     { name: 'statusMessage', type: 'string', description: 'Status message' },
   ],
+    scope: 'integrations:write',
 });
 
 registerToolDef({
@@ -67,6 +71,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Integration ID', required: true },
   ],
+    scope: 'integrations:write',
 });
 
 registerToolDef({
@@ -77,6 +82,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Integration ID', required: true },
   ],
+    scope: 'integrations:write',
 });
 
 registerToolDef({
@@ -87,6 +93,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Integration ID', required: true },
   ],
+    scope: 'integrations:read',
 });
 
 registerToolDef({
@@ -97,6 +104,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Integration ID', required: true },
   ],
+    scope: 'integrations:read',
 });
 
 registerToolDef({
@@ -107,6 +115,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Project ID', required: true },
   ],
+    scope: 'integrations:read',
 });
 
 registerToolDef({
@@ -120,6 +129,7 @@ registerToolDef({
     { name: 'capability', type: 'string', description: 'Capability (issues or vcs)', required: true },
     { name: 'config', type: 'string', description: 'Config JSON (filters, repos, etc.)' },
   ],
+    scope: 'integrations:write',
 });
 
 registerToolDef({
@@ -133,6 +143,7 @@ registerToolDef({
     { name: 'config', type: 'string', description: 'Config JSON' },
     { name: 'enabled', type: 'boolean', description: 'Enabled flag' },
   ],
+    scope: 'integrations:write',
 });
 
 registerToolDef({
@@ -144,6 +155,7 @@ registerToolDef({
     { name: 'id', type: 'string', description: 'Project ID', required: true },
     { name: 'piId', type: 'string', description: 'Project integration ID', required: true },
   ],
+    scope: 'integrations:write',
 });
 
 registerToolDef({
@@ -155,6 +167,7 @@ registerToolDef({
     { name: 'id', type: 'string', description: 'Project ID', required: true },
     { name: 'piId', type: 'string', description: 'Project integration ID', required: true },
   ],
+    scope: 'integrations:write',
 });
 
 // ── Routes ──────────────────────────────────────────────────────────

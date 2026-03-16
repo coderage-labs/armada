@@ -7,6 +7,7 @@ registerToolDef({
   description: 'Scan all projects for untriaged GitHub issues and dispatch triage to PM agents.',
   method: 'POST', path: '/api/triage/scan',
   parameters: [],
+    scope: 'tasks:write',
 });
 
 registerToolDef({
@@ -17,6 +18,7 @@ registerToolDef({
     { name: 'projectId', type: 'string', description: 'Project ID', required: true },
     { name: 'issueNumber', type: 'number', description: 'GitHub issue number', required: true },
   ],
+    scope: 'tasks:write',
 });
 
 registerToolDef({
@@ -27,6 +29,7 @@ registerToolDef({
     { name: 'projectId', type: 'string', description: 'Project ID', required: true },
     { name: 'issueNumber', type: 'number', description: 'GitHub issue number', required: true },
   ],
+    scope: 'tasks:write',
 });
 import { triageIssue, handleTriageResult, triageNewIssues, markIssueTriaged } from '../services/triage.js';
 import { getCachedIssues } from '../services/github-sync.js';

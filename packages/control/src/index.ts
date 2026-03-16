@@ -49,20 +49,24 @@ async function start() {
 
   // ── Meta: tool definitions for auto-discovery ───────────────────
   const { getToolDefs } = await import('./utils/tool-registry.js');
-  app.get('/api/meta/tools', (req, res) => {
+  const { optionalAuthMiddleware } = await import('./middleware/auth.js');
+  
+  app.get('/api/meta/tools', optionalAuthMiddleware, (req, res) => {
     const allTools = getToolDefs();
-    const agentName = req.headers['x-agent-name'] as string;
-
-    // If no agent header, return all tools (e.g., operator/control plugin)
-    if (!agentName) return res.json(allTools);
-
-    // Look up agent's role
-    const agents = agentsRepo.getAll();
-    const agent = agents.find(a => a.name === agentName);
-    if (!agent) return res.json(allTools); // Unknown agent, return all
-
-    // All tools available — tool filtering via allowedTools was removed (#598)
-    res.json(allTools);
+    
+    // Get caller's scopes from auth middleware (optional - may be undefined)
+    const callerScopes: string[] = req.caller?.scopes ?? [];
+    
+    // No scopes = return all (backward compat: unauthenticated or operator without scope restriction)
+    // Wildcard = return all
+    if (callerScopes.length === 0 || callerScopes.includes('*')) {
+      return res.json(allTools);
+    }
+    
+    // Filter tools to only those the caller has scope for
+    // Tools without a scope field are accessible to everyone
+    const filtered = allTools.filter(t => !t.scope || callerScopes.includes(t.scope));
+    res.json(filtered);
   });
 
   // ── Production: serve UI static files ─────────────────────────────

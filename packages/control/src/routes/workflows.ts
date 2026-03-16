@@ -19,6 +19,7 @@ registerToolDef({
   description: 'List all workflows. Optional projectId filter.',
   method: 'GET', path: '/api/workflows',
   parameters: [{ name: 'projectId', type: 'string', description: 'Filter by project ID' }],
+    scope: 'workflows:read',
 });
 
 registerToolDef({
@@ -26,6 +27,7 @@ registerToolDef({
   description: 'Get a workflow by ID. Returns steps, projectIds, enabled status.',
   method: 'GET', path: '/api/workflows/:id',
   parameters: [{ name: 'id', type: 'string', description: 'Workflow ID', required: true }],
+    scope: 'workflows:read',
 });
 
 registerToolDef({
@@ -38,6 +40,7 @@ registerToolDef({
     { name: 'projectIds', type: 'string', description: 'JSON array of project IDs to assign' },
     { name: 'steps', type: 'string', description: 'JSON array of workflow steps', required: true },
   ],
+    scope: 'workflows:write',
 });
 
 registerToolDef({
@@ -52,6 +55,7 @@ registerToolDef({
     { name: 'projectIds', type: 'string', description: 'JSON array of project IDs' },
     { name: 'enabled', type: 'boolean', description: 'Enable/disable workflow' },
   ],
+    scope: 'workflows:write',
 });
 
 registerToolDef({
@@ -59,6 +63,7 @@ registerToolDef({
   description: 'Delete a workflow.',
   method: 'DELETE', path: '/api/workflows/:id',
   parameters: [{ name: 'id', type: 'string', description: 'Workflow ID', required: true }],
+    scope: 'workflows:write',
 });
 
 registerToolDef({
@@ -71,6 +76,7 @@ registerToolDef({
     { name: 'triggerRef', type: 'string', description: 'Trigger reference (e.g. issue URL)' },
     { name: 'vars', type: 'string', description: 'JSON object of template variables' },
   ],
+    scope: 'workflows:write',
 });
 
 registerToolDef({
@@ -81,6 +87,7 @@ registerToolDef({
     { name: 'id', type: 'string', description: 'Workflow ID', required: true },
     { name: 'limit', type: 'number', description: 'Max runs to return (default 20)' },
   ],
+    scope: 'workflows:read',
 });
 
 registerToolDef({
@@ -88,6 +95,7 @@ registerToolDef({
   description: 'Get details of a workflow run including step outputs and context.',
   method: 'GET', path: '/api/workflows/runs/:runId',
   parameters: [{ name: 'runId', type: 'string', description: 'Run ID', required: true }],
+    scope: 'workflows:read',
 });
 
 registerToolDef({
@@ -95,6 +103,7 @@ registerToolDef({
   description: 'Get step runs for a workflow run.',
   method: 'GET', path: '/api/workflows/runs/:runId/steps',
   parameters: [{ name: 'runId', type: 'string', description: 'Run ID', required: true }],
+    scope: 'workflows:read',
 });
 
 registerToolDef({
@@ -105,6 +114,7 @@ registerToolDef({
     { name: 'runId', type: 'string', description: 'Run ID', required: true },
     { name: 'stepId', type: 'string', description: 'Step ID to approve', required: true },
   ],
+    scope: 'workflows:write',
 });
 
 registerToolDef({
@@ -116,6 +126,7 @@ registerToolDef({
     { name: 'stepId', type: 'string', description: 'Step ID to reject', required: true },
     { name: 'reason', type: 'string', description: 'Rejection reason' },
   ],
+    scope: 'workflows:write',
 });
 
 registerToolDef({
@@ -127,6 +138,7 @@ registerToolDef({
     { name: 'stepId', type: 'string', description: 'Step ID to retry', required: true },
     { name: 'feedback', type: 'string', description: 'Feedback for the retry (what was wrong)' },
   ],
+    scope: 'workflows:write',
 });
 
 registerToolDef({
@@ -134,6 +146,7 @@ registerToolDef({
   description: 'Cancel a workflow run.',
   method: 'POST', path: '/api/workflows/runs/:runId/cancel',
   parameters: [{ name: 'runId', type: 'string', description: 'Run ID', required: true }],
+    scope: 'workflows:write',
 });
 
 registerToolDef({
@@ -141,6 +154,7 @@ registerToolDef({
   description: 'Get the full workflow context for a run — all steps, their outputs, agents, and rework history. Agents use this to inspect the workflow state.',
   method: 'GET', path: '/api/workflow-runs/:runId/context',
   parameters: [{ name: 'runId', type: 'string', description: 'Run ID', required: true }],
+    scope: 'workflows:read',
 });
 
 registerToolDef({
@@ -153,6 +167,7 @@ registerToolDef({
     { name: 'targetStepId', type: 'string', description: 'Step ID to rework (must be completed)', required: true },
     { name: 'feedback', type: 'string', description: 'Feedback explaining what needs to change', required: true },
   ],
+    scope: 'workflows:write',
 });
 
 registerToolDef({
@@ -160,6 +175,7 @@ registerToolDef({
   description: 'Get all active (running/paused) workflow runs with step data.',
   method: 'GET', path: '/api/workflows/runs/active',
   parameters: [],
+    scope: 'workflows:read',
 });
 
 registerToolDef({
@@ -167,6 +183,7 @@ registerToolDef({
   description: 'Get completed/failed/cancelled workflow runs from the last 24 hours.',
   method: 'GET', path: '/api/workflows/runs/recent',
   parameters: [],
+    scope: 'workflows:read',
 });
 import {
   getWorkflowsForProject,
