@@ -1,8 +1,9 @@
 import WebSocket from 'ws';
 import { randomUUID } from 'crypto';
+import { unlinkSync, existsSync } from 'node:fs';
 import type { EventMessage, CommandMessage, ResponseMessage } from '@coderage-labs/armada-shared';
 import { handleCommand } from './command-handler.js';
-import { loadCredentials, saveCredentials } from '../credentials.js';
+import { loadCredentials, saveCredentials, CREDENTIALS_PATH } from '../credentials.js';
 import { getMachineFingerprint } from '../fingerprint.js';
 import { NODE_VERSION, PROTOCOL_VERSION, MIN_CONTROL_VERSION } from '../version.js';
 
@@ -17,6 +18,9 @@ const PING_INTERVAL_MS = 30_000;
 const PONG_TIMEOUT_MS = 10_000;
 const BACKOFF_STEPS = [1000, 2000, 4000, 8000, 16000, 32000, 60000];
 
+/** Number of consecutive 403 failures before falling back to install token */
+const MAX_SESSION_AUTH_FAILURES = 3;
+
 // ── State ─────────────────────────────────────────────────────────────────────
 
 let ws: WebSocket | null = null;
@@ -26,6 +30,9 @@ let pingTimer: ReturnType<typeof setInterval> | null = null;
 let pongTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let cachedFingerprint: string | null = null;
+
+/** Track consecutive 403 failures when using session credentials */
+let sessionAuthFailureCount = 0;
 
 // Pending commands sent by the node to the control plane (awaiting responses)
 interface PendingCommand {
@@ -139,11 +146,14 @@ function connect(): void {
   ws.on('pong', onPong);
   ws.on('close', onClose);
   ws.on('error', onError);
+  ws.on('unexpected-response', (req, res) => onUnexpectedResponse(req, res, nodeId));
 }
 
 function onOpen(): void {
   console.log('[ws] Connected to control plane ✓');
   reconnectAttempt = 0;
+  // Reset session auth failure count on successful connection
+  sessionAuthFailureCount = 0;
   startHeartbeat();
   startPing();
 
@@ -208,6 +218,42 @@ function onClose(code: number, reason: Buffer): void {
 function onError(err: Error): void {
   console.warn('[ws] Connection error:', err.message);
   // close event fires after error — reconnect handled there
+}
+
+function onUnexpectedResponse(
+  _req: import('http').ClientRequest,
+  res: import('http').IncomingMessage,
+  nodeId: string | null,
+): void {
+  console.warn(`[ws] Unexpected HTTP response: ${res.statusCode} ${res.statusMessage}`);
+
+  // If we got a 403 and we were using session credentials, track it
+  if (res.statusCode === 403 && nodeId !== null) {
+    sessionAuthFailureCount++;
+    console.warn(`[ws] Session credential rejected (${sessionAuthFailureCount}/${MAX_SESSION_AUTH_FAILURES} failures)`);
+
+    if (sessionAuthFailureCount >= MAX_SESSION_AUTH_FAILURES) {
+      console.warn(
+        `[ws] Max session auth failures reached — credentials may be stale (e.g., control DB wiped). ` +
+        `Falling back to install token mode.`
+      );
+
+      // Delete the stale credentials file to trigger fallback to install token
+      try {
+        if (existsSync(CREDENTIALS_PATH)) {
+          unlinkSync(CREDENTIALS_PATH);
+          console.log(`[ws] Deleted stale credentials file: ${CREDENTIALS_PATH}`);
+        }
+        // Reset counter so we don't immediately fall back again if install token also fails
+        sessionAuthFailureCount = 0;
+      } catch (err) {
+        console.error(`[ws] Failed to delete credentials file: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  }
+
+  // Drain the response body to avoid hanging
+  res.resume();
 }
 
 // ── Heartbeat ─────────────────────────────────────────────────────────────────
