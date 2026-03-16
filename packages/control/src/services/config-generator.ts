@@ -43,6 +43,27 @@ function normalizeModelId(modelId: string): string {
   return modelId.replace(/-\d{8}$/, '');
 }
 
+/**
+ * Build the controlUi config section, handling the empty-allowedOrigins edge case.
+ *
+ * OpenClaw rejects `allowedOrigins: []` as "not configured" and refuses to start.
+ * When no origins are provided we use `dangerouslyAllowHostHeaderOriginFallback`
+ * instead. This is safe for instances because they are only reachable via
+ * Docker-internal networking (node agent proxy) — never exposed to the internet.
+ *
+ * When explicit origins ARE provided, they are used as-is and the fallback flag
+ * is omitted (it is not needed and should not be set unnecessarily).
+ */
+export function buildControlUiConfig(
+  allowedOrigins?: string[],
+): NonNullable<NonNullable<GeneratedConfig['gateway']>['controlUi']> {
+  if (allowedOrigins && allowedOrigins.length > 0) {
+    return { allowedOrigins };
+  }
+  // No origins configured — use host-header fallback instead of an empty array.
+  return { dangerouslyAllowHostHeaderOriginFallback: true };
+}
+
 export interface GeneratedConfig {
   gateway?: {
     auth?: {
@@ -189,13 +210,7 @@ function generateModelsConfig(): GeneratedConfig {
         mode: 'token',
         token: crypto.randomBytes(24).toString('hex'),
       },
-      controlUi: {
-        // Instance containers don't serve a web UI — only accessed via node agent proxy.
-        // We'd prefer allowedOrigins: [] but OpenClaw rejects empty arrays as "not set".
-        // Using the fallback flag is safe here since instances are only reachable via
-        // Docker-internal networking (node agent proxy), never exposed to the internet.
-        dangerouslyAllowHostHeaderOriginFallback: true,
-      },
+      controlUi: buildControlUiConfig(),
       reload: {
         // Armada controls restarts — disable config file watcher auto-restart
         mode: 'off',
