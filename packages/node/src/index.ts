@@ -14,9 +14,21 @@ import './log-buffer.js';
 import { connectToControlPlane } from './ws/connection.js';
 import { startGatewayProxy } from './gateway/proxy.js';
 import { docker } from './docker/client.js';
+import { detectOwnNetwork } from './docker/index.js';
 import { StatsCollector } from './stats.js';
 import { ensureCredentialHelper } from './credential-helper.js';
 import { startStatsStreamer } from './services/stats-streamer.js';
+
+// ── Network Detection ────────────────────────────────────────────────
+// Detect which Docker network this node agent is on at startup.
+// This network will be used as the default for all created containers.
+export let detectedNetwork = 'bridge'; // fallback
+
+(async () => {
+  detectedNetwork = await detectOwnNetwork();
+  console.log(`📡 Detected network: ${detectedNetwork}`);
+})();
+
 // ── Deploy credential helper on startup ─────────────────────────────
 try {
   ensureCredentialHelper();

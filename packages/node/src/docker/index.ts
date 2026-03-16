@@ -11,4 +11,4 @@ export {
   pullImage,
 } from './client.js';
 export type { CreateContainerOptions, ContainerStats } from './client.js';
-export { ensureNetwork } from './network.js';
+export { ensureNetwork, detectOwnNetwork } from './network.js';

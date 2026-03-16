@@ -24,6 +24,7 @@ import {
   pullImage,
 } from '../docker/index.js';
 import { allocatePort, releasePort } from '../port-pool.js';
+import { detectedNetwork } from '../index.js';
 
 export async function handleContainerCommand(
   msg: CommandMessage,
@@ -46,8 +47,14 @@ export async function handleContainerCommand(
         // Allocate port from local pool (idempotent — returns existing if already allocated)
         const containerName = p.name as string;
         const port = allocatePort(containerName);
+        
+        // Network resolution:
+        // If the control plane passes 'armada-net' (the default/hint), use our detected network instead.
+        // This allows the node agent to override with its actual network.
+        const requestedNetwork = p.network ?? 'bridge';
+        const network = requestedNetwork === 'armada-net' ? detectedNetwork : requestedNetwork;
+        
         // Ensure the target network exists before creating
-        const network = p.network ?? 'bridge';
         if (network !== 'bridge' && network !== 'host' && network !== 'none') {
           await ensureNetwork(network);
         }
