@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { apiFetch } from '../hooks/useApi';
-import { Shield, Fingerprint, Trash2, User, Key, Lock, Save, Loader2, Bell } from 'lucide-react';
+import { Shield, Fingerprint, Trash2, User, Key, Lock, Save, Loader2, Bell, Link, Unlink, CheckCircle, MessageCircle } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import RegisterPasskey from '../components/RegisterPasskey';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -8,11 +8,24 @@ import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
 import { Switch } from '../components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+
+interface UserChannels {
+  [type: string]: {
+    platformId: string;
+    verified: boolean;
+    linkedAt: string;
+  };
+}
 
 interface NotificationPreferences {
-  channels: string[];
-  preferences: { gates: boolean; completions: boolean; failures: boolean };
-  telegram?: { chatId: string };
+  preferences: {
+    gates: boolean;
+    completions: boolean;
+    failures: boolean;
+    quietHours?: { start: string; end: string };
+  };
+  defaultChannel?: string;
 }
 
 interface CallerInfo {
@@ -26,7 +39,8 @@ interface CallerInfo {
     github?: string;
     email?: string;
   };
-  notifications?: NotificationPreferences;
+  notifications?: NotificationPreferences & { channels?: string[] };
+  channels?: UserChannels;
 }
 
 interface Passkey {
@@ -66,13 +80,20 @@ export default function Account() {
 
   // Notification preferences state
   const [notifPrefs, setNotifPrefs] = useState<NotificationPreferences>({
-    channels: [],
     preferences: { gates: true, completions: true, failures: true },
-    telegram: { chatId: '' },
   });
   const [notifSaving, setNotifSaving] = useState(false);
   const [notifError, setNotifError] = useState('');
   const [notifSuccess, setNotifSuccess] = useState('');
+
+  // Channel linking state
+  const [systemChannels, setSystemChannels] = useState<string[]>([]);
+  const [linkingChannel, setLinkingChannel] = useState<string | null>(null);
+  const [linkCode, setLinkCode] = useState('');
+  const [linkingInProgress, setLinkingInProgress] = useState(false);
+  const [linkError, setLinkError] = useState('');
+  const [linkSuccess, setLinkSuccess] = useState('');
+  const [unlinkingChannel, setUnlinkingChannel] = useState<string | null>(null);
 
   // Password state
   const [showPasswordForm, setShowPasswordForm] = useState(false);
@@ -87,14 +108,21 @@ export default function Account() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [me, pks, tks] = await Promise.all([
+      const [me, pks, tks, sysChannels] = await Promise.all([
         apiFetch<CallerInfo>('/api/auth/me').catch(() => null),
         apiFetch<Passkey[]>('/api/auth/passkeys').catch(() => []),
         apiFetch<ApiToken[]>('/api/auth/tokens').catch(() => []),
+        apiFetch<any>('/api/notification-channels').catch(() => null),
       ]);
       if (me) setCaller(me);
       setPasskeys(pks);
       setTokens(tks);
+      if (sysChannels) {
+        const chList = Array.isArray(sysChannels)
+          ? sysChannels
+          : (sysChannels.channels ?? Object.keys(sysChannels));
+        setSystemChannels(chList.filter((c: any) => typeof c === 'string'));
+      }
     } finally {
       setLoading(false);
     }
@@ -111,14 +139,15 @@ export default function Account() {
         github: caller.linkedAccounts?.github ?? '',
       });
       if (caller.notifications) {
+        const notifs = caller.notifications as any;
         setNotifPrefs({
-          channels: caller.notifications.channels ?? [],
           preferences: {
-            gates: caller.notifications.preferences?.gates ?? true,
-            completions: caller.notifications.preferences?.completions ?? true,
-            failures: caller.notifications.preferences?.failures ?? true,
+            gates: notifs.preferences?.gates ?? true,
+            completions: notifs.preferences?.completions ?? true,
+            failures: notifs.preferences?.failures ?? true,
+            quietHours: notifs.preferences?.quietHours,
           },
-          telegram: { chatId: caller.notifications.telegram?.chatId ?? '' },
+          defaultChannel: notifs.defaultChannel,
         });
       }
     }
@@ -153,14 +182,14 @@ export default function Account() {
     setNotifError('');
     setNotifSuccess('');
     try {
-      const payload: NotificationPreferences = {
-        channels: notifPrefs.telegram?.chatId ? ['telegram'] : [],
-        preferences: notifPrefs.preferences,
-        telegram: notifPrefs.telegram?.chatId ? { chatId: notifPrefs.telegram.chatId } : undefined,
-      };
       await apiFetch('/api/auth/me', {
         method: 'PUT',
-        body: JSON.stringify({ notifications: payload }),
+        body: JSON.stringify({
+          notifications: {
+            preferences: notifPrefs.preferences,
+            defaultChannel: notifPrefs.defaultChannel || undefined,
+          },
+        }),
       });
       setNotifSuccess('Notification preferences saved');
       await fetchData();
@@ -169,6 +198,49 @@ export default function Account() {
     } finally {
       setNotifSaving(false);
     }
+  }
+
+  async function handleLink(channel: string, code: string) {
+    setLinkingInProgress(true);
+    setLinkError('');
+    setLinkSuccess('');
+    try {
+      await apiFetch('/api/auth/me/link', {
+        method: 'POST',
+        body: JSON.stringify({ code }),
+      });
+      setLinkSuccess(`${channel.charAt(0).toUpperCase() + channel.slice(1)} linked successfully`);
+      setLinkingChannel(null);
+      setLinkCode('');
+      await fetchData();
+    } catch (err: any) {
+      setLinkError(err.message || 'Failed to link channel');
+    } finally {
+      setLinkingInProgress(false);
+    }
+  }
+
+  async function handleUnlink(channel: string) {
+    setUnlinkingChannel(channel);
+    setLinkError('');
+    setLinkSuccess('');
+    try {
+      await apiFetch('/api/auth/me/unlink', {
+        method: 'POST',
+        body: JSON.stringify({ channel }),
+      });
+      setLinkSuccess(`${channel.charAt(0).toUpperCase() + channel.slice(1)} unlinked`);
+      await fetchData();
+    } catch (err: any) {
+      setLinkError(err.message || 'Failed to unlink channel');
+    } finally {
+      setUnlinkingChannel(null);
+    }
+  }
+
+  function getChannelIcon(type: string) {
+    if (type === 'telegram') return <MessageCircle className="w-4 h-4 text-blue-400" />;
+    return <MessageCircle className="w-4 h-4 text-zinc-400" />;
   }
 
   async function deletePasskey(id: string) {
@@ -352,6 +424,105 @@ export default function Account() {
         </div>
       )}
 
+      {/* Linked Channels */}
+      <div className="bg-zinc-800/50 border border-zinc-800 rounded-lg p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <Link className="w-5 h-5 text-blue-400" />
+          <h2 className="text-sm font-semibold text-zinc-200">Linked Channels</h2>
+        </div>
+
+        {linkError && <p className="text-xs text-red-400">{linkError}</p>}
+        {linkSuccess && <p className="text-xs text-emerald-400">{linkSuccess}</p>}
+
+        {systemChannels.length === 0 ? (
+          <p className="text-xs text-zinc-500">No notification channels configured by the administrator.</p>
+        ) : (
+          <div className="space-y-1">
+            {systemChannels.map((channelType) => {
+              const linked = caller?.channels?.[channelType];
+              const isLinking = linkingChannel === channelType;
+              const isUnlinking = unlinkingChannel === channelType;
+
+              return (
+                <div key={channelType} className="flex flex-col gap-2 py-3 border-b border-zinc-800 last:border-0">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      {getChannelIcon(channelType)}
+                      <span className="text-sm text-zinc-200 capitalize">{channelType}</span>
+                      {linked ? (
+                        <>
+                          <Badge className="text-xs bg-emerald-500/20 text-emerald-300 border-emerald-500/30 flex items-center gap-1">
+                            <CheckCircle className="w-3 h-3" /> Linked
+                          </Badge>
+                          <span className="text-xs text-zinc-500">{linked.platformId}</span>
+                        </>
+                      ) : (
+                        <Badge variant="secondary" className="text-xs bg-zinc-700/50 text-zinc-400 border-zinc-700">
+                          Not linked
+                        </Badge>
+                      )}
+                    </div>
+                    <div>
+                      {linked ? (
+                        <Button
+                          variant="ghost"
+                          onClick={() => handleUnlink(channelType)}
+                          disabled={isUnlinking}
+                          className="flex items-center gap-1.5 text-xs font-medium text-red-400/70 hover:text-red-400 bg-red-500/10 hover:bg-red-500/20 px-3 py-1.5 rounded-lg transition disabled:opacity-50"
+                        >
+                          <Unlink className="w-3.5 h-3.5" />
+                          {isUnlinking ? 'Unlinking…' : 'Unlink'}
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          onClick={() => {
+                            setLinkingChannel(isLinking ? null : channelType);
+                            setLinkCode('');
+                            setLinkError('');
+                          }}
+                          className="flex items-center gap-1.5 text-xs font-medium text-blue-300 hover:text-blue-200 bg-blue-500/10 hover:bg-blue-500/20 px-3 py-1.5 rounded-lg transition"
+                        >
+                          <Link className="w-3.5 h-3.5" />
+                          {isLinking ? 'Cancel' : `Link ${channelType.charAt(0).toUpperCase() + channelType.slice(1)}`}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  {channelType === 'telegram' && !linked && (
+                    <p className="text-xs text-zinc-500">Send /start to the Armada Telegram bot to get a linking code.</p>
+                  )}
+
+                  {isLinking && (
+                    <div className="flex items-center gap-2 animate-in fade-in duration-150">
+                      <Input
+                        type="text"
+                        value={linkCode}
+                        onChange={(e) => setLinkCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        placeholder="6-digit code"
+                        maxLength={6}
+                        className="w-36"
+                        autoFocus
+                      />
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleLink(channelType, linkCode)}
+                        disabled={linkCode.length !== 6 || linkingInProgress}
+                        className="flex items-center gap-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded-lg transition disabled:opacity-50"
+                      >
+                        {linkingInProgress && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                        Verify
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {/* Notification Preferences */}
       <div className="bg-zinc-800/50 border border-zinc-800 rounded-lg p-5 space-y-4">
         <div className="flex items-center gap-2">
@@ -398,16 +569,65 @@ export default function Account() {
             />
           </div>
 
-          <div className="pt-1">
-            <label className="block text-xs text-zinc-400 mb-1">Telegram Chat ID</label>
-            <Input
-              type="text"
-              value={notifPrefs.telegram?.chatId ?? ''}
-              onChange={(e) => setNotifPrefs(p => ({ ...p, telegram: { chatId: e.target.value } }))}
-              placeholder="e.g. 5059211930"
-            />
-            <p className="text-xs text-zinc-500 mt-1">Your Telegram user or chat ID for direct delivery. Start a chat with the Armada bot to get your ID.</p>
+          <div className="pt-2 border-t border-zinc-800">
+            <p className="text-sm text-zinc-200 mb-2">Quiet hours</p>
+            <div className="flex items-center gap-3">
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">Start</label>
+                <Input
+                  type="text"
+                  value={notifPrefs.preferences.quietHours?.start ?? ''}
+                  onChange={(e) => setNotifPrefs(p => ({
+                    ...p,
+                    preferences: {
+                      ...p.preferences,
+                      quietHours: { start: e.target.value, end: p.preferences.quietHours?.end ?? '' },
+                    },
+                  }))}
+                  placeholder="23:00"
+                  className="w-24"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">End</label>
+                <Input
+                  type="text"
+                  value={notifPrefs.preferences.quietHours?.end ?? ''}
+                  onChange={(e) => setNotifPrefs(p => ({
+                    ...p,
+                    preferences: {
+                      ...p.preferences,
+                      quietHours: { start: p.preferences.quietHours?.start ?? '', end: e.target.value },
+                    },
+                  }))}
+                  placeholder="08:00"
+                  className="w-24"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-zinc-500 mt-1">Suppress notifications during these hours (e.g. 23:00 – 08:00).</p>
           </div>
+
+          {caller?.channels && Object.keys(caller.channels).length > 0 && (
+            <div className="pt-2">
+              <label className="block text-xs text-zinc-400 mb-1">Default channel</label>
+              <Select
+                value={notifPrefs.defaultChannel ?? ''}
+                onValueChange={(v) => setNotifPrefs(p => ({ ...p, defaultChannel: v || undefined }))}
+              >
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Select channel" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.keys(caller.channels).map((ch) => (
+                    <SelectItem key={ch} value={ch}>
+                      {ch.charAt(0).toUpperCase() + ch.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
 
         <div className="flex justify-end pt-1">
