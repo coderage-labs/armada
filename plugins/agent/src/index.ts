@@ -12,7 +12,7 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { writeFileSync, readFileSync, renameSync, existsSync, mkdirSync } from 'node:fs';
+import { writeFileSync, readFileSync, renameSync, existsSync, mkdirSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
@@ -178,6 +178,7 @@ let _logger: ArmadaLogger = console;
 
 const _dataDir = join(process.env.HOME || '/home/node', '.openclaw');
 const _tasksFilePath = join(_dataDir, 'armada-agent-tasks.json');
+const _bootTime = Date.now();
 
 /** Serializable subset of InboundContext for persistence */
 interface PersistedInboundContext {
@@ -256,6 +257,8 @@ function loadAgentTasks(): void {
       const restored = deserializeTaskMap(JSON.stringify(data.inbound));
       let count = 0;
       for (const [, ctx] of restored) {
+        // Skip tasks that arrived after this boot — they're not restart leftovers
+        if (ctx.startedAt && ctx.startedAt >= _bootTime) continue;
         if (ctx.callbackUrl) {
           _logger.info(`[armada-agent] Sending restart error callback for inbound task ${ctx.taskId}`);
           fetch(ctx.callbackUrl, {
@@ -278,6 +281,11 @@ function loadAgentTasks(): void {
       }
       if (count > 0) _logger.info(`[armada-agent] Sent ${count} restart error callbacks for inbound tasks`);
     }
+
+    // Clear the file after processing to prevent re-firing on next restart
+    try {
+      unlinkSync(_tasksFilePath);
+    } catch {}
   } catch (err: any) {
     _logger.warn(`[armada-agent] Failed to load tasks: ${err.message}`);
   }
