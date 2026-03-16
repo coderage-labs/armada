@@ -26,6 +26,7 @@
     "better-sqlite3": "^12.6.2",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
+    "discord.js": "^14.25.1",
     "drizzle-orm": "^0.45.1",
     "express": "^4.21.2",
     "grammy": "^1.41.1",
