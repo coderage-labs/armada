@@ -481,6 +481,26 @@ export async function onStepCompleted(
   const runId = stepRun.runId;
   const stepId = stepRun.stepId;
 
+  // If step already transitioned to waiting_for_rework (via requestRework()),
+  // don't overwrite — the agent called rework before its task completed.
+  // Store the output but preserve the waiting_for_rework status.
+  if (stepRun.status === 'waiting_for_rework') {
+    console.log(`[workflow-engine] Step "${stepId}" completed but is waiting_for_rework — preserving status, storing output`);
+    db.run(sql`
+      UPDATE workflow_step_runs
+      SET output = ${output}, shared_refs_json = ${JSON.stringify(sharedRefs)}, completed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+      WHERE id = ${stepRun.id}
+    `);
+    // Still update context with output
+    const run = getRunById(runId);
+    if (run) {
+      const context = { ...run.context } as any;
+      context[stepId] = { output, sharedRefs };
+      db.update(workflowRuns).set({ contextJson: JSON.stringify(context) }).where(eq(workflowRuns.id, runId)).run();
+    }
+    return; // Don't advance — rework target will trigger re-dispatch when it completes
+  }
+
   // Update step run
   const stepStatus: StepRunStatus = status === 'completed' ? 'completed' : 'failed';
   db.run(sql`
