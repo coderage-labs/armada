@@ -96,22 +96,19 @@ router.put('/me', (req, res) => {
     res.status(401).json({ error: 'Auth required' });
     return;
   }
-  const { displayName, linkedAccounts } = req.body;
-  const update: Record<string, any> = {};
-  if (displayName !== undefined) update.displayName = displayName;
-  if (linkedAccounts !== undefined) update.linkedAccounts = linkedAccounts;
+  const { displayName, linkedAccounts, notifications } = req.body;
   try {
-    const db = getDrizzle();
-    if (Object.keys(update).length > 0) {
-      const sets: Record<string, any> = {};
-      if (update.displayName !== undefined) sets.displayName = update.displayName;
-      if (update.linkedAccounts !== undefined) sets.linkedAccounts = JSON.stringify(update.linkedAccounts);
-      db.update(users).set(sets).where(eq(users.id, req.caller.id)).run();
+    const updates: Record<string, any> = {};
+    if (displayName !== undefined) updates.displayName = displayName;
+    if (linkedAccounts !== undefined) updates.linkedAccounts = linkedAccounts;
+    if (notifications !== undefined) updates.notifications = notifications;
+    if (Object.keys(updates).length > 0) {
+      usersRepo.update(req.caller.id, updates);
     }
-    // Re-fetch and return
-    const row = db.select().from(users).where(eq(users.id, req.caller.id)).get();
-    if (!row) { res.status(404).json({ error: 'User not found' }); return; }
-    res.json(row);
+    // Re-fetch and return full user record
+    const fullUser = usersRepo.getById(req.caller.id);
+    if (!fullUser) { res.status(404).json({ error: 'User not found' }); return; }
+    res.json(fullUser);
   } catch (err: any) {
     res.status(500).json({ error: err.message ?? 'Failed to update profile' });
   }

@@ -1,12 +1,19 @@
 import { useEffect, useState, useCallback } from 'react';
 import { apiFetch } from '../hooks/useApi';
-import { Shield, Fingerprint, Trash2, User, Key, Lock, Save, Loader2 } from 'lucide-react';
+import { Shield, Fingerprint, Trash2, User, Key, Lock, Save, Loader2, Bell } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import RegisterPasskey from '../components/RegisterPasskey';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
+import { Switch } from '../components/ui/switch';
+
+interface NotificationPreferences {
+  channels: string[];
+  preferences: { gates: boolean; completions: boolean; failures: boolean };
+  telegram?: { chatId: string };
+}
 
 interface CallerInfo {
   id: string;
@@ -19,6 +26,7 @@ interface CallerInfo {
     github?: string;
     email?: string;
   };
+  notifications?: NotificationPreferences;
 }
 
 interface Passkey {
@@ -56,6 +64,16 @@ export default function Account() {
   const [profileError, setProfileError] = useState('');
   const [profileSuccess, setProfileSuccess] = useState('');
 
+  // Notification preferences state
+  const [notifPrefs, setNotifPrefs] = useState<NotificationPreferences>({
+    channels: [],
+    preferences: { gates: true, completions: true, failures: true },
+    telegram: { chatId: '' },
+  });
+  const [notifSaving, setNotifSaving] = useState(false);
+  const [notifError, setNotifError] = useState('');
+  const [notifSuccess, setNotifSuccess] = useState('');
+
   // Password state
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
@@ -92,6 +110,17 @@ export default function Account() {
         email: caller.linkedAccounts?.email ?? '',
         github: caller.linkedAccounts?.github ?? '',
       });
+      if (caller.notifications) {
+        setNotifPrefs({
+          channels: caller.notifications.channels ?? [],
+          preferences: {
+            gates: caller.notifications.preferences?.gates ?? true,
+            completions: caller.notifications.preferences?.completions ?? true,
+            failures: caller.notifications.preferences?.failures ?? true,
+          },
+          telegram: { chatId: caller.notifications.telegram?.chatId ?? '' },
+        });
+      }
     }
   }, [caller]);
 
@@ -116,6 +145,29 @@ export default function Account() {
       setProfileError(err.message || 'Failed to update profile');
     } finally {
       setProfileSaving(false);
+    }
+  }
+
+  async function handleNotifSave() {
+    setNotifSaving(true);
+    setNotifError('');
+    setNotifSuccess('');
+    try {
+      const payload: NotificationPreferences = {
+        channels: notifPrefs.telegram?.chatId ? ['telegram'] : [],
+        preferences: notifPrefs.preferences,
+        telegram: notifPrefs.telegram?.chatId ? { chatId: notifPrefs.telegram.chatId } : undefined,
+      };
+      await apiFetch('/api/auth/me', {
+        method: 'PUT',
+        body: JSON.stringify({ notifications: payload }),
+      });
+      setNotifSuccess('Notification preferences saved');
+      await fetchData();
+    } catch (err: any) {
+      setNotifError(err.message || 'Failed to save notification preferences');
+    } finally {
+      setNotifSaving(false);
     }
   }
 
@@ -299,6 +351,79 @@ export default function Account() {
           </div>
         </div>
       )}
+
+      {/* Notification Preferences */}
+      <div className="bg-zinc-800/50 border border-zinc-800 rounded-lg p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <Bell className="w-5 h-5 text-blue-400" />
+          <h2 className="text-sm font-semibold text-zinc-200">Notification Preferences</h2>
+        </div>
+
+        {notifError && <p className="text-xs text-red-400">{notifError}</p>}
+        {notifSuccess && <p className="text-xs text-emerald-400">{notifSuccess}</p>}
+
+        <div className="space-y-3">
+          <p className="text-xs text-zinc-500">Choose which events trigger notifications.</p>
+
+          <div className="flex items-center justify-between py-2 border-b border-zinc-800">
+            <div>
+              <p className="text-sm text-zinc-200">Gate approvals</p>
+              <p className="text-xs text-zinc-500">Notify when a workflow gate needs approval</p>
+            </div>
+            <Switch
+              checked={notifPrefs.preferences.gates}
+              onCheckedChange={(v) => setNotifPrefs(p => ({ ...p, preferences: { ...p.preferences, gates: v } }))}
+            />
+          </div>
+
+          <div className="flex items-center justify-between py-2 border-b border-zinc-800">
+            <div>
+              <p className="text-sm text-zinc-200">Workflow completions</p>
+              <p className="text-xs text-zinc-500">Notify when a workflow run completes</p>
+            </div>
+            <Switch
+              checked={notifPrefs.preferences.completions}
+              onCheckedChange={(v) => setNotifPrefs(p => ({ ...p, preferences: { ...p.preferences, completions: v } }))}
+            />
+          </div>
+
+          <div className="flex items-center justify-between py-2 border-b border-zinc-800">
+            <div>
+              <p className="text-sm text-zinc-200">Workflow failures</p>
+              <p className="text-xs text-zinc-500">Notify when a workflow run fails</p>
+            </div>
+            <Switch
+              checked={notifPrefs.preferences.failures}
+              onCheckedChange={(v) => setNotifPrefs(p => ({ ...p, preferences: { ...p.preferences, failures: v } }))}
+            />
+          </div>
+
+          <div className="pt-1">
+            <label className="block text-xs text-zinc-400 mb-1">Telegram Chat ID</label>
+            <Input
+              type="text"
+              value={notifPrefs.telegram?.chatId ?? ''}
+              onChange={(e) => setNotifPrefs(p => ({ ...p, telegram: { chatId: e.target.value } }))}
+              placeholder="e.g. 5059211930"
+            />
+            <p className="text-xs text-zinc-500 mt-1">Your Telegram user or chat ID for direct delivery. Start a chat with the Armada bot to get your ID.</p>
+          </div>
+        </div>
+
+        <div className="flex justify-end pt-1">
+          <Button
+            onClick={handleNotifSave}
+            disabled={notifSaving}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 h-9 disabled:opacity-50"
+          >
+            {notifSaving ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</>
+            ) : (
+              <><Save className="w-4 h-4" /> Save Preferences</>
+            )}
+          </Button>
+        </div>
+      </div>
 
       {/* Passkeys */}
       <div className="bg-zinc-800/50 border border-zinc-800 rounded-lg p-5 space-y-4">
