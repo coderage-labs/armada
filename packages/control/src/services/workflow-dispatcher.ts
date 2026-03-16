@@ -80,12 +80,14 @@ export function initWorkflowDispatcher() {
 
       const containerName = `armada-instance-${instance.name}`;
       const node = getNodeClient(instance.nodeId);
+      // Use instance proxyUrl for callback so agents can reach the control plane through the node proxy
+      const callbackBaseUrl = process.env.ARMADA_AGENT_GATEWAY_URL || 'http://armada-node:3002';
       const body = JSON.stringify({
         taskId: opts.taskId,
         from: 'workflow-engine',
         fromRole: 'operator',
         message: opts.message,
-        callbackUrl: `${CONTROL_PLANE_URL}/api/tasks/${opts.taskId}/result`,
+        callbackUrl: `${callbackBaseUrl}/api/tasks/${opts.taskId}/result`,
         projectId: opts.projectId,
         ...(agent.targetAgent && { targetAgent: agent.targetAgent }),
       });

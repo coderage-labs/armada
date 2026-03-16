@@ -365,12 +365,14 @@ router.post('/send', requireScope('tasks:write'), async (req, res) => {
   // Dispatch via node relay
   try {
     const node = getNodeClient(instance.nodeId);
+    // Use instance proxyUrl for callback so agents can reach the control plane through the node proxy
+    const callbackBaseUrl = process.env.ARMADA_AGENT_GATEWAY_URL || 'http://armada-node:3002';
     const body = JSON.stringify({
       taskId,
       from: callerName,
       fromRole: req.caller?.role || 'operator',
       message,
-      callbackUrl: `${controlPlaneUrl}/api/tasks/${taskId}/result`,
+      callbackUrl: `${callbackBaseUrl}/api/tasks/${taskId}/result`,
     });
 
     const resp = await node.relayRequest(containerName, 'POST', '/armada/task', body) as any;
