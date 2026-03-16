@@ -31,6 +31,7 @@ registerToolDef({
     { name: 'baseUrl', type: 'string', description: 'Custom base URL', required: false },
     { name: 'enabled', type: 'boolean', description: 'Enable/disable provider', required: false },
   ],
+    scope: 'system:write',
 });
 
 registerToolDef({
@@ -45,6 +46,7 @@ registerToolDef({
   description: 'Sync discovered models into the model registry from a provider.',
   method: 'POST', path: '/api/providers/:id/sync',
   parameters: [{ name: 'id', type: 'string', description: 'Provider ID', required: true }],
+    scope: 'system:write',
 });
 
 registerToolDef({
@@ -65,6 +67,7 @@ registerToolDef({
     { name: 'isDefault', type: 'boolean', description: 'Set as default', required: false },
     { name: 'priority', type: 'number', description: 'Priority (lower = preferred)', required: false },
   ],
+    scope: 'system:write',
 });
 
 const router = Router();

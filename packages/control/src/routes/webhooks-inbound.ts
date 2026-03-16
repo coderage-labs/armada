@@ -37,6 +37,7 @@ registerToolDef({
     { name: 'actionConfig', type: 'string', description: 'Action configuration JSON string (workflowId, projectId, etc.)', required: false },
     { name: 'secret', type: 'string', description: 'Optional HMAC-SHA256 secret for request verification', required: false },
   ],
+    scope: 'webhooks:write',
 });
 
 registerToolDef({
@@ -52,6 +53,7 @@ registerToolDef({
     { name: 'secret', type: 'string', description: 'HMAC secret', required: false },
     { name: 'enabled', type: 'boolean', description: 'Whether the webhook is enabled', required: false },
   ],
+    scope: 'webhooks:write',
 });
 
 registerToolDef({
@@ -62,6 +64,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Webhook ID', required: true },
   ],
+    scope: 'webhooks:write',
 });
 
 // GET /api/webhooks/inbound

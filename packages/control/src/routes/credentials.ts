@@ -104,6 +104,7 @@ export function createCredentialRoutes(nodeManager: NodeManager): Router {
     parameters: [
       { name: 'name', type: 'string', description: 'Agent name', required: true },
     ],
+    scope: 'agents:write',
   });
 
   // ── GET /api/agents/:name/credentials ─────────────────────────────

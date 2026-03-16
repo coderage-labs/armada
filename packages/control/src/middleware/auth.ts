@@ -150,3 +150,85 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
 
   res.status(401).json({ error: 'Missing or invalid Authorization header' });
 }
+
+/**
+ * Optional auth middleware - runs auth logic but doesn't reject on failure.
+ * Used for endpoints that work both authenticated (with filtering) and unauthenticated.
+ */
+export function optionalAuthMiddleware(req: Request, _res: Response, next: NextFunction): void {
+  // Extract token from header or query param
+  const header = req.headers.authorization;
+  const queryToken = req.query.token as string | undefined;
+  const token = header?.startsWith('Bearer ') ? header.slice(7) : queryToken;
+
+  try {
+    // 1. Check session cookie
+    const sessionToken = req.cookies?.armada_session;
+    if (sessionToken) {
+      const sessionHash = hashToken(sessionToken);
+      const session = sessionRepo.findByHash(sessionHash);
+
+      if (session && (!session.expiresAt || new Date(session.expiresAt) > new Date())) {
+        req.caller = {
+          id: session.userId,
+          name: session.name,
+          displayName: session.displayName || session.name,
+          role: session.role || 'viewer',
+          type: (session.type || 'human') as Caller['type'],
+        };
+        next();
+        return;
+      }
+    }
+
+    // 2. Check per-user/agent tokens
+    if (token) {
+      const hash = hashToken(token);
+      const row = authTokenRepo.findByHash(hash);
+
+      if (row) {
+        // Check expiry
+        if (row.expiresAt && new Date(row.expiresAt) < new Date()) {
+          // Expired - continue without setting caller
+          next();
+          return;
+        }
+
+        // Update last_used_at
+        authTokenRepo.updateLastUsed(row.tokenId);
+
+        // Parse scopes
+        let parsedScopes: string[] | undefined;
+        if (row.scopes) {
+          try {
+            if (typeof row.scopes === 'string') {
+              parsedScopes = JSON.parse(row.scopes);
+            } else if (Array.isArray(row.scopes)) {
+              parsedScopes = row.scopes;
+            }
+          } catch {
+            // Parsing failed - leave undefined
+          }
+        }
+
+        req.caller = {
+          id: row.uid || row.tokenId,
+          name: row.name || row.agentName || 'unknown',
+          displayName: row.displayName || row.name || row.agentName || 'Unknown',
+          role: row.role || 'agent',
+          type: row.agentName ? 'agent' : ((row.type || 'human') as Caller['type']),
+          agentName: row.agentName || undefined,
+          tokenId: row.tokenId,
+          scopes: parsedScopes,
+        };
+        next();
+        return;
+      }
+    }
+  } catch (err: any) {
+    console.warn('[auth] Optional auth check failed:', err.message);
+  }
+
+  // No auth found - continue without caller (unauthenticated)
+  next();
+}

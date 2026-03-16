@@ -19,6 +19,7 @@ registerToolDef({
   description: 'Update the task routing rules. Each role maps to an array of roles it can assign tasks to.',
   method: 'PUT', path: '/api/hierarchy',
   parameters: [],
+  scope: 'system:write',
 });
 
 registerToolDef({
@@ -32,6 +33,7 @@ registerToolDef({
     { name: 'tier', type: 'number', description: 'Tier: 0=top, 1=middle, 2=leaf' },
     { name: 'icon', type: 'string', description: 'Emoji or icon identifier' },
   ],
+  scope: 'system:write',
 });
 
 registerToolDef({
@@ -41,6 +43,7 @@ registerToolDef({
   parameters: [
     { name: 'role', type: 'string', description: 'Role name (path param)', required: true },
   ],
+  scope: 'system:write',
 });
 
 export interface HierarchyRules {

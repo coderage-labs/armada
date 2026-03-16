@@ -38,6 +38,7 @@ registerToolDef({
   parameters: [
     { name: 'includeArchived', type: 'boolean', description: 'Include archived projects (default: false)' },
   ],
+    scope: 'projects:read',
 });
 
 registerToolDef({
@@ -48,6 +49,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Project ID', required: true },
   ],
+    scope: 'projects:read',
 });
 
 registerToolDef({
@@ -63,6 +65,7 @@ registerToolDef({
     { name: 'icon', type: 'string', description: 'Project icon (emoji)' },
     { name: 'repositories', type: 'string', description: 'JSON array of {url, defaultBranch?, cloneDir?} repository objects' },
   ],
+    scope: 'projects:write',
 });
 
 registerToolDef({
@@ -79,6 +82,7 @@ registerToolDef({
     { name: 'icon', type: 'string', description: 'Project icon (emoji)' },
     { name: 'repositories', type: 'string', description: 'JSON array of {url, defaultBranch?, cloneDir?} repository objects' },
   ],
+    scope: 'projects:write',
 });
 
 registerToolDef({
@@ -89,6 +93,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Project ID', required: true },
   ],
+    scope: 'projects:write',
 });
 
 registerToolDef({
@@ -99,6 +104,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Project ID', required: true },
   ],
+    scope: 'projects:write',
 });
 
 registerToolDef({
@@ -109,6 +115,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Project ID', required: true },
   ],
+    scope: 'projects:write',
 });
 
 registerToolDef({
@@ -119,6 +126,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Project ID', required: true },
   ],
+    scope: 'projects:read',
 });
 
 registerToolDef({
@@ -129,6 +137,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Project ID or name', required: true },
   ],
+    scope: 'projects:read',
 });
 
 registerToolDef({
@@ -139,6 +148,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Project ID', required: true },
   ],
+    scope: 'projects:write',
 });
 
 registerToolDef({
@@ -149,6 +159,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Project ID or name', required: true },
   ],
+    scope: 'projects:read',
 });
 
 registerToolDef({
@@ -159,6 +170,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Project ID or name', required: true },
   ],
+    scope: 'projects:read',
 });
 
 registerToolDef({
@@ -170,6 +182,7 @@ registerToolDef({
     { name: 'id', type: 'string', description: 'Task ID', required: true },
     { name: 'column', type: 'string', description: 'Target board column', required: true },
   ],
+    scope: 'projects:write',
 });
 
 registerToolDef({
@@ -180,6 +193,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Project ID or name', required: true },
   ],
+    scope: 'projects:read',
 });
 
 // ── Routes ───────────────────────────────────────────────────────────

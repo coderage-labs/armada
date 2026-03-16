@@ -11,6 +11,7 @@ registerToolDef({
   parameters: [
     { name: 'tools', type: 'string', description: 'GitHub repo slugs (e.g. cli/cli, jqlang/jq) — pass as JSON array', required: true },
   ],
+    scope: 'system:write',
 });
 
 registerToolDef({
@@ -29,6 +30,7 @@ registerToolDef({
   parameters: [
     { name: 'tool', type: 'string', description: 'GitHub repo slug (e.g. cli/cli)', required: true },
   ],
+    scope: 'system:write',
 });
 
 export function createToolRoutes(nodeManager: NodeManager): Router {

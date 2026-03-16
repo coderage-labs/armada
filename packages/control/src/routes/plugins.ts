@@ -23,6 +23,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Plugin name to update', required: true },
   ],
+  scope: 'plugins:write',
 });
 
 registerToolDef({
@@ -30,6 +31,7 @@ registerToolDef({
   description: 'Update all plugins in the armada shared plugins directory.',
   method: 'POST', path: '/api/plugins/update-all',
   parameters: [],
+  scope: 'plugins:write',
 });
 
 const PLUGINS_PATH = process.env.ARMADA_PLUGINS_PATH || '/data/armada/plugins';

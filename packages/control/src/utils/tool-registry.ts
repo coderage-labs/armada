@@ -28,6 +28,8 @@ export interface ToolDefinition {
   responseFormat?: 'json' | 'text';
   /** If true, the tool supports "all" as a target to operate on every agent */
   supportsAll?: boolean;
+  /** Required scope to access this tool. Used for filtering in /api/meta/tools */
+  scope?: string;
 }
 
 const _tools: ToolDefinition[] = [];

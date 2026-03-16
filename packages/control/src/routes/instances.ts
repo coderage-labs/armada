@@ -23,6 +23,7 @@ registerToolDef({
   description: 'List all armada instances. Shows instance name, node, status, and agent count.',
   method: 'GET', path: '/api/instances',
   parameters: [],
+    scope: 'instances:read',
 });
 
 registerToolDef({
@@ -32,6 +33,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Instance ID or name', required: true },
   ],
+    scope: 'instances:read',
 });
 
 registerToolDef({
@@ -48,6 +50,7 @@ registerToolDef({
     { name: 'memory', type: 'string', description: 'Container memory limit (e.g. 2g, 512m). Default: 2g' },
     { name: 'cpus', type: 'string', description: 'Container CPU limit (e.g. 1, 0.5). Default: 1' },
   ],
+    scope: 'instances:write',
 });
 
 registerToolDef({
@@ -64,6 +67,7 @@ registerToolDef({
     { name: 'status', type: 'string', description: 'Instance status' },
     { name: 'statusMessage', type: 'string', description: 'Status message' },
   ],
+    scope: 'instances:write',
 });
 
 registerToolDef({
@@ -73,6 +77,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Instance ID to destroy', required: true },
   ],
+    scope: 'instances:write',
 });
 
 registerToolDef({
@@ -82,6 +87,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Instance ID', required: true },
   ],
+    scope: 'instances:read',
 });
 
 // ── Routes ──────────────────────────────────────────────────────────

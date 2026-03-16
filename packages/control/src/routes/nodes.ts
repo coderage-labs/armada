@@ -16,6 +16,7 @@ registerToolDef({
   description: 'List all armada nodes (Docker hosts). Shows node name, URL, status, and agent count.',
   method: 'GET', path: '/api/nodes',
   parameters: [],
+    scope: 'nodes:read',
 });
 
 registerToolDef({
@@ -25,6 +26,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Node ID', required: true },
   ],
+    scope: 'nodes:read',
 });
 
 registerToolDef({
@@ -34,6 +36,7 @@ registerToolDef({
   parameters: [
     { name: 'hostname', type: 'string', description: 'Node hostname label', required: false },
   ],
+    scope: 'nodes:write',
 });
 
 registerToolDef({
@@ -44,6 +47,7 @@ registerToolDef({
     { name: 'id', type: 'string', description: 'Node ID', required: true },
     { name: 'hostname', type: 'string', description: 'Node hostname label' },
   ],
+    scope: 'nodes:write',
 });
 
 registerToolDef({
@@ -53,6 +57,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Node ID to remove', required: true },
   ],
+    scope: 'nodes:write',
 });
 
 registerToolDef({
@@ -62,6 +67,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Node ID to test', required: true },
   ],
+    scope: 'nodes:write',
 });
 
 registerToolDef({
@@ -71,6 +77,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Node ID', required: true },
   ],
+    scope: 'nodes:read',
 });
 
 registerToolDef({
@@ -80,6 +87,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Node ID', required: true },
   ],
+    scope: 'nodes:read',
 });
 
 export function createNodeRoutes(nodeManager: NodeManager): Router {

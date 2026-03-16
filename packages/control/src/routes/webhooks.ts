@@ -19,6 +19,7 @@ registerToolDef({
   method: 'GET',
   path: '/api/webhooks',
   parameters: [],
+    scope: 'webhooks:read',
 });
 
 registerToolDef({
@@ -31,6 +32,7 @@ registerToolDef({
     { name: 'events', type: 'string', description: 'Comma-separated event types to subscribe to, or * for all', required: false },
     { name: 'secret', type: 'string', description: 'Optional shared secret for HMAC-SHA256 signature verification', required: false },
   ],
+    scope: 'webhooks:write',
 });
 
 registerToolDef({
@@ -45,6 +47,7 @@ registerToolDef({
     { name: 'secret', type: 'string', description: 'Shared secret for HMAC-SHA256 signatures', required: false },
     { name: 'enabled', type: 'boolean', description: 'Whether the webhook is enabled', required: false },
   ],
+    scope: 'webhooks:write',
 });
 
 registerToolDef({
@@ -55,6 +58,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Webhook ID', required: true },
   ],
+    scope: 'webhooks:write',
 });
 
 registerToolDef({
@@ -65,6 +69,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Webhook ID', required: true },
   ],
+    scope: 'webhooks:write',
 });
 
 registerToolDef({
@@ -73,6 +78,7 @@ registerToolDef({
   method: 'GET',
   path: '/api/webhooks/events',
   parameters: [],
+    scope: 'webhooks:read',
 });
 
 // ── Routes ───────────────────────────────────────────────────────────

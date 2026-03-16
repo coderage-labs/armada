@@ -86,6 +86,7 @@ registerToolDef({
   parameters: [
     { name: 'project', type: 'string', description: 'Project ID or name', required: true },
   ],
+    scope: 'integrations:write',
 });
 
 router.post('/repos', async (req, res, next) => {
@@ -144,6 +145,7 @@ registerToolDef({
     { name: 'labels', type: 'string', description: 'Comma-separated label filter' },
     { name: 'cursor', type: 'string', description: 'Pagination cursor from previous response' },
   ],
+    scope: 'integrations:write',
 });
 
 router.post('/list', async (req, res, next) => {
@@ -204,6 +206,7 @@ registerToolDef({
     { name: 'repo', type: 'string', description: 'Repository full name (owner/repo)', required: true },
     { name: 'number', type: 'number', description: 'PR number', required: true },
   ],
+    scope: 'integrations:write',
 });
 
 router.post('/get', async (req, res, next) => {
@@ -240,6 +243,7 @@ registerToolDef({
     { name: 'repo', type: 'string', description: 'Repository full name (owner/repo)', required: true },
     { name: 'number', type: 'number', description: 'PR number', required: true },
   ],
+    scope: 'integrations:write',
 });
 
 router.post('/reviews', async (req, res, next) => {
@@ -279,6 +283,7 @@ registerToolDef({
     { name: 'path', type: 'string', description: 'File path for inline review comment' },
     { name: 'line', type: 'number', description: 'Line number for inline comment' },
   ],
+    scope: 'integrations:write',
 });
 
 router.post('/comment', requireScope('integrations:write'), async (req, res, next) => {
@@ -321,6 +326,7 @@ registerToolDef({
     { name: 'draft', type: 'boolean', description: 'Create as draft PR (default: false)' },
     { name: 'labels', type: 'string', description: 'JSON array of label names' },
   ],
+    scope: 'integrations:write',
 });
 
 router.post('/create', requireScope('integrations:write'), async (req, res, next) => {
@@ -375,6 +381,7 @@ registerToolDef({
     { name: 'commitTitle', type: 'string', description: 'Custom merge commit title' },
     { name: 'commitMessage', type: 'string', description: 'Custom merge commit message' },
   ],
+    scope: 'integrations:write',
 });
 
 router.post('/merge', requireScope('integrations:write'), async (req, res, next) => {
@@ -417,6 +424,7 @@ registerToolDef({
     { name: 'labels', type: 'string', description: 'JSON array of label names (replaces all)' },
     { name: 'assignees', type: 'string', description: 'JSON array of assignee usernames' },
   ],
+    scope: 'integrations:write',
 });
 
 router.post('/update', requireScope('integrations:write'), async (req, res, next) => {

@@ -18,6 +18,7 @@ registerToolDef({
   method: 'GET',
   path: '/api/users',
   parameters: [],
+    scope: 'users:read',
 });
 
 registerToolDef({
@@ -28,6 +29,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'User ID or name', required: true },
   ],
+    scope: 'users:read',
 });
 
 registerToolDef({
@@ -43,6 +45,7 @@ registerToolDef({
     { name: 'linkedAccounts', type: 'string', description: 'Linked accounts JSON (telegram, github, email)', required: false },
     { name: 'notifications', type: 'string', description: 'Notification settings JSON', required: false },
   ],
+    scope: 'users:write',
 });
 
 registerToolDef({
@@ -59,6 +62,7 @@ registerToolDef({
     { name: 'linkedAccounts', type: 'string', description: 'Linked accounts JSON', required: false },
     { name: 'notifications', type: 'string', description: 'Notification settings JSON', required: false },
   ],
+    scope: 'users:write',
 });
 
 registerToolDef({
@@ -69,6 +73,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'User ID', required: true },
   ],
+    scope: 'users:write',
 });
 
 // ── Routes ───────────────────────────────────────────────────────────
@@ -194,6 +199,7 @@ registerToolDef({
   description: 'Generate an AI avatar for a armada user.',
   method: 'POST', path: '/api/users/:id/avatar/generate',
   parameters: [{ name: 'id', type: 'string', description: 'User ID', required: true }],
+    scope: 'users:write',
 });
 
 registerToolDef({
@@ -201,6 +207,7 @@ registerToolDef({
   description: 'Delete the avatar for a armada user.',
   method: 'DELETE', path: '/api/users/:id/avatar',
   parameters: [{ name: 'id', type: 'string', description: 'User ID', required: true }],
+    scope: 'users:write',
 });
 
 // GET /api/users/:id/avatar/status — persisted generating flag

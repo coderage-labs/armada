@@ -9,6 +9,7 @@ registerToolDef({
   name: 'armada_settings_get',
   description: 'Get all armada settings (version, retention, avatar generation, sync interval).',
   method: 'GET', path: '/api/settings', parameters: [],
+    scope: 'system:read',
 });
 
 registerToolDef({
@@ -19,6 +20,7 @@ registerToolDef({
     { name: 'key', type: 'string', description: 'Setting key (armada_openclaw_version, workspace_retention_days, ai_avatar_generation, github_sync_interval_minutes, avatar_provider_id, avatar_model_id)', required: true },
     { name: 'value', type: 'string', description: 'Setting value', required: true },
   ],
+    scope: 'system:write',
 });
 
 const router = Router();
