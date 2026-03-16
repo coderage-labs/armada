@@ -28,6 +28,7 @@ import {
   validateInviteToken,
   acceptInvite,
 } from '../services/auth-service.js';
+import { verifyLinkingCode } from '../services/linking-service.js';
 import { inviteRepo } from '../repositories/invite-repo.js';
 
 const router = Router();
@@ -110,6 +111,55 @@ router.put('/me', (req, res) => {
   } catch (err: any) {
     res.status(500).json({ error: err.message ?? 'Failed to update profile' });
   }
+});
+
+// ── Channel Linking ───────────────────────────────────────────────────
+
+// POST /api/auth/me/link — link a channel identity via verification code
+router.post('/me/link', (req, res) => {
+  if (!req.caller) { res.status(401).json({ error: 'Auth required' }); return; }
+  const { code } = req.body;
+  if (!code) { res.status(400).json({ error: 'code is required' }); return; }
+
+  const result = verifyLinkingCode(code);
+  if (!result) { res.status(400).json({ error: 'Invalid or expired linking code' }); return; }
+
+  const user = usersRepo.getById(req.caller.id);
+  if (!user) { res.status(404).json({ error: 'User not found' }); return; }
+
+  const channels = { ...(user.channels || {}) };
+  channels[result.channelType] = {
+    platformId: result.platformId,
+    verified: true,
+    linkedAt: new Date().toISOString(),
+  };
+
+  usersRepo.update(req.caller.id, { channels });
+  res.json({ ok: true, channel: result.channelType, platformId: result.platformId });
+});
+
+// POST /api/auth/me/unlink — unlink a channel
+router.post('/me/unlink', (req, res) => {
+  if (!req.caller) { res.status(401).json({ error: 'Auth required' }); return; }
+  const { channel } = req.body;
+  if (!channel) { res.status(400).json({ error: 'channel is required' }); return; }
+
+  const user = usersRepo.getById(req.caller.id);
+  if (!user) { res.status(404).json({ error: 'User not found' }); return; }
+
+  const channels = { ...(user.channels || {}) };
+  delete channels[channel];
+
+  usersRepo.update(req.caller.id, { channels });
+  res.json({ ok: true });
+});
+
+// GET /api/auth/me/channels — list linked channels
+router.get('/me/channels', (req, res) => {
+  if (!req.caller) { res.status(401).json({ error: 'Auth required' }); return; }
+  const user = usersRepo.getById(req.caller.id);
+  if (!user) { res.status(404).json({ error: 'User not found' }); return; }
+  res.json(user.channels || {});
 });
 
 // ── Password Authentication ───────────────────────────────────────────

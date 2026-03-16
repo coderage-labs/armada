@@ -323,6 +323,7 @@ export const users = sqliteTable('users', {
   passwordHash: text('password_hash'),
   linkedAccountsJson: text('linked_accounts_json').notNull().default('{}'),
   notificationsJson: text('notifications_json').notNull().default('{}'),
+  channelsJson: text('channels_json').notNull().default('{}'),
   createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
   avatarGenerating: integer('avatar_generating').notNull().default(0),
   avatarVersion: integer('avatar_version').notNull().default(0),

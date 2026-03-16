@@ -2,11 +2,12 @@ import { eq } from 'drizzle-orm';
 import { getDrizzle } from '../db/drizzle.js';
 import { users } from '../db/drizzle-schema.js';
 import type { ArmadaUser } from '@coderage-labs/armada-shared';
-import { parseJsonWithSchema, linkedAccountsSchema, notificationsSchema, defaultNotifications } from '../utils/json-schemas.js';
+import { parseJsonWithSchema, linkedAccountsSchema, notificationsSchema, userChannelsSchema, defaultNotifications } from '../utils/json-schemas.js';
 
 function rowToUser(r: typeof users.$inferSelect): ArmadaUser {
   const linkedAccounts = parseJsonWithSchema('[user-repo] linkedAccounts', r.linkedAccountsJson, linkedAccountsSchema, {}) as ArmadaUser['linkedAccounts'];
   const notifications = parseJsonWithSchema('[user-repo] notifications', r.notificationsJson, notificationsSchema, defaultNotifications()) as ArmadaUser['notifications'];
+  const channels = parseJsonWithSchema('[user-repo] channels', (r as any).channelsJson ?? '{}', userChannelsSchema, {}) as ArmadaUser['channels'];
   return {
     id: r.id,
     name: r.name,
@@ -17,6 +18,7 @@ function rowToUser(r: typeof users.$inferSelect): ArmadaUser {
     avatarGenerating: !!r.avatarGenerating,
     avatarVersion: r.avatarVersion ?? 0,
     linkedAccounts,
+    channels,
     notifications,
     createdAt: r.createdAt,
   };
@@ -37,7 +39,7 @@ export const usersRepo = {
     return row ? rowToUser(row) : null;
   },
 
-  create(data: { name: string; displayName: string; type?: string; role?: string; avatarUrl?: string | null; linkedAccounts?: Record<string, any>; notifications?: Record<string, any> }): ArmadaUser {
+  create(data: { name: string; displayName: string; type?: string; role?: string; avatarUrl?: string | null; linkedAccounts?: Record<string, any>; notifications?: Record<string, any>; channels?: Record<string, any> }): ArmadaUser {
     const id = crypto.randomUUID();
     getDrizzle().insert(users).values({
       id,
@@ -48,15 +50,16 @@ export const usersRepo = {
       avatarUrl: data.avatarUrl ?? null,
       linkedAccountsJson: JSON.stringify(data.linkedAccounts ?? {}),
       notificationsJson: JSON.stringify(data.notifications ?? { channels: [], preferences: { gates: false, completions: false, failures: false } }),
-    }).run();
+      channelsJson: JSON.stringify(data.channels ?? {}),
+    } as any).run();
     return usersRepo.getById(id)!;
   },
 
-  update(id: string, data: Partial<{ name: string; displayName: string; type: string; role: string; avatarUrl: string | null; avatarGenerating: number; avatarVersion: number; linkedAccounts: Record<string, any>; notifications: Record<string, any> }>): ArmadaUser {
+  update(id: string, data: Partial<{ name: string; displayName: string; type: string; role: string; avatarUrl: string | null; avatarGenerating: number; avatarVersion: number; linkedAccounts: Record<string, any>; notifications: Record<string, any>; channels: Record<string, any> }>): ArmadaUser {
     const existing = usersRepo.getById(id);
     if (!existing) throw new Error(`User not found: ${id}`);
 
-    const updates: Partial<typeof users.$inferInsert> = {};
+    const updates: Partial<typeof users.$inferInsert> & { channelsJson?: string } = {};
     if (data.name !== undefined) updates.name = data.name;
     if (data.displayName !== undefined) updates.displayName = data.displayName;
     if (data.type !== undefined) updates.type = data.type;
@@ -66,6 +69,7 @@ export const usersRepo = {
     if (data.avatarVersion !== undefined) updates.avatarVersion = data.avatarVersion;
     if (data.linkedAccounts !== undefined) updates.linkedAccountsJson = JSON.stringify(data.linkedAccounts);
     if (data.notifications !== undefined) updates.notificationsJson = JSON.stringify(data.notifications);
+    if (data.channels !== undefined) updates.channelsJson = JSON.stringify(data.channels);
 
     if (Object.keys(updates).length > 0) {
       getDrizzle().update(users).set(updates).where(eq(users.id, id)).run();
