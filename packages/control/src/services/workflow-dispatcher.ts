@@ -149,16 +149,21 @@ export function initWorkflowDispatcher() {
 export function checkWorkflowStep(taskId: string, status: string, result: string): boolean {
   if (!taskId.startsWith('wf-')) return false;
 
+  // Get the task from the database to ensure we have the latest result
+  // (the result parameter might be empty even if the task record has content)
+  const task = tasksRepo.getById(taskId);
+  const finalResult = task?.result || result || '';
+
   // Extract shared refs from result
   const sharedRefs: string[] = [];
   const sharedPattern = /\{\{shared:([^:}]+):([^}]+)\}\}/g;
   let match;
-  while ((match = sharedPattern.exec(result)) !== null) {
+  while ((match = sharedPattern.exec(finalResult)) !== null) {
     sharedRefs.push(match[0]);
   }
 
   const stepStatus = status === 'completed' ? 'completed' : 'failed';
-  onStepCompleted(taskId, stepStatus as any, result, sharedRefs).catch(err => {
+  onStepCompleted(taskId, stepStatus as any, finalResult, sharedRefs).catch(err => {
     console.error(`[workflow-dispatcher] Failed to advance workflow for task ${taskId}:`, err);
   });
 
