@@ -314,3 +314,44 @@ export function generateInstanceConfig(instanceId: string): GeneratedConfig {
 
   return config;
 }
+
+/**
+ * Generate auth-profiles.json for OpenClaw multi-agent instances.
+ * Reads enabled providers + API keys from DB and returns the auth profile structure.
+ */
+export function generateAuthProfiles(): { version: number; profiles: Record<string, any> } {
+  const db = getDrizzle();
+
+  // Get all enabled, non-hidden providers
+  const providers = db.select().from(modelProviders).all()
+    .filter(p => p.enabled === 1 && p.hidden === 0);
+
+  // Get all API keys
+  const allKeys = db.select().from(providerApiKeys).all();
+  const keysByProvider: Record<string, typeof allKeys> = {};
+  for (const key of allKeys) {
+    if (!keysByProvider[key.providerId]) keysByProvider[key.providerId] = [];
+    keysByProvider[key.providerId].push(key);
+  }
+
+  const profiles: Record<string, any> = {};
+
+  for (const provider of providers) {
+    const keys = keysByProvider[provider.id] ?? [];
+    
+    for (const key of keys) {
+      // Profile key format: {providerType}:{keyName}
+      const profileKey = `${provider.type}:${key.name}`;
+      profiles[profileKey] = {
+        provider: provider.type,
+        type: 'api_key',
+        key: key.apiKey,
+      };
+    }
+  }
+
+  return {
+    version: 1,
+    profiles,
+  };
+}
