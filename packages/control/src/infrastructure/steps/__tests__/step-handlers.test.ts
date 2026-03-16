@@ -41,6 +41,7 @@ vi.mock('../../../repositories/index.js', () => ({
   },
   agentsRepo: {
     listByInstance: vi.fn(() => []),
+    getAll: vi.fn(() => []),
   },
   nodesRepo: {
     getById: vi.fn(),
@@ -56,6 +57,7 @@ vi.mock('../../../services/config-generator.js', () => ({
       controlUi: { dangerouslyAllowHostHeaderOriginFallback: true },
     },
   })),
+  generateAuthProfiles: vi.fn(() => ({})),
 }));
 
 // ── Import handlers after mocks ──────────────────────────────────────────────
