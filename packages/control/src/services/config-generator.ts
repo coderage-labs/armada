@@ -33,6 +33,16 @@ const PROVIDER_BASE_URL: Record<string, string> = {
   ollama: 'http://localhost:11434',
 };
 
+/**
+ * Normalize model IDs by stripping dated suffixes (e.g., -20250514).
+ * Anthropic's API only accepts short-form model IDs like "claude-sonnet-4-5",
+ * not dated variants like "claude-sonnet-4-5-20250514".
+ */
+function normalizeModelId(modelId: string): string {
+  // Strip dated suffixes like -20250514 or -20250620
+  return modelId.replace(/-\d{8}$/, '');
+}
+
 export interface GeneratedConfig {
   gateway?: {
     auth?: {
@@ -132,9 +142,9 @@ function generateModelsConfig(): GeneratedConfig {
     if (baseUrl) entry.baseUrl = baseUrl;
     if (defaultKey) entry.apiKey = defaultKey.apiKey;
 
-    // Add model list
+    // Add model list (normalize model IDs to strip date suffixes)
     entry.models = providerModels.map(m => ({
-      id: m.modelId,
+      id: normalizeModelId(m.modelId),
       name: m.name,
     }));
 
@@ -224,9 +234,9 @@ function generateAgentsList(instanceId: string): Array<Record<string, any>> {
       workspace: `agents/${agent.name}`,
     };
 
-    // Model: agent override → template → omit
+    // Model: agent override → template → omit (normalize to strip date suffixes)
     const model = agent.model || (template ? resolveTemplateModel(template) : null);
-    if (model) entry.model = model;
+    if (model) entry.model = normalizeModelId(model);
 
     // Tools from template (toolsAllow is already parsed by template repo)
     if (template?.toolsAllow?.length) {
@@ -259,7 +269,7 @@ export function generateInstanceConfig(instanceId: string): GeneratedConfig {
     if (template?.model) {
       config.agent = {
         model: {
-          primary: template.model,
+          primary: normalizeModelId(template.model),
         },
       };
     }
