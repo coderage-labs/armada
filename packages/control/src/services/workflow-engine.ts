@@ -1077,7 +1077,7 @@ export function createWorkflow(id: string, params: CreateWorkflowParams): Workfl
   const steps = rawSteps.map(s => ({
     ...s,
     id: s.id || (s as any).name || randomUUID(),
-    waitFor: s.waitFor || (s as any).dependencies || [],
+    waitFor: s.waitFor || (s as any).dependsOn || (s as any).dependencies || [],
   }));
 
   db.insert(workflowsTable).values({
@@ -1114,7 +1114,7 @@ export function updateWorkflow(id: string, params: UpdateWorkflowParams): (Workf
     const normalised = params.steps.map(s => ({
       ...s,
       id: s.id || (s as any).name || randomUUID(),
-      waitFor: s.waitFor || (s as any).dependencies || [],
+      waitFor: s.waitFor || (s as any).dependsOn || (s as any).dependencies || [],
     }));
     db.update(workflowsTable).set({ stepsJson: JSON.stringify(normalised) }).where(eq(workflowsTable.id, id)).run();
   }

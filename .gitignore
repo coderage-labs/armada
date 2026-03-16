@@ -6,3 +6,4 @@ dist
 *.tsbuildinfo
 fleet.db*
 packages/ui/e2e/.auth/
+armada.db
