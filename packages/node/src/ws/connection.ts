@@ -34,6 +34,10 @@ let cachedFingerprint: string | null = null;
 /** Track consecutive 403 failures when using session credentials */
 let sessionAuthFailureCount = 0;
 
+/** Connection-ready promise for waiting on connection to establish */
+let connectionReady: Promise<void> | null = null;
+let resolveReady: (() => void) | null = null;
+
 // Pending commands sent by the node to the control plane (awaiting responses)
 interface PendingCommand {
   resolve: (value: unknown) => void;
@@ -49,6 +53,21 @@ export function getWsConnection(): WebSocket | null {
 }
 
 /**
+ * Wait for the WebSocket connection to be ready (OPEN state).
+ * Returns immediately if already connected, otherwise waits up to timeoutMs.
+ */
+export function waitForConnection(timeoutMs = 10_000): Promise<void> {
+  if (ws && ws.readyState === WebSocket.OPEN) return Promise.resolve();
+  if (!connectionReady) {
+    connectionReady = new Promise((resolve, reject) => {
+      resolveReady = resolve;
+      setTimeout(() => reject(new Error('Connection timeout')), timeoutMs);
+    });
+  }
+  return connectionReady;
+}
+
+/**
  * Send a command to the control plane and await the response.
  * Used by the gateway proxy to forward instance requests upstream.
  */
@@ -57,7 +76,23 @@ export async function sendCommandToControl(
   params: Record<string, unknown>,
   timeoutMs = 30_000,
 ): Promise<unknown> {
+  // If WS exists but still connecting, wait for it
+  if (ws && ws.readyState === WebSocket.CONNECTING) {
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('WS connection timeout')), 5000);
+      ws!.once('open', () => {
+        clearTimeout(timeout);
+        resolve();
+      });
+      ws!.once('error', (err) => {
+        clearTimeout(timeout);
+        reject(err);
+      });
+    });
+  }
+
   if (!ws || ws.readyState !== WebSocket.OPEN) {
+    console.warn(`[ws] sendCommand(${action}): ws=${!!ws} readyState=${ws?.readyState} (need ${WebSocket.OPEN})`);
     throw new Error('Not connected to control plane');
   }
 
@@ -139,6 +174,7 @@ function connect(): void {
     headers['X-Node-Fingerprint'] = cachedFingerprint;
   }
 
+  console.log(`[ws] Creating new WebSocket connection`);
   ws = new WebSocket(CONTROL_URL, { headers });
 
   ws.on('open', onOpen);
@@ -154,6 +190,14 @@ function onOpen(): void {
   reconnectAttempt = 0;
   // Reset session auth failure count on successful connection
   sessionAuthFailureCount = 0;
+  
+  // Resolve connection-ready promise
+  if (resolveReady) {
+    resolveReady();
+    connectionReady = null;
+    resolveReady = null;
+  }
+  
   startHeartbeat();
   startPing();
 
@@ -209,14 +253,19 @@ function onPong(): void {
 }
 
 function onClose(code: number, reason: Buffer): void {
-  console.warn(`[ws] Disconnected (code=${code} reason=${reason.toString() || 'none'})`);
+  const reasonStr = reason.toString() || 'none';
+  console.warn(`[ws] Disconnected (code=${code} reason=${reasonStr})`);
+  
+  // Set ws to null to ensure clean state
+  ws = null;
+  
   stopHeartbeat();
   stopPing();
   scheduleReconnect();
 }
 
 function onError(err: Error): void {
-  console.warn('[ws] Connection error:', err.message);
+  console.warn(`[ws] Connection error: ${err.message}`);
   // close event fires after error — reconnect handled there
 }
 
