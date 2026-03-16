@@ -49,7 +49,12 @@ export function requireScope(...scopes: Scope[]): any {
       res.status(401).json({ error: 'Authentication required' });
       return;
     }
-    const userScopes = getScopesForRole(caller.role);
+    
+    // Use token-specific scopes if present, otherwise fall back to role-based scopes
+    const userScopes = caller.scopes && Array.isArray(caller.scopes) && caller.scopes.length > 0
+      ? caller.scopes
+      : getScopesForRole(caller.role);
+    
     const missing = scopes.filter(s => !userScopes.includes(s));
     if (missing.length > 0) {
       res.status(403).json({ error: 'Insufficient permissions', required: scopes, missing });

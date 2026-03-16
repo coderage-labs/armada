@@ -11,6 +11,7 @@ export interface Caller {
   type: 'human' | 'agent' | 'operator' | 'system';
   agentName?: string;
   tokenId?: string;
+  scopes?: string[];
 }
 
 declare global {
@@ -115,6 +116,20 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
         // Update last_used_at
         authTokenRepo.updateLastUsed(row.tokenId);
 
+        // Parse scopes from JSON string (handles null, empty string, already-parsed-array)
+        let parsedScopes: string[] | undefined;
+        if (row.scopes) {
+          try {
+            if (typeof row.scopes === 'string') {
+              parsedScopes = JSON.parse(row.scopes);
+            } else if (Array.isArray(row.scopes)) {
+              parsedScopes = row.scopes;
+            }
+          } catch {
+            // If parsing fails, leave undefined
+          }
+        }
+
         req.caller = {
           id: row.uid || row.tokenId,
           name: row.name || row.agentName || 'unknown',
@@ -123,6 +138,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
           type: row.agentName ? 'agent' : ((row.type || 'human') as Caller['type']),
           agentName: row.agentName || undefined,
           tokenId: row.tokenId,
+          scopes: parsedScopes,
         };
         next();
         return;
