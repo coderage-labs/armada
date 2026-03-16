@@ -547,4 +547,28 @@ registerToolDef({
   scope: 'tasks:write',
 });
 
+registerToolDef({
+  name: 'armada_steer',
+  description: 'Inject a message into an agent\'s active task. Use this to course-correct, provide additional info, or tell the agent to retry something mid-task.',
+  method: 'POST',
+  path: '/api/tasks/:id/steer',
+  parameters: [
+    { name: 'id', type: 'string', description: 'Task ID', required: true },
+    { name: 'message', type: 'string', description: 'Message to inject into the task', required: true },
+  ],
+  scope: 'tasks:write',
+});
+
+registerToolDef({
+  name: 'armada_task_send',
+  description: 'Send a task to an agent via the control plane relay. Resolves agent to instance to node.',
+  method: 'POST',
+  path: '/api/tasks/send',
+  parameters: [
+    { name: 'target', type: 'string', description: 'Agent name to send the task to', required: true },
+    { name: 'message', type: 'string', description: 'Task message/instructions', required: true },
+  ],
+  scope: 'tasks:write',
+});
+
 export default router;
