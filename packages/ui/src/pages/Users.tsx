@@ -4,7 +4,15 @@ import { useAuth } from '../hooks/useAuth';
 import { useUsers } from '../hooks/useUsers';
 import { formatDate, formatDateTime } from '../lib/dates';
 import type { ArmadaUser } from '@coderage-labs/armada-shared';
-import { Users as UsersIcon, Trash2, Pencil, User, Bot, Palette, Loader2, Mail, Copy, Check, Clock, Fingerprint, Shield, Key, Lock } from 'lucide-react';
+import { Users as UsersIcon, Trash2, Pencil, User, Bot, Palette, Loader2, Mail, Copy, Check, Clock, Fingerprint, Shield, Key, Lock, MessageCircle } from 'lucide-react';
+
+interface UserChannels {
+  [type: string]: {
+    platformId: string;
+    verified: boolean;
+    linkedAt: string;
+  };
+}
 import { PageHeader } from '../components/PageHeader';
 import { Checkbox } from '../components/ui/checkbox';
 import RegisterPasskey from '../components/RegisterPasskey';
@@ -59,6 +67,7 @@ interface UserFormData {
     webhook?: { url: string };
     preferences: { gates: boolean; completions: boolean; failures: boolean; quietHours?: { start: string; end: string } };
   };
+  channels?: UserChannels;
 }
 
 const emptyForm: UserFormData = {
@@ -68,6 +77,7 @@ const emptyForm: UserFormData = {
   role: 'viewer',
   linkedAccounts: {},
   notifications: { channels: [], preferences: { gates: false, completions: false, failures: false } },
+  channels: {},
 };
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
@@ -108,6 +118,7 @@ function UserDialog({
             ...(user.notifications?.preferences ?? { gates: false, completions: false, failures: false }),
           },
         },
+        channels: { ...((user as any).channels ?? {}) },
       });
     } else {
       setForm(emptyForm);
@@ -252,24 +263,6 @@ function UserDialog({
 
                 {/* Conditional channel detail fields */}
                 <div className="mt-3 space-y-2">
-                  {form.notifications.channels.includes('telegram') && (
-                    <div className="animate-in fade-in duration-150">
-                      <label className="block text-xs text-zinc-500 mb-1">Telegram Chat ID</label>
-                      <Input
-                        type="text"
-                        value={form.notifications.telegram?.chatId ?? ''}
-                        onChange={(e) => setForm({
-                          ...form,
-                          notifications: {
-                            ...form.notifications,
-                            telegram: { chatId: e.target.value },
-                          },
-                        })}
-                        className="w-full"
-                        placeholder="e.g. 123456789"
-                      />
-                    </div>
-                  )}
                   {form.notifications.channels.includes('webhook') && (
                     <div className="animate-in fade-in duration-150">
                       <label className="block text-xs text-zinc-500 mb-1">Webhook URL</label>
@@ -385,6 +378,38 @@ function UserDialog({
                       placeholder="e.g. user@example.com"
                     />
                   </div>
+                </div>
+              </div>
+
+              {/* Channel Platform IDs (admin direct-set) */}
+              <div className="border-t border-zinc-800 pt-4">
+                <SectionHeading>Channel Platform IDs</SectionHeading>
+                <p className="text-xs text-zinc-500 mb-3">Set platform IDs directly. Admin-configured channels are auto-verified.</p>
+                <div className="space-y-2">
+                  {(['telegram', 'slack', 'discord'] as const).map((ch) => (
+                    <div key={ch}>
+                      <label className="block text-xs text-zinc-500 mb-1 flex items-center gap-1.5">
+                        <MessageCircle className="w-3 h-3" />
+                        {ch.charAt(0).toUpperCase() + ch.slice(1)} Platform ID
+                      </label>
+                      <Input
+                        type="text"
+                        value={form.channels?.[ch]?.platformId ?? ''}
+                        onChange={(e) => {
+                          const val = e.target.value.trim();
+                          const next = { ...form.channels } as UserChannels;
+                          if (val) {
+                            next[ch] = { platformId: val, verified: true, linkedAt: new Date().toISOString() };
+                          } else {
+                            delete next[ch];
+                          }
+                          setForm({ ...form, channels: next });
+                        }}
+                        className="w-full"
+                        placeholder={ch === 'telegram' ? 'e.g. 5059211930' : 'e.g. U01234ABCDE'}
+                      />
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
