@@ -47,6 +47,7 @@ import { pendingMutationsRoutes } from './routes/pending-mutations.js';
 import { draftRoutes } from './routes/draft.js';
 import sessionEventsRouter from './routes/session-events.js';
 import { usageRoutes, internalUsageRouter } from './routes/usage.js';
+import { installScriptRoutes } from './routes/install-script.js';
 
 export interface AppOptions {
   nodeManager: NodeManager;
@@ -75,6 +76,9 @@ export function createApp(opts: AppOptions): express.Express {
 
   // ── Public inbound webhook receiver (no auth required) ──────────────
   app.use('/hooks', webhooksInboundReceiverRouter);
+
+  // ── Public install script endpoint (no auth required) ────────────────
+  app.use('/install', installScriptRoutes);
 
   app.use('/api', authMiddleware);
 

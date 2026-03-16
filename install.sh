@@ -30,9 +30,11 @@ for cmd in docker openssl; do
   fi
 done
 
-if ! docker compose version &> /dev/null; then
-  echo "❌ docker compose (v2) is required"
-  exit 1
+if [ "$MODE" != "node-only" ]; then
+  if ! docker compose version &> /dev/null; then
+    echo "❌ docker compose (v2) is required"
+    exit 1
+  fi
 fi
 
 echo "🚀 Armada Installer"
@@ -57,11 +59,56 @@ else
   source "$ARMADA_DIR/.env"
 fi
 
-# Network is created by docker compose (name: armada-net) — no manual creation needed
-
 # Create host data directory for node agent bind mount
 DATA_DIR="$ARMADA_DIR/data"
 mkdir -p "$DATA_DIR/node-credentials"
+
+# Set default control URL if not provided
+if [ -z "$CONTROL_URL" ]; then
+  CONTROL_URL="__CONTROL_URL__"
+fi
+
+# ── Node-Only Mode: Standalone Docker Run ──────────────────────────────
+if [ "$MODE" = "node-only" ]; then
+  # Create network if it doesn't exist
+  docker network create armada-net 2>/dev/null || true
+  
+  # Pull the node image
+  docker pull "${REGISTRY}/armada-node:${ARMADA_VERSION}"
+  
+  # Stop and remove existing container if present
+  docker stop armada-node 2>/dev/null || true
+  docker rm armada-node 2>/dev/null || true
+  
+  # Run the node agent as a standalone container
+  docker run -d \
+    --name armada-node \
+    --network armada-net \
+    --restart unless-stopped \
+    -p 8080:8080 \
+    -e "ARMADA_NODE_TOKEN=${ARMADA_NODE_TOKEN:-}" \
+    -e "ARMADA_CONTROL_URL=${CONTROL_URL}" \
+    -e "HOST_DATA_DIR=${DATA_DIR}" \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    -v "${DATA_DIR}:/data" \
+    -v "${DATA_DIR}/node-credentials:/etc/armada-node" \
+    "${REGISTRY}/armada-node:${ARMADA_VERSION}"
+  
+  echo ""
+  echo "✅ Armada node is running!"
+  echo ""
+  echo "  🖥️  Node Agent: running on port 8080"
+  echo "  📡 Control:    $CONTROL_URL"
+  echo ""
+  if [ -z "$ARMADA_NODE_TOKEN" ]; then
+    echo "  ⚠️  No token set. Set ARMADA_NODE_TOKEN in $ARMADA_DIR/.env and restart:"
+    echo "     docker restart armada-node"
+  fi
+  echo ""
+  exit 0
+fi
+
+# ── Compose Mode: Control Plane (and optionally node) ──────────────────
 
 # Write docker-compose.yml
 cat > "$ARMADA_DIR/docker-compose.yml" << COMPOSE
@@ -90,27 +137,9 @@ if [ "$MODE" = "full" ] || [ "$MODE" = "control-only" ]; then
 COMPOSE
 fi
 
-if [ "$MODE" = "full" ] || [ "$MODE" = "node-only" ]; then
-  cat >> "$ARMADA_DIR/docker-compose.yml" << COMPOSE
-  node:
-    image: ${REGISTRY}/armada-node:\${ARMADA_VERSION:-latest}
-    container_name: armada-node
-    ports:
-      - "8080:8080"
-    environment:
-      - ARMADA_NODE_TOKEN=\${ARMADA_NODE_TOKEN:-}
-      - ARMADA_CONTROL_URL=${CONTROL_URL:-ws://armada-control:3001/api/nodes/ws}
-      - HOST_DATA_DIR=${DATA_DIR}
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ${DATA_DIR}:/data
-      - ${DATA_DIR}/node-credentials:/etc/armada-node
-      - armada-plugins:/data/armada/plugins:ro
-    networks:
-      - armada-net
-    restart: unless-stopped
-COMPOSE
-fi
+# Note: In full mode, we no longer include the node in compose.
+# Users should run `curl https://fleet.../install | bash -s -- --node-only --token <token>`
+# on each remote node instead.
 
 # Volumes and networks
 cat >> "$ARMADA_DIR/docker-compose.yml" << 'COMPOSE'
@@ -135,20 +164,13 @@ docker compose pull
 docker compose up -d
 
 echo ""
-echo "✅ Armada is running!"
+echo "✅ Armada control plane is running!"
 echo ""
-if [ "$MODE" = "full" ] || [ "$MODE" = "control-only" ]; then
-  echo "  🌐 Dashboard:  http://localhost:3001"
-  echo ""
-  echo "  Next steps:"
-  echo "  1. Open the dashboard and complete the setup wizard"
-  echo "  2. Register a node (Nodes → Add Node → copy the install token)"
-  echo "  3. Set the token in $ARMADA_DIR/.env: ARMADA_NODE_TOKEN=<token>"
-  echo "  4. Restart the node: cd $ARMADA_DIR && docker compose restart node"
-  echo "  5. Create templates, instances, and agents from the dashboard"
-fi
-if [ "$MODE" = "node-only" ]; then
-  echo "  🖥️  Node Agent: running on port 8080"
-  echo "  📡 Control:    $CONTROL_URL"
-fi
+echo "  🌐 Dashboard:  http://localhost:3001"
+echo ""
+echo "  Next steps:"
+echo "  1. Open the dashboard and complete the setup wizard"
+echo "  2. Register a node (Nodes → Add Node → copy the install token)"
+echo "  3. On each node machine, run:"
+echo "     curl https://your-domain/install | bash -s -- --node-only --token <token>"
 echo ""
