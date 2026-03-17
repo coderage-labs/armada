@@ -3,7 +3,15 @@ export * from './ws-protocol.js';
 /** Armada protocol version — bump when WS commands or shared types change in breaking ways. */
 export const ARMADA_PROTOCOL_VERSION = 1;
 
-/** Component versions — read from package.json at build time, fallback to these. */
+/**
+ * Minimum compatible version for ALL armada components.
+ * All packages release together via Release Please at the same version.
+ * Any component below this version is incompatible with this release.
+ * Updated automatically by Release Please when versions are bumped.
+ */
+export const ARMADA_MIN_VERSION = '0.2.0';
+
+/** @deprecated Use ARMADA_MIN_VERSION — all packages share one version */
 export const ARMADA_VERSIONS = {
   shared: '1.0.0',
 } as const;

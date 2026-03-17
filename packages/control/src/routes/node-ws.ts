@@ -225,16 +225,60 @@ wss.on('connection', (ws: WebSocket, _request: IncomingMessage, auth: Extract<Au
           minControlVersion?: string;
         };
 
+        const compatible = nodeVersion ? isVersionCompatible(nodeVersion, MIN_NODE_VERSION) : false;
+
         // Store version info on the connection manager
         nodeConnectionManager.setNodeVersion(nodeId, {
           version: nodeVersion ?? 'unknown',
           protocolVersion: protocolVersion ?? 0,
-          compatible: nodeVersion ? isVersionCompatible(nodeVersion, MIN_NODE_VERSION) : false,
+          compatible,
         });
+
+        // Enforce version compatibility — send event and degrade node status if incompatible
+        if (!compatible) {
+          const reason = `Node version ${nodeVersion} is incompatible with control plane (requires >= ${MIN_NODE_VERSION})`;
+          console.warn(`[node-ws] ${reason}`);
+
+          // Send version.incompatible event to the node
+          if (ws.readyState === ws.OPEN) {
+            ws.send(serializeMessage({
+              type: 'event',
+              event: 'version.incompatible',
+              data: {
+                reason,
+                minVersion: MIN_NODE_VERSION,
+                currentVersion: nodeVersion ?? 'unknown',
+              },
+            }));
+          }
+
+          // Update node status to degraded in DB
+          const node = nodesRepo.getById(nodeId);
+          if (node) {
+            nodesRepo.update(nodeId, {
+              status: 'degraded',
+              lastSeen: new Date().toISOString(),
+            });
+            console.log(`[node-ws] Node ${nodeId} marked as degraded due to version incompatibility`);
+          }
+        }
 
         // Check if this node requires a newer control plane
         if (minControlVersion && !isVersionCompatible(CONTROL_VERSION, minControlVersion)) {
           console.warn(`[node-ws] Node ${nodeId} requires control plane >= ${minControlVersion} (running ${CONTROL_VERSION})`);
+
+          // Send event back to the node
+          if (ws.readyState === ws.OPEN) {
+            ws.send(serializeMessage({
+              type: 'event',
+              event: 'version.incompatible',
+              data: {
+                reason: `Control plane version ${CONTROL_VERSION} is incompatible with node requirements (requires >= ${minControlVersion})`,
+                minVersion: minControlVersion,
+                currentVersion: CONTROL_VERSION,
+              },
+            }));
+          }
         }
 
         // Check protocol version match

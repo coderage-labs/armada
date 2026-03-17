@@ -210,6 +210,7 @@ export function createNodeRoutes(nodeManager: NodeManager): Router {
   async function enrichNode(node: ReturnType<typeof nodesRepo.getById> & {}): Promise<ArmadaNodeEnriched> {
     const agents = agentsRepo.getAll().filter(a => a.nodeId === node.id);
     const wsStatus = nodeConnectionManager.getStatus(node.id);
+    const versionInfo = nodeConnectionManager.getNodeVersion(node.id);
 
     // Prefer cached live stats (pushed by the node agent every 10s via WS).
     // Fall back to a synchronous healthCheck only when not yet received.
@@ -233,7 +234,9 @@ export function createNodeRoutes(nodeManager: NodeManager): Router {
       wsStatus,
       agentCount: agents.length,
       liveStats,
-    };
+      version: versionInfo?.version,
+      versionCompatible: versionInfo?.compatible,
+    } as any;
   }
 
   // GET /api/nodes — list all nodes with live health

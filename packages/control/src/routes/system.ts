@@ -12,6 +12,7 @@ import { logActivity } from '../services/activity-service.js';
 import type { NodeManager } from '../node-manager.js';
 import { CONTROL_VERSION, PROTOCOL_VERSION, MIN_NODE_VERSION, MIN_AGENT_PLUGIN_VERSION } from '../version.js';
 import { nodeConnectionManager } from '../ws/node-connections.js';
+import { isVersionCompatible } from '@coderage-labs/armada-shared';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkgPath = resolve(__dirname, '..', '..', '..', '..', 'package.json');
@@ -132,6 +133,7 @@ export function createSystemRoutes(nodeManager: NodeManager): Router {
   router.get('/system/versions', (_req, res) => {
     const latest = getLatestVersion();
     const instances = instancesRepo.getAll();
+    const agents = agentsRepo.getAll();
 
     const instanceVersions = instances.map((inst) => ({
       name: inst.name,
@@ -152,6 +154,18 @@ export function createSystemRoutes(nodeManager: NodeManager): Router {
       };
     });
 
+    // Add agent plugin version info
+    const agentPluginVersions = agents.map((agent) => {
+      const meta = agent.heartbeatMeta as any;
+      const pluginVersion = meta?.pluginVersions?.['armada-agent'] ?? null;
+      const compatible = pluginVersion ? isVersionCompatible(pluginVersion, MIN_AGENT_PLUGIN_VERSION) : null;
+      return {
+        name: agent.name,
+        pluginVersion,
+        compatible,
+      };
+    });
+
     res.json({
       control: {
         version: CONTROL_VERSION,
@@ -164,6 +178,7 @@ export function createSystemRoutes(nodeManager: NodeManager): Router {
       latest,
       instances: instanceVersions,
       nodes: nodeVersions,
+      agents: agentPluginVersions,
     });
   });
 
