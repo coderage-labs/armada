@@ -8,16 +8,16 @@ interface LoadingStateProps {
 
 const sharedStyles = `
   @keyframes rocket-float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-8px); }
+    0%, 100% { transform: rotate(-45deg) translateY(0); }
+    50% { transform: rotate(-45deg) translateY(-8px); }
   }
   @keyframes rocket-float-sm {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-3px); }
+    0%, 100% { transform: rotate(-45deg) translateY(0); }
+    50% { transform: rotate(-45deg) translateY(-3px); }
   }
   @keyframes rocket-float-inline {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-2px); }
+    0%, 100% { transform: rotate(-45deg) translateY(0); }
+    50% { transform: rotate(-45deg) translateY(-2px); }
   }
   @keyframes exhaust-pulse {
     from { height: 12px; opacity: 0.7; }
@@ -67,7 +67,7 @@ export function LoadingState({ size = 'lg', message, inline = false }: LoadingSt
         <style>{sharedStyles}</style>
         <div className="relative" style={{ width: 24, height: 24 }}>
           <Rocket
-            className="w-4 h-4 text-violet-400 -rotate-45"
+            className="w-4 h-4 text-violet-400"
             style={{
               animation: 'rocket-float-sm 1.4s ease-in-out infinite',
               filter: 'drop-shadow(0 0 6px rgba(139,92,246,.4))',
@@ -85,7 +85,7 @@ export function LoadingState({ size = 'lg', message, inline = false }: LoadingSt
       <style>{sharedStyles}</style>
       <div className="relative" style={{ width: 48, height: 48 }}>
         <Rocket
-          className="w-8 h-8 text-violet-400 -rotate-45"
+          className="w-8 h-8 text-violet-400"
           style={{
             animation: 'rocket-float 1.6s ease-in-out infinite',
             filter: 'drop-shadow(0 0 12px rgba(139,92,246,.5))',
