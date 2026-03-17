@@ -17,6 +17,8 @@ import { sendMessage as messageSend, nudgeAgent } from './agent-message-service.
 import { startAvatarGeneration, removeAvatar } from './agent-avatar-service.js';
 import { deleteAvatar as deleteAvatarFile } from './avatar-generator.js';
 import { resolveVariables } from '../templates/resolver.js';
+import { isVersionCompatible } from '@coderage-labs/armada-shared';
+import { MIN_AGENT_PLUGIN_VERSION } from '../version.js';
 import type { Agent, HeartbeatMeta } from '@coderage-labs/armada-shared';
 import type { NodeManager } from '../node-manager.js';
 import type { SendMessageResult } from './agent-message-service.js';
@@ -219,12 +221,23 @@ class AgentManagerImpl implements AgentManager {
     if (meta.taskCount !== undefined) cleanMeta.taskCount = meta.taskCount;
     if (meta.memoryMb !== undefined) cleanMeta.memoryMb = meta.memoryMb;
     if (meta.uptimeMs !== undefined) cleanMeta.uptimeMs = meta.uptimeMs;
+    if (meta.pluginVersions !== undefined) cleanMeta.pluginVersions = meta.pluginVersions;
+
+    // Check armada-agent plugin version compatibility
+    let versionCompatible = true;
+    if (meta.pluginVersions?.['armada-agent']) {
+      const agentPluginVersion = meta.pluginVersions['armada-agent'];
+      versionCompatible = isVersionCompatible(agentPluginVersion, MIN_AGENT_PLUGIN_VERSION);
+      if (!versionCompatible) {
+        console.warn(`[agent-manager] Agent ${agentName} has incompatible armada-agent plugin version ${agentPluginVersion} (requires >= ${MIN_AGENT_PLUGIN_VERSION})`);
+      }
+    }
 
     const previousStatus = agent.status;
     agentsRepo.update(agent.id, {
       status: 'running',
       lastHeartbeat: new Date().toISOString(),
-      healthStatus: 'healthy',
+      healthStatus: versionCompatible ? 'healthy' : 'degraded',
       heartbeatMeta: Object.keys(cleanMeta).length > 0 ? cleanMeta : agent.heartbeatMeta,
     });
 

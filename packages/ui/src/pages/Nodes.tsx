@@ -20,6 +20,8 @@ interface NodeData {
   status: 'online' | 'offline' | 'degraded';
   wsStatus: 'online' | 'offline' | 'stale';
   agentCount: number;
+  version?: string;
+  versionCompatible?: boolean;
   url?: string;
   token?: string;
   liveStats?: {
@@ -82,6 +84,27 @@ function ConnectionBadge({ status }: { status: 'online' | 'offline' | 'stale' })
     <span className={`inline-flex items-center gap-1.5 text-[11px] ${config.text}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${config.dot} ${config.pulse ? 'animate-pulse' : ''}`} />
       {config.label}
+    </span>
+  );
+}
+
+/* ── Version Badge ─────────────────────────────────── */
+
+function VersionBadge({ version, compatible }: { version?: string; compatible?: boolean }) {
+  if (!version) return null;
+
+  const isCompatible = compatible ?? true;
+  const chipClass = isCompatible
+    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+    : 'bg-red-500/10 text-red-400 border-red-500/20';
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded border ${chipClass}`}
+      title={isCompatible ? `Version ${version} (compatible)` : `Version ${version} (incompatible — requires >= 0.1.0)`}
+    >
+      {isCompatible ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+      v{version}
     </span>
   );
 }
@@ -162,6 +185,7 @@ function NodeCard({
             <h3 className="text-base font-semibold text-zinc-100">{node.hostname}</h3>
             <div className="flex items-center gap-3 mt-1">
               <ConnectionBadge status={wsStatus} />
+              <VersionBadge version={node.version} compatible={node.versionCompatible} />
               {node.agentCount > 0 && (
                 <span className="text-[11px] text-zinc-500">
                   {node.agentCount} agent{node.agentCount !== 1 ? 's' : ''}

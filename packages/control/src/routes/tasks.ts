@@ -16,6 +16,8 @@ import { checkAndDispatch, onTaskCompleted } from '../services/task-dispatcher.j
 import { checkWorkflowStep } from '../services/workflow-dispatcher.js';
 import { taskManager } from '../services/task-manager.js';
 import { eventBus } from '../infrastructure/event-bus.js';
+import { nodeConnectionManager } from '../ws/node-connections.js';
+import { MIN_NODE_VERSION } from '../version.js';
 import type { MeshTask, TaskComment, BoardColumn, TaskType, TaskPayload } from '@coderage-labs/armada-shared';
 
 // ── SSE event bus ────────────────────────────────────────────────────
@@ -344,6 +346,17 @@ router.post('/send', requireScope('tasks:write'), async (req, res) => {
     res.status(400).json({ error: `Instance for agent "${target}" has no nodeId` });
     return;
   }
+
+  // Check node version compatibility before dispatching
+  const nodeVersionInfo = nodeConnectionManager.getNodeVersion(instance.nodeId);
+  if (nodeVersionInfo && !nodeVersionInfo.compatible) {
+    const node = nodesRepo.getById(instance.nodeId);
+    res.status(503).json({
+      error: `Node ${node?.hostname || instance.nodeId} is running version ${nodeVersionInfo.version} which is incompatible with control plane (requires >= ${MIN_NODE_VERSION})`
+    });
+    return;
+  }
+
   const containerName = `armada-instance-${instance.name}`;
   const taskId = `ft-${Date.now()}-${randomBytes(4).toString('hex')}`;
   const controlPlaneUrl = process.env.ARMADA_API_URL || `http://armada-control:3001`;
