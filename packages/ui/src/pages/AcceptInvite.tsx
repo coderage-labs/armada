@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Loader2, AlertCircle, UserPlus, CheckCircle } from 'lucide-react';
+import { LoadingState } from '../components/LoadingState';
 import RegisterPasskey from '../components/RegisterPasskey';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -91,7 +92,7 @@ export default function AcceptInvite() {
   if (loading) {
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-violet-500" />
+        <LoadingState />
       </div>
     );
   }

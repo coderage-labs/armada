@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { apiFetch } from '../hooks/useApi';
 import { Shield, Fingerprint, Trash2, User, Key, Lock, Save, Loader2, Bell, Link, Unlink, CheckCircle, MessageCircle } from 'lucide-react';
+import { LoadingState } from '../components/LoadingState';
 import { PageHeader } from '../components/PageHeader';
 import RegisterPasskey from '../components/RegisterPasskey';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -330,9 +331,7 @@ export default function Account() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-violet-500" />
-      </div>
+      <LoadingState message="Loading account…" />
     );
   }
 

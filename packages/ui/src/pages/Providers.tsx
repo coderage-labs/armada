@@ -21,6 +21,7 @@ import { Input } from '../components/ui/input';
 import { Switch } from '../components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/responsive-dialog';
 import { toast } from 'sonner';
+import { LoadingState } from '../components/LoadingState';
 
 const PROVIDER_COLORS: Record<string, string> = {
   anthropic: 'bg-violet-500/20 text-violet-300',
@@ -693,9 +694,7 @@ export default function Providers() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
-      </div>
+      <LoadingState message="Loading providers…" />
     );
   }
 
