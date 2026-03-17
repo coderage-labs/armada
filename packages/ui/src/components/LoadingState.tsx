@@ -31,14 +31,18 @@ const sharedStyles = `
 
 function ExhaustTrail({ size }: { size: 'sm' | 'lg' }) {
   const isLg = size === 'lg';
+  // The rocket SVG is 24x24 viewBox rotated -45deg. The nozzle ends up
+  // roughly at the visual bottom-center of the icon bounding box.
+  // For lg (w-8 = 32px in 48px container): nozzle is near 50%/bottom
+  // For sm (w-4 = 16px in 24px container): same ratio
   return (
     <span
-      className="absolute left-1/2 rounded-sm"
+      className="absolute rounded-sm"
       style={{
-        bottom: isLg ? '-4px' : '-2px',
+        bottom: isLg ? '0px' : '0px',
+        left: isLg ? '22px' : '10px',
         width: isLg ? '4px' : '2px',
         height: isLg ? '12px' : '5px',
-        transform: 'translateX(-50%)',
         background: 'linear-gradient(to bottom, #8b5cf6, #6d28d9 50%, transparent)',
         animation: `${isLg ? 'exhaust-pulse' : 'exhaust-pulse-sm'} 0.6s ease-in-out infinite alternate`,
         opacity: 0.8,
