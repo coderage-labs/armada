@@ -22,6 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Switch } from '../components/ui/switch';
 import { toast } from 'sonner';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
+import { LoadingState } from '../components/LoadingState';
 
 /* ── Types ─────────────────────────────────────────── */
 
@@ -1047,11 +1048,7 @@ function IntegrationsTab({ projectId }: { projectId: string }) {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-6 h-6 text-zinc-500 animate-spin" />
-      </div>
-    );
+    return <LoadingState message="Loading project…" />;
   }
 
   return (
@@ -1301,10 +1298,7 @@ function formatDuration(ms: number | null): string {
 function MetricsTab({ metrics }: { metrics: ProjectMetrics | null }) {
   if (!metrics) {
     return (
-      <div className="text-center py-12">
-        <Loader2 className="w-8 h-8 text-zinc-700 mx-auto animate-spin" />
-        <p className="text-sm text-zinc-500 mt-2">Loading metrics…</p>
-      </div>
+      <LoadingState message="Loading metrics…" />
     );
   }
 

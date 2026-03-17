@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Loader2, Palette, Hand, Bot, RefreshCw, Trash2, MessageSquare, Settings2 } from 'lucide-react';
+import { ArrowLeft, Palette, Hand, Bot, RefreshCw, Trash2, MessageSquare, Settings2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '../hooks/useApi';
@@ -21,6 +21,7 @@ import SessionView from '../components/SessionView';
 import { useSSEEvent } from '../providers/SSEProvider';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../components/ui/table';
+import { LoadingState } from '../components/LoadingState';
 
 interface ConfigDiff {
   key: string;
@@ -341,7 +342,7 @@ export default function AgentDetail() {
   }
 
   if (loading) {
-    return <div className="py-12 text-center text-zinc-500">Loading…</div>;
+    return <LoadingState message="Loading agent…" />;
   }
 
   if (error && !agent) {

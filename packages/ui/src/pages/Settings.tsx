@@ -6,6 +6,7 @@ import { useProviders } from '../hooks/queries/useProviders';
 import { useModels } from '../hooks/queries/useModels';
 import { useSSEConnection } from '../providers/SSEProvider';
 import { Settings as SettingsIcon, Tag, Save, Loader2, CheckCircle2, XCircle, Trash2, Radio, Wifi, WifiOff, Image, Globe } from 'lucide-react';
+import { LoadingState } from '../components/LoadingState';
 import { PageHeader } from '../components/PageHeader';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -178,10 +179,7 @@ export default function Settings() {
       />
 
       {loading ? (
-        <div className="flex items-center gap-2 text-zinc-400 text-sm">
-          <Loader2 className="w-4 h-4 animate-spin" />
-          Loading settings…
-        </div>
+        <LoadingState message="Loading settings…" />
       ) : (
         <div className="space-y-8">
           {/* Public URL */}
