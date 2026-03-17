@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Check, Copy, RefreshCw, Server, ShieldCheck, RotateCcw, Monitor } from 'lucide-react';
+import { LoadingState } from '../components/LoadingState';
 import { PageHeader } from '../components/PageHeader';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { apiFetch } from '../hooks/useApi';
@@ -301,7 +302,7 @@ export default function NodeDetail() {
   }
 
   if (loading) {
-    return <div className="py-12 text-center text-zinc-500">Loading…</div>;
+    return <LoadingState />;
   }
 
   if (error && !node) {

@@ -15,6 +15,7 @@ import {
   Radio, Zap, Bot, Hash, ExternalLink, Server, Loader2,
 } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
+import { LoadingState } from '../components/LoadingState';
 import type { Operation } from '@coderage-labs/armada-shared';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -666,14 +667,7 @@ export default function Operations() {
   }, [activeRuns, tasks]);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-zinc-500 text-sm animate-pulse flex items-center gap-2">
-          <Radio className="w-4 h-4" />
-          Loading operations…
-        </div>
-      </div>
-    );
+    return <LoadingState message="Loading operations…" />;
   }
 
   return (

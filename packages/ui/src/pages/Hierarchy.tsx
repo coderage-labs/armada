@@ -4,6 +4,7 @@ import { useHierarchy } from '../hooks/queries/useHierarchy';
 import type { RoleMetadata } from '@coderage-labs/armada-shared';
 import EmojiPickerButton from '../components/EmojiPickerButton';
 import { X, GitBranch as GitBranchIcon } from 'lucide-react';
+import { LoadingState } from '../components/LoadingState';
 import { PageHeader } from '../components/PageHeader';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { Button } from '../components/ui/button';
@@ -573,11 +574,7 @@ export default function Hierarchy() {
   }
 
   if (loading) {
-    return (
-      <div className="p-8">
-        <div className="animate-pulse text-zinc-400">Loading hierarchy...</div>
-      </div>
-    );
+    return <LoadingState message="Loading hierarchy..." />;
   }
 
   const allRoles = Object.keys(hierarchy.rules);

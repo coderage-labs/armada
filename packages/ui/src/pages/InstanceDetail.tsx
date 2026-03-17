@@ -11,6 +11,7 @@ import StatusDot from '../components/StatusDot';
 import ConfirmDialog from '../components/ConfirmDialog';
 import type { ReactNode } from 'react';
 import { ArrowLeft, Layers, RotateCcw, Square, Play, Trash2, Settings, RefreshCw as RefreshIcon } from 'lucide-react';
+import { LoadingState } from '../components/LoadingState';
 import { PageHeader } from '../components/PageHeader';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -335,7 +336,7 @@ export default function InstanceDetailPage() {
   }
 
   if (loading) {
-    return <div className="py-12 text-center text-zinc-500">Loading…</div>;
+    return <LoadingState />;
   }
 
   if (error && !instance) {
