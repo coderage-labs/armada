@@ -15,8 +15,8 @@ const ARMADA_NODE_TOKEN = process.env.ARMADA_NODE_TOKEN ?? '';
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
 const PING_INTERVAL_MS = 30_000;
-const PONG_TIMEOUT_MS = 10_000;
-const BACKOFF_STEPS = [1000, 2000, 4000, 8000, 16000, 32000, 60000];
+const PONG_TIMEOUT_MS = 5_000;
+const BACKOFF_STEPS = [1000, 2000, 4000, 8000, 16000, 30000];
 
 /** Number of consecutive 403 failures before falling back to install token */
 const MAX_SESSION_AUTH_FAILURES = 3;
@@ -53,6 +53,14 @@ export function getWsConnection(): WebSocket | null {
 }
 
 /**
+ * Returns true if the WebSocket connection is currently in OPEN state.
+ * Used by the gateway proxy to return 503 immediately instead of timing out.
+ */
+export function isConnected(): boolean {
+  return ws !== null && ws.readyState === WebSocket.OPEN;
+}
+
+/**
  * Wait for the WebSocket connection to be ready (OPEN state).
  * Returns immediately if already connected, otherwise waits up to timeoutMs.
  */
@@ -76,7 +84,13 @@ export async function sendCommandToControl(
   params: Record<string, unknown>,
   timeoutMs = 30_000,
 ): Promise<unknown> {
-  // If WS exists but still connecting, wait for it
+  // Fail fast if clearly not connected — don't let caller hang on timeout
+  if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
+    console.warn(`[ws] sendCommand(${action}): WS not connected (readyState=${ws?.readyState ?? 'null'})`);
+    throw new Error('WS disconnected: control plane unreachable');
+  }
+
+  // If WS exists but still connecting, wait briefly for it
   if (ws && ws.readyState === WebSocket.CONNECTING) {
     await new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => reject(new Error('WS connection timeout')), 5000);
@@ -93,7 +107,7 @@ export async function sendCommandToControl(
 
   if (!ws || ws.readyState !== WebSocket.OPEN) {
     console.warn(`[ws] sendCommand(${action}): ws=${!!ws} readyState=${ws?.readyState} (need ${WebSocket.OPEN})`);
-    throw new Error('Not connected to control plane');
+    throw new Error('WS disconnected: control plane unreachable');
   }
 
   const id = randomUUID();
@@ -383,7 +397,8 @@ function stopPing(): void {
 function scheduleReconnect(): void {
   if (reconnectTimer !== null) return;
   const delay = BACKOFF_STEPS[Math.min(reconnectAttempt, BACKOFF_STEPS.length - 1)];
-  console.log(`[ws] Reconnecting in ${delay / 1000}s...`);
+  const nextAttempt = reconnectAttempt + 1;
+  console.log(`[ws] Reconnect attempt ${nextAttempt} in ${delay / 1000}s → ${CONTROL_URL}`);
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null;
     reconnectAttempt++;

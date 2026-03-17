@@ -10,7 +10,7 @@
  */
 
 import http from 'node:http';
-import { sendCommandToControl } from '../ws/connection.js';
+import { sendCommandToControl, isConnected } from '../ws/connection.js';
 
 const GATEWAY_PORT = parseInt(process.env.GATEWAY_PORT ?? '3002', 10);
 
@@ -58,6 +58,13 @@ export function startGatewayProxy(): http.Server {
       }
     }
 
+    // Fail fast if WS is disconnected — return 503 immediately instead of hanging
+    if (!isConnected()) {
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Node is not connected to control plane. Reconnecting — please retry shortly.' }));
+      return;
+    }
+
     // Read the body
     let body: unknown = undefined;
     const rawBody = await readBody(req).catch(() => Buffer.alloc(0));
@@ -103,8 +110,11 @@ export function startGatewayProxy(): http.Server {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error(`[gateway-proxy] Failed to proxy ${method} ${path}:`, message);
-      res.writeHead(502, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Gateway proxy error', details: message }));
+      // Use 503 for WS disconnection errors so clients know to retry, 502 for other errors
+      const isDisconnected = message.includes('WS disconnected') || message.includes('Not connected');
+      const statusCode = isDisconnected ? 503 : 502;
+      res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: isDisconnected ? 'Node is not connected to control plane. Reconnecting — please retry shortly.' : 'Gateway proxy error', details: message }));
     }
   });
 
