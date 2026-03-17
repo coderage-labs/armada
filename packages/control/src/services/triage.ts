@@ -9,7 +9,7 @@
  * which is then used to start a workflow run.
  */
 
-import { agentsRepo, projectsRepo, roleMetaRepo, tasksRepo, instancesRepo, userProjectsRepo } from '../repositories/index.js';
+import { agentsRepo, projectsRepo, roleMetaRepo, tasksRepo, instancesRepo, userProjectsRepo, assignmentRepo } from '../repositories/index.js';
 import { getDrizzle } from '../db/drizzle.js';
 import { triagedIssues } from '../db/drizzle-schema.js';
 import { and, eq, sql } from 'drizzle-orm';
@@ -107,20 +107,46 @@ export async function triageIssue(
   const project = projectsRepo.get(projectId);
   const projectName = project?.name ?? projectId;
 
-  const pm = resolveProjectManager(projectId);
+  // Try resolveTriager first (explicit assignment → role-based → owner → operators)
+  // then fall back to the legacy PM resolution chain.
+  const triagerCandidates = assignmentRepo.resolveTriager(projectId);
+  const triagerAgent = triagerCandidates.find(c => c.type === 'agent');
+
+  // Also check for PM-tier agent (legacy chain, kept as fallback)
+  const legacyPm = resolveProjectManager(projectId);
+
+  // Prefer explicit triager assignment, fall back to legacy PM
+  const pm = triagerAgent
+    ? { name: triagerAgent.name!, role: 'triager' }
+    : legacyPm;
+
   const workflows = getWorkflowsForProject(projectId).filter(w => w.enabled);
 
   if (!pm) {
-    // No PM — check for project owner, then fall back to operators
-    const reason = 'No PM-tier agent is assigned and running for this project';
+    // No triager or PM — notify owner/operators
+    const reason = 'No triager or PM-tier agent is assigned and running for this project';
     if (shouldNotifyFallback(projectId, issue.number)) {
       // Notify project owner if one exists
       const owner = userProjectsRepo.getOwner(projectId);
       if (owner) {
         import('./user-notifier.js').then(({ deliverToUser }) => {
-          const message = `🔔 **Triage Required**\n\nIssue #${issue.number}: ${issue.title}\nProject: ${projectName}\n\nNo PM agent available. As project owner, please triage this issue manually.\n\nReason: ${reason}`;
+          const message = `🔔 **Triage Required**\n\nIssue #${issue.number}: ${issue.title}\nProject: ${projectName}\n\nNo triager agent available. As project owner, please triage this issue manually.\n\nReason: ${reason}`;
           deliverToUser(owner, message, { event: 'triage.owner_fallback', issueNumber: issue.number, issueTitle: issue.title, projectId, projectName, reason });
         }).catch((err: Error) => console.error('[triage] Failed to notify owner:', err.message));
+      } else {
+        // Try resolving owner from assignment table
+        const ownerCandidates = assignmentRepo.resolveTriager(projectId).filter(c => c.type === 'user');
+        for (const ownerCandidate of ownerCandidates) {
+          import('./user-notifier.js').then(({ deliverToUser }) => {
+            import('../repositories/index.js').then(({ usersRepo }) => {
+              const ownerUser = usersRepo.getById(ownerCandidate.id);
+              if (ownerUser) {
+                const message = `🔔 **Triage Required**\n\nIssue #${issue.number}: ${issue.title}\nProject: ${projectName}\n\nNo triager agent available. Please triage this issue manually.\n\nReason: ${reason}`;
+                deliverToUser(ownerUser, message, { event: 'triage.owner_fallback', issueNumber: issue.number, issueTitle: issue.title, projectId, projectName, reason });
+              }
+            }).catch(() => {});
+          }).catch((err: Error) => console.error('[triage] Failed to notify owner candidate:', err.message));
+        }
       }
       // Also notify operators
       notifyTriageOperatorFallback({

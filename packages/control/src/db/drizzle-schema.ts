@@ -2,7 +2,7 @@
  * Drizzle ORM schema — mirrors the existing SQLite tables exactly.
  * This is additive only; the existing raw-SQL schema.ts is untouched.
  */
-import { sqliteTable, text, integer, real, primaryKey, unique } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, primaryKey, unique, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
 // ── nodes ────────────────────────────────────────────────────────────
@@ -624,6 +624,19 @@ export const pendingMutations = sqliteTable('pending_mutations', {
   instanceId: text('instance_id'),
   createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 });
+
+// ── project_assignments (#77) ────────────────────────────────────────
+export const projectAssignments = sqliteTable('project_assignments', {
+  id: text('id').primaryKey(),
+  projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  assignmentType: text('assignment_type').notNull(), // 'triager' | 'approver' | 'owner'
+  assigneeType: text('assignee_type').notNull(),     // 'user' | 'agent' | 'role'
+  assigneeId: text('assignee_id').notNull(),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+  updatedAt: text('updated_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+}, (table) => [
+  uniqueIndex('project_assignment_unique').on(table.projectId, table.assignmentType),
+]);
 
 // ── notification_channels (#512) ────────────────────────────────────
 export const notificationChannels = sqliteTable('notification_channels', {
