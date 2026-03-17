@@ -121,4 +121,20 @@ router.post('/:id/cancel', (req, res) => {
   }
 });
 
+// DELETE /api/changesets/:id — delete a failed or cancelled changeset
+router.delete('/:id', (req, res) => {
+  try {
+    changesetService.remove(req.params.id);
+    res.status(204).send();
+  } catch (err: any) {
+    if (err.message?.includes('not found')) {
+      return res.status(404).json({ error: err.message });
+    }
+    if (err.message?.includes('cannot be removed')) {
+      return res.status(422).json({ error: err.message });
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export { router as changesetsRoutes };

@@ -611,7 +611,25 @@ export function createChangesetService(): ChangesetService {
     return get(id)!;
   }
 
-  return { preview, create, get, list, rebuildSteps, approve, apply, retry, cancel } as ChangesetService;
+  function remove(id: string): void {
+    const existing = get(id);
+    if (!existing) throw new Error(`Changeset "${id}" not found`);
+    // Only allow deletion of failed or cancelled changesets
+    if (existing.status !== 'failed' && existing.status !== 'cancelled') {
+      throw new Error(`Changeset "${id}" cannot be removed (current status: ${existing.status}). Only failed or cancelled changesets can be deleted.`);
+    }
+
+    // Clean up any remaining pending mutations (should already be gone, but be safe)
+    pendingMutationRepo.removeByChangeset(id);
+
+    // Delete the changeset record
+    getDrizzle().delete(changesets).where(eq(changesets.id, id)).run();
+
+    console.log(`[changeset] Deleted changeset ${id} (status: ${existing.status})`);
+    eventBus.emit('changeset.removed', { changesetId: id, status: existing.status });
+  }
+
+  return { preview, create, get, list, rebuildSteps, approve, apply, retry, cancel, remove } as ChangesetService;
 }
 
 /** Singleton changeset service */
