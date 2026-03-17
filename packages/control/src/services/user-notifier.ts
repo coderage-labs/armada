@@ -238,7 +238,7 @@ export async function notifyTriageOperatorFallback(opts: NotifyTriageOperatorFal
 
 // ── Delivery ────────────────────────────────────────────────────────
 
-async function deliverToUser(
+export async function deliverToUser(
   user: ArmadaUser,
   message: string,
   payload: Record<string, any>,

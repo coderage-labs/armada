@@ -9,7 +9,7 @@
  * which is then used to start a workflow run.
  */
 
-import { agentsRepo, projectsRepo, roleMetaRepo, tasksRepo, instancesRepo } from '../repositories/index.js';
+import { agentsRepo, projectsRepo, roleMetaRepo, tasksRepo, instancesRepo, userProjectsRepo } from '../repositories/index.js';
 import { getDrizzle } from '../db/drizzle.js';
 import { triagedIssues } from '../db/drizzle-schema.js';
 import { and, eq, sql } from 'drizzle-orm';
@@ -111,9 +111,18 @@ export async function triageIssue(
   const workflows = getWorkflowsForProject(projectId).filter(w => w.enabled);
 
   if (!pm) {
-    // No PM — operator (Robin) handles triage
+    // No PM — check for project owner, then fall back to operators
     const reason = 'No PM-tier agent is assigned and running for this project';
     if (shouldNotifyFallback(projectId, issue.number)) {
+      // Notify project owner if one exists
+      const owner = userProjectsRepo.getOwner(projectId);
+      if (owner) {
+        import('./user-notifier.js').then(({ deliverToUser }) => {
+          const message = `🔔 **Triage Required**\n\nIssue #${issue.number}: ${issue.title}\nProject: ${projectName}\n\nNo PM agent available. As project owner, please triage this issue manually.\n\nReason: ${reason}`;
+          deliverToUser(owner, message, { event: 'triage.owner_fallback', issueNumber: issue.number, issueTitle: issue.title, projectId, projectName, reason });
+        }).catch((err: Error) => console.error('[triage] Failed to notify owner:', err.message));
+      }
+      // Also notify operators
       notifyTriageOperatorFallback({
         issueNumber: issue.number,
         issueTitle: issue.title,
@@ -129,6 +138,15 @@ export async function triageIssue(
     // No workflows defined — can't auto-triage
     const reason = 'No enabled workflows are configured for this project';
     if (shouldNotifyFallback(projectId, issue.number)) {
+      // Notify project owner if one exists
+      const owner = userProjectsRepo.getOwner(projectId);
+      if (owner) {
+        import('./user-notifier.js').then(({ deliverToUser }) => {
+          const message = `🔔 **Triage Required**\n\nIssue #${issue.number}: ${issue.title}\nProject: ${projectName}\n\nNo workflows configured. As project owner, please triage this issue manually.\n\nReason: ${reason}`;
+          deliverToUser(owner, message, { event: 'triage.owner_fallback', issueNumber: issue.number, issueTitle: issue.title, projectId, projectName, reason });
+        }).catch((err: Error) => console.error('[triage] Failed to notify owner:', err.message));
+      }
+      // Also notify operators
       notifyTriageOperatorFallback({
         issueNumber: issue.number,
         issueTitle: issue.title,
