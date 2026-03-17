@@ -7,3 +7,4 @@ export { InstanceOpRow } from './InstanceOpRow';
 export type { InstanceOp } from './InstanceOpRow';
 export { ChangesetActions } from './ChangesetActions';
 export { ChangesetSummary, ChangesetSummaryLine, relativeTime } from './ChangesetSummary';
+export { ImpactBadge, AffectedResourcesList } from './ImpactBadge';

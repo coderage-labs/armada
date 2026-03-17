@@ -406,6 +406,15 @@ const migrations: Migration[] = [
       "ALTER TABLE users ADD COLUMN channels_json TEXT NOT NULL DEFAULT '{}'",
     ],
   },
+  {
+    version: 34,
+    description: 'Add impact analysis columns to changesets (#83)',
+    sql: [
+      "ALTER TABLE changesets ADD COLUMN impact_level TEXT NOT NULL DEFAULT 'none'",
+      'ALTER TABLE changesets ADD COLUMN affected_resources_json TEXT NOT NULL DEFAULT \'[]\'',
+      'ALTER TABLE changesets ADD COLUMN requires_restart INTEGER NOT NULL DEFAULT 0',
+    ],
+  },
 ];
 
 /**
