@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.0](https://github.com/coderage-labs/armada/compare/armada-v0.2.0...armada-v0.3.0) (2026-03-17)
+
+
+### Features
+
+* add project owner with mutex and triage escalation ([#75](https://github.com/coderage-labs/armada/issues/75)) ([3d5bfb5](https://github.com/coderage-labs/armada/commit/3d5bfb5d93c81471091868a31c9eaea28439b62a))
+
+
+### Bug Fixes
+
+* correct agent plugin workspace name in CI publish job ([a927154](https://github.com/coderage-labs/armada/commit/a927154b4c8b7b52722fa31f391721fb2fefc3f5))
+* TypeScript compilation errors from Slack/Discord integration merge ([fa2f552](https://github.com/coderage-labs/armada/commit/fa2f552941cb6e2c17a56eb142592d48a0685b32))
+* use releases_created global flag for publish job triggers ([95c56ee](https://github.com/coderage-labs/armada/commit/95c56ee9b20cbbcb155082c2703f5700b32bf0c4))
+
 ## [0.2.0](https://github.com/coderage-labs/armada/compare/armada-v0.1.0...armada-v0.2.0) (2026-03-16)
 
 

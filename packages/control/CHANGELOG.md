@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.0](https://github.com/coderage-labs/armada/compare/armada-control-v0.2.0...armada-control-v0.3.0) (2026-03-17)
+
+
+### Features
+
+* add project owner with mutex and triage escalation ([#75](https://github.com/coderage-labs/armada/issues/75)) ([3d5bfb5](https://github.com/coderage-labs/armada/commit/3d5bfb5d93c81471091868a31c9eaea28439b62a))
+
+
+### Bug Fixes
+
+* TypeScript compilation errors from Slack/Discord integration merge ([fa2f552](https://github.com/coderage-labs/armada/commit/fa2f552941cb6e2c17a56eb142592d48a0685b32))
+
 ## [0.2.0](https://github.com/coderage-labs/armada/compare/armada-control-v0.1.0...armada-control-v0.2.0) (2026-03-16)
 
 

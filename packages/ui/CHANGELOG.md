@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/coderage-labs/armada/compare/ui-v0.2.0...ui-v0.3.0) (2026-03-17)
+
+
+### Features
+
+* add project owner with mutex and triage escalation ([#75](https://github.com/coderage-labs/armada/issues/75)) ([3d5bfb5](https://github.com/coderage-labs/armada/commit/3d5bfb5d93c81471091868a31c9eaea28439b62a))
+
 ## [0.2.0](https://github.com/coderage-labs/armada/compare/ui-v0.1.0...ui-v0.2.0) (2026-03-16)
 
 

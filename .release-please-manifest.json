@@ -1,8 +1,8 @@
 {
-  ".": "0.2.0",
-  "packages/control": "0.2.0",
+  ".": "0.3.0",
+  "packages/control": "0.3.0",
   "packages/node": "0.2.0",
-  "packages/ui": "0.2.0",
+  "packages/ui": "0.3.0",
   "plugins/agent": "0.2.0",
   "plugins/shared": "0.2.0",
   "plugins/control": "0.2.0"
