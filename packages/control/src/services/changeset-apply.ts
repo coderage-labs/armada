@@ -1,5 +1,6 @@
 // ── Changeset Apply Pipeline — execution of an approved changeset ──
 
+import crypto from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { getDrizzle } from '../db/drizzle.js';
 import { changesets, changesetOperations } from '../db/drizzle-schema.js';
@@ -9,8 +10,94 @@ import { operationExecutor } from '../infrastructure/executor-singleton.js';
 import { changesetValidator } from './changeset-validator.js';
 import { configDiffService } from './config-diff.js';
 import { eventBus } from '../infrastructure/event-bus.js';
+import { instancesRepo, pendingMutationRepo } from '../repositories/index.js';
+import { getAffectedInstanceIds } from './changeset-impact.js';
 import type { ChangesetPlan, Changeset } from '@coderage-labs/armada-shared';
 import type { ChangesetWithValidation } from './changeset-service.js';
+
+// ── Scoped apply helpers ──────────────────────────────────────────────────
+
+/**
+ * Build a minimal instanceOp for a config-push-only apply (low impact).
+ * Steps: push_config only (no restart).
+ */
+function buildConfigPushOp(
+  instanceId: string,
+  configVersion: number,
+): ChangesetPlan['instanceOps'][0] {
+  const instance = instancesRepo.getById(instanceId);
+  const instanceName = instance?.name ?? instanceId;
+  const nodeId = instance?.nodeId ?? undefined;
+  const containerName = `armada-instance-${instanceName}`;
+
+  const pushConfigId = crypto.randomUUID();
+  const pushConfigStep = {
+    id: pushConfigId,
+    name: 'push_config' as const,
+    status: 'pending' as const,
+    metadata: { instanceId, configVersion, nodeId, containerName },
+  };
+
+  return {
+    instanceId,
+    instanceName,
+    changes: [],
+    steps: [pushConfigStep],
+    stepDeps: [],
+    estimatedDowntime: 0,
+  };
+}
+
+/**
+ * Build a minimal instanceOp for a config-push + SIGUSR1 restart (medium impact).
+ * Steps: push_config → restart_gateway → health_check.
+ */
+function buildAgentRestartOp(
+  instanceId: string,
+  configVersion: number,
+): ChangesetPlan['instanceOps'][0] {
+  const instance = instancesRepo.getById(instanceId);
+  const instanceName = instance?.name ?? instanceId;
+  const nodeId = instance?.nodeId ?? undefined;
+  const containerName = `armada-instance-${instanceName}`;
+
+  const pushConfigId = crypto.randomUUID();
+  const restartId = crypto.randomUUID();
+  const healthCheckId = crypto.randomUUID();
+
+  const steps = [
+    {
+      id: pushConfigId,
+      name: 'push_config' as const,
+      status: 'pending' as const,
+      metadata: { instanceId, configVersion, nodeId, containerName },
+    },
+    {
+      id: restartId,
+      name: 'restart_gateway' as const,
+      status: 'pending' as const,
+      metadata: { nodeId, containerName },
+    },
+    {
+      id: healthCheckId,
+      name: 'health_check' as const,
+      status: 'pending' as const,
+      metadata: { instanceId, nodeId, containerName, timeoutMs: 60_000 },
+    },
+  ];
+
+  return {
+    instanceId,
+    instanceName,
+    changes: [],
+    steps,
+    stepDeps: [
+      [pushConfigId, restartId],
+      [restartId, healthCheckId],
+    ] as [string, string][],
+    estimatedDowntime: 5,
+  };
+}
 
 // ── Concurrency constants ─────────────────────────────────────────────────
 
@@ -127,6 +214,9 @@ export async function applyChangeset(
   // the current pending_mutations state (which may have changed since approval).
   // The approved plan already contains the exact steps the user reviewed.
 
+  // Capture the mutations BEFORE flushing — needed for scoped apply after DB write
+  const pendingMutationsSnapshot = pendingMutationRepo.getByChangeset(id);
+
   // THEN flush mutations to real DB (deletes pending_mutations, writes to agents/providers/models)
   // This must happen before step execution — push_config reads from agents table
   const { executed: mutationsExecuted, errors: mutationErrors } = executePendingMutations(id);
@@ -140,6 +230,47 @@ export async function applyChangeset(
   }
   if (mutationsExecuted > 0) {
     console.log(`[changeset] Flushed ${mutationsExecuted} pending mutations to DB`);
+  }
+
+  // ── Scoped apply: skip or reduce instance operations based on impact ───────
+  //
+  // 'none'   → DB writes only; no instance/agent operations needed
+  // 'low'    → DB writes + push_config to affected instances (no restart)
+  // 'medium' → DB writes + push_config + SIGUSR1 restart affected instances
+  // 'high'   → Full instance redeploy (original behavior — uses plan.instanceOps)
+  //
+  const impactLevel = cs.impactLevel ?? 'high';
+
+  if (impactLevel === 'none') {
+    // Zero-impact: just write to DB and mark completed
+    console.log(`[changeset] Zero-impact changeset ${id} — DB-only apply, skipping all instance operations`);
+    const completedAt = new Date().toISOString();
+    getDrizzle().update(changesets).set({ status: 'completed', completedAt }).where(eq(changesets.id, id)).run();
+    eventBus.emit('changeset.completed', { changesetId: id });
+    return getChangeset(id)! as ChangesetWithValidation;
+  }
+
+  // For low/medium: override the plan's instanceOps with minimal scoped steps
+  let effectiveInstanceOps = plan.instanceOps;
+
+  if (impactLevel === 'low' || impactLevel === 'medium') {
+    const affectedInstanceIds = getAffectedInstanceIds(pendingMutationsSnapshot);
+
+    if (affectedInstanceIds.length === 0) {
+      // No running instances affected — treat as zero-impact
+      console.log(`[changeset] ${impactLevel}-impact changeset ${id} — no running instances affected, DB-only apply`);
+      const completedAt = new Date().toISOString();
+      getDrizzle().update(changesets).set({ status: 'completed', completedAt }).where(eq(changesets.id, id)).run();
+      eventBus.emit('changeset.completed', { changesetId: id });
+      return getChangeset(id)! as ChangesetWithValidation;
+    }
+
+    console.log(`[changeset] ${impactLevel}-impact changeset ${id} — scoped apply for ${affectedInstanceIds.length} instance(s)`);
+    effectiveInstanceOps = affectedInstanceIds.map(instanceId =>
+      impactLevel === 'low'
+        ? buildConfigPushOp(instanceId, currentVersion)
+        : buildAgentRestartOp(instanceId, currentVersion),
+    );
   }
 
   // ── Per-instance result tracking (for isolated failure handling) ──────────
@@ -206,7 +337,7 @@ export async function applyChangeset(
   //    cannot prevent other instances (on any node) from completing.
 
   const byNode = new Map<string, ChangesetPlan['instanceOps']>();
-  for (const instanceOp of plan.instanceOps) {
+  for (const instanceOp of effectiveInstanceOps) {
     const nodeId = getInstanceNodeId(instanceOp);
     if (!byNode.has(nodeId)) byNode.set(nodeId, []);
     byNode.get(nodeId)!.push(instanceOp);

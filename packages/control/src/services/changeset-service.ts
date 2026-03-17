@@ -314,13 +314,12 @@ export function createChangesetService(): ChangesetService {
 
     const changeset = get(id)!;
 
-    // ── Auto-apply zero-impact changesets (#83) ─────────────────────
+    // ── Auto-apply zero-impact changesets (#83, #87) ────────────────────────
     // If nothing has real impact (e.g. just adding a new model), skip review
     // and apply immediately so operators aren't bothered for low-friction ops.
-    // Auto-apply disabled — impact detection is informational only for now.
-    // TODO: Re-enable when apply logic is scoped properly (adding a model
-    // shouldn't trigger instance redeploys). See #83.
-    if (false && isZeroImpact && intraConflicts.filter(c => c.type === 'error').length === 0) {
+    // Scoped apply (#87) ensures zero-impact changesets only write to DB and
+    // never trigger instance redeployments.
+    if (isZeroImpact && intraConflicts.filter(c => c.type === 'error').length === 0) {
       console.log(`[changeset] Auto-approving zero-impact changeset ${id}`);
       getDrizzle().update(changesets).set({
         status: 'approved',
