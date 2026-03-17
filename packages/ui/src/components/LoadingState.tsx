@@ -67,7 +67,7 @@ export function LoadingState({ size = 'lg', message, inline = false }: LoadingSt
         <style>{sharedStyles}</style>
         <div className="relative" style={{ width: 24, height: 24 }}>
           <Rocket
-            className="w-4 h-4 text-violet-400"
+            className="w-4 h-4 text-violet-400 -rotate-45"
             style={{
               animation: 'rocket-float-sm 1.4s ease-in-out infinite',
               filter: 'drop-shadow(0 0 6px rgba(139,92,246,.4))',
@@ -85,7 +85,7 @@ export function LoadingState({ size = 'lg', message, inline = false }: LoadingSt
       <style>{sharedStyles}</style>
       <div className="relative" style={{ width: 48, height: 48 }}>
         <Rocket
-          className="w-8 h-8 text-violet-400"
+          className="w-8 h-8 text-violet-400 -rotate-45"
           style={{
             animation: 'rocket-float 1.6s ease-in-out infinite',
             filter: 'drop-shadow(0 0 12px rgba(139,92,246,.5))',
