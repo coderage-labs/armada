@@ -6,13 +6,13 @@
 
 ## Architecture
 
-Armada is a three-tier system: a **control plane**, one or more **node agents**, and **agent containers**.
+Armada is a three-tier system: a **control plane**, one or more **node agents**, and **agent containers** (instances).
 
 ```mermaid
 graph TD
     subgraph Machine1["Machine 1"]
         CP["Control Plane :3001"]
-        CP --- API["REST API (Fastify)"]
+        CP --- API["REST API (Express)"]
         CP --- DBL["SQLite (Drizzle ORM)"]
         CP --- WS1["WebSocket tunnel"]
         CP --- SSE["SSE event bus"]
@@ -23,7 +23,7 @@ graph TD
         NA1["Node Agent"]
         NA1 --- DS1["Docker socket"]
         NA1 --- CR["Container reconciliation"]
-        NA1 --- GP["Gateway proxy"]
+        NA1 --- GP["Gateway proxy :3002"]
     end
 
     subgraph MachineN["Machine N"]
@@ -40,12 +40,12 @@ graph TD
 
 ### Control Plane
 
-The control plane (`packages/control`) is a Node.js server that:
+The control plane (`packages/control`) is a Node.js server (Express) that:
 
 - Serves the React dashboard (`packages/ui`) via Vite-built static files
 - Exposes the REST API (all endpoints under `/api/`)
-- Maintains a SQLite database via Drizzle ORM (auto-migrating, currently v30)
-- Manages WebSocket tunnels to each node agent (nodes dial outbound)
+- Maintains a SQLite database via Drizzle ORM (auto-migrating, currently at v30)
+- Manages WebSocket tunnels to each node agent (nodes dial outbound — no inbound ports required)
 - Runs: health monitor, task dispatcher, workflow engine, changeset pipeline, webhook dispatcher
 
 ### Node Agent
@@ -53,15 +53,22 @@ The control plane (`packages/control`) is a Node.js server that:
 The node agent (`packages/node`) runs on each host machine. It:
 
 - Manages Docker containers (create, start, stop, remove)
-- Connects outbound to the control plane via WebSocket (no inbound ports required)
+- Connects **outbound** to the control plane via WebSocket (no inbound ports needed on the node)
 - Reports container statuses in heartbeats for automatic reconciliation
-- Relays API requests from the control plane to containers
+- Relays API requests from the control plane to containers via `instance.relay` commands
 - Streams real-time CPU/memory/network stats
 - Provisions CLI tools via [eget](https://github.com/zyedidia/eget)
+- Runs a **local HTTP proxy on port 3002** that instances use to reach the control plane
 
-### Agent Containers
+### Agent Containers (Instances)
 
-Each agent runs in a Docker container with its own tools, skills, and security boundaries. Agents communicate with the control plane via HTTP. The `armada-agent` plugin handles task execution, heartbeats, and result callbacks.
+Each instance runs in a Docker container with the `armada-agent` OpenClaw plugin installed. Instances:
+
+- Receive tasks via `POST /armada/task` (relayed from the control plane via the node agent)
+- Communicate back to the control plane through the **node agent proxy** (`http://armada-node:3002`) — never directly
+- Report heartbeats and task results via the proxy
+
+The `armada-agent` plugin handles task execution, heartbeats, progress reporting, and result callbacks. See [Plugin Guide](./PLUGIN-GUIDE.md) and the [armada-agent README](../plugins/agent/README.md).
 
 ---
 
@@ -121,7 +128,8 @@ curl -fsSL https://raw.githubusercontent.com/coderage-labs/armada/main/install.s
 |---|---|---|
 | `ARMADA_API_TOKEN` | *(required)* | Master API token |
 | `ARMADA_NODE_TOKEN` | *(required)* | Node agent authentication token |
-| `ARMADA_API_URL` | `http://armada-control:3001` | Internal control plane URL (for agent callbacks) |
+| `ARMADA_API_URL` | `http://armada-control:3001` | Internal control plane URL (used for agent callback base URL) |
+| `ARMADA_AGENT_GATEWAY_URL` | `http://armada-node:3002` | Proxy URL injected into instance configs — how instances reach the control plane |
 | `ARMADA_UI_URL` | — | Public URL of the dashboard (for notification links) |
 | `ARMADA_DB_PATH` | `/data/armada.db` | SQLite database path |
 | `ARMADA_PLUGINS_PATH` | `/data/plugins` | Plugin storage directory |
@@ -135,21 +143,58 @@ curl -fsSL https://raw.githubusercontent.com/coderage-labs/armada/main/install.s
 
 All routes under `/api/`. Authenticate with `Authorization: Bearer <token>` or session cookie.
 
-### Core Resources
+### Agents
 
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/api/agents` | List agents |
 | `POST` | `/api/agents` | Create agent |
-| `GET/PATCH/DELETE` | `/api/agents/:id` | Agent CRUD |
-| `POST` | `/api/agents/:id/deploy` | Deploy/restart agent |
+| `DELETE` | `/api/agents/:name` | Delete agent |
+| `POST` | `/api/agents/:name/redeploy` | Redeploy (restart) agent |
+| `GET` | `/api/agents/:name/logs` | Get agent container logs |
+| `POST` | `/api/agents/:name/heartbeat` | Receive heartbeat from agent |
+| `POST` | `/api/agents/:name/nudge` | Send a nudge to agent |
+| `POST` | `/api/agents/:name/maintain` | Trigger maintenance |
+| `GET` | `/api/agents/capacity` | Get agent capacity info |
+| `GET` | `/api/agents/:name/session` | List agent sessions |
+| `GET` | `/api/agents/:name/session/messages` | Get session message history |
+| `POST` | `/api/agents/:name/avatar/generate` | Generate AI avatar |
+| `DELETE` | `/api/agents/:name/avatar` | Remove avatar |
+
+### Instances
+
+| Method | Path | Description |
+|---|---|---|
 | `GET` | `/api/instances` | List instances |
+| `GET/PATCH/DELETE` | `/api/instances/:id` | Instance CRUD |
+| `POST` | `/api/instances/:id/start` | Start instance |
+| `POST` | `/api/instances/:id/stop` | Stop instance |
+
+### Nodes
+
+| Method | Path | Description |
+|---|---|---|
 | `GET` | `/api/nodes` | List nodes |
+
+### Templates
+
+| Method | Path | Description |
+|---|---|---|
 | `GET` | `/api/templates` | List templates |
 | `POST` | `/api/templates` | Create template |
+| `GET/PUT/DELETE` | `/api/templates/:id` | Template CRUD |
+| `GET` | `/api/templates/:id/drift` | Check agent drift from template |
+| `POST` | `/api/templates/:id/sync` | Sync template to agents |
+
+### Tasks
+
+| Method | Path | Description |
+|---|---|---|
 | `GET` | `/api/tasks` | List tasks |
 | `POST` | `/api/tasks` | Create task |
-| `POST` | `/api/tasks/:id/result` | Task completion callback |
+| `GET` | `/api/tasks/:id` | Get task detail |
+| `PUT` | `/api/tasks/:id` | Update task status |
+| `POST` | `/api/tasks/:id/result` | Task completion callback (called by agents) |
 
 ### Workflows
 
@@ -157,10 +202,18 @@ All routes under `/api/`. Authenticate with `Authorization: Bearer <token>` or s
 |---|---|---|
 | `GET` | `/api/workflows` | List workflows |
 | `POST` | `/api/workflows` | Create workflow |
+| `GET/PUT/DELETE` | `/api/workflows/:id` | Workflow CRUD |
 | `POST` | `/api/workflows/:id/run` | Start a run (accepts `variables`) |
+| `GET` | `/api/workflows/:id/runs` | List runs for workflow |
+| `GET` | `/api/workflows/runs/active` | Get active runs |
+| `GET` | `/api/workflows/runs/recent` | Get recent runs |
 | `GET` | `/api/workflows/runs/:runId` | Run status |
 | `GET` | `/api/workflows/runs/:runId/steps` | Step statuses |
 | `GET` | `/api/workflows/runs/:runId/context` | Full context (steps + outputs + reworks) |
+| `POST` | `/api/workflows/runs/:runId/approve/:stepId` | Approve a workflow step |
+| `POST` | `/api/workflows/runs/:runId/reject/:stepId` | Reject a workflow step |
+| `POST` | `/api/workflows/runs/:runId/retry/:stepId` | Retry a failed step |
+| `POST` | `/api/workflows/runs/:runId/cancel` | Cancel a run |
 | `POST` | `/api/workflows/runs/:runId/rework` | Request rework on a step |
 
 ### Changesets
@@ -169,10 +222,12 @@ All routes under `/api/`. Authenticate with `Authorization: Bearer <token>` or s
 |---|---|---|
 | `GET` | `/api/changesets` | List changesets |
 | `POST` | `/api/changesets` | Create changeset |
-| `POST` | `/api/changesets/:id/apply` | Apply staged changes |
-| `POST` | `/api/changesets/:id/discard` | Discard changes |
-| `GET` | `/api/changesets/:id/diff` | View staged diffs |
-| `POST` | `/api/changesets/:id/retry` | Retry failed changeset |
+| `GET` | `/api/changesets/:id` | Get changeset detail (includes steps and diffs) |
+| `POST` | `/api/changesets/:id/approve` | Approve a draft changeset |
+| `POST` | `/api/changesets/:id/validate` | Validate a changeset |
+| `POST` | `/api/changesets/:id/apply` | Apply an approved changeset |
+| `POST` | `/api/changesets/:id/cancel` | Cancel a draft or approved changeset |
+| `POST` | `/api/changesets/:id/retry` | Retry a failed changeset |
 
 ### Events
 
@@ -187,9 +242,10 @@ All routes under `/api/`. Authenticate with `Authorization: Bearer <token>` or s
 | `POST` | `/api/auth/login/password` | Password login |
 | `POST` | `/api/auth/passkey/login-options` | WebAuthn challenge |
 | `POST` | `/api/auth/passkey/login-verify` | WebAuthn verify |
+| `GET` | `/api/auth/setup-status` | Check if first-boot setup is needed (public) |
+| `POST` | `/api/auth/setup` | First-boot admin setup (public, only works before any users exist) |
 | `GET` | `/api/auth/me` | Current user profile |
 | `PUT` | `/api/auth/me` | Update profile |
-| `POST` | `/api/auth/setup` | First-boot admin setup |
 
 ---
 
@@ -215,7 +271,7 @@ External services POST to Armada to trigger actions:
 
 ## Further Reading
 
-- [Architecture](./ARCHITECTURE.md) — core concepts and team model
+- [Architecture](./ARCHITECTURE.md) — core concepts, communication flows, and topology
 - [Changeset pipeline](./UNIVERSAL-CHANGESET-SPEC.md) — how config mutations work
 - [Collaboration spec](./COLLABORATION-SPEC.md) — inter-agent workflow collaboration
 - [Credential injection](./CREDENTIAL-INJECTION-SPEC.md) — secure key management
