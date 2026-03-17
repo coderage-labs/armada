@@ -452,7 +452,11 @@ router.post('/:id/users', requireScope('projects:write'), (req, res) => {
     res.status(404).json({ error: 'User not found' });
     return;
   }
-  userProjectsRepo.assign(userId, project.id, role);
+  if (role === 'owner') {
+    userProjectsRepo.setOwner(userId, project.id);
+  } else {
+    userProjectsRepo.assign(userId, project.id, role);
+  }
   const users = userProjectsRepo.getUsersForProject(project.id);
   res.json({ users });
 });

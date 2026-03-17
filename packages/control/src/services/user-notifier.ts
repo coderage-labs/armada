@@ -49,6 +49,14 @@ export interface NotifyCompletionOptions {
   projectId: string;
 }
 
+export interface NotifyTriageOperatorFallbackOptions {
+  issueNumber: number;
+  issueTitle: string;
+  projectId: string;
+  projectName: string;
+  reason: string;
+}
+
 // ── Quiet hours ─────────────────────────────────────────────────────
 
 /**
@@ -186,9 +194,51 @@ export async function notifyCompletion(opts: NotifyCompletionOptions): Promise<v
   }
 }
 
+/**
+ * Notify operator-type users when a triage falls back to manual handling.
+ * - Targets operator users assigned to the project (falls back to all operators)
+ * - Skips non-operator users (humans don't handle triage)
+ * - Skips quiet hours (triage fallback needs attention but isn't blocking like a gate)
+ * - Rate-limited: at most one notification per issue (caller responsibility via cooldown map)
+ */
+export async function notifyTriageOperatorFallback(opts: NotifyTriageOperatorFallbackOptions): Promise<void> {
+  const { issueNumber, issueTitle, projectId, projectName, reason } = opts;
+
+  // Get users assigned to project (or all users if none assigned)
+  let users = userProjectsRepo.getUsersForProject(projectId);
+  if (users.length === 0) {
+    users = usersRepo.getAll();
+  }
+
+  // Only notify operators — triage fallback requires operator action
+  const operators = users.filter(u => u.type === 'operator');
+
+  for (const user of operators) {
+    try {
+      // Skip during quiet hours — triage is important but not blocking
+      if (isInQuietHours(user)) {
+        console.log(`[user-notifier] Skipping triage.operator_fallback for ${user.name} — quiet hours`);
+        continue;
+      }
+
+      const message = formatTriageFallbackMessage(issueNumber, issueTitle, projectName, reason);
+      await deliverToUser(user, message, {
+        event: 'triage.operator_fallback',
+        issueNumber,
+        issueTitle,
+        projectId,
+        projectName,
+        reason,
+      });
+    } catch (err: any) {
+      console.error(`[user-notifier] Failed to notify operator ${user.name} of triage fallback: ${err.message}`);
+    }
+  }
+}
+
 // ── Delivery ────────────────────────────────────────────────────────
 
-async function deliverToUser(
+export async function deliverToUser(
   user: ArmadaUser,
   message: string,
   payload: Record<string, any>,
@@ -307,6 +357,20 @@ function formatCompletionMessage(
 ): string {
   const emoji = status === 'completed' ? '✅' : '❌';
   return `${emoji} Workflow <b>${escapeHtml(workflowName)}</b> ${status}\n\n<code>${runId}</code>`;
+}
+
+function formatTriageFallbackMessage(
+  issueNumber: number,
+  issueTitle: string,
+  projectName: string,
+  reason: string,
+): string {
+  return (
+    `🔀 <b>Manual triage required</b>\n\n` +
+    `Issue <b>#${issueNumber}</b> in project <b>${escapeHtml(projectName)}</b> could not be auto-triaged.\n\n` +
+    `<b>Title:</b> ${escapeHtml(issueTitle)}\n` +
+    `<b>Reason:</b> ${escapeHtml(reason)}`
+  );
 }
 
 // ── Channel implementations ─────────────────────────────────────────

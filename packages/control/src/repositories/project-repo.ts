@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm';
+import { eq, sql, and } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { getDrizzle } from '../db/drizzle.js';
 import { projects, userProjects, users, templates, agents } from '../db/drizzle-schema.js';
@@ -208,5 +208,48 @@ export const userProjectsRepo = {
       .where(sql`${userProjects.userId} = ${userId} AND ${userProjects.projectId} = ${projectId}`)
       .get();
     return !!row;
+  },
+
+  getOwner(projectId: string): ArmadaUser | null {
+    const row = getDrizzle()
+      .select({
+        id: users.id,
+        name: users.name,
+        displayName: users.displayName,
+        type: users.type,
+        role: users.role,
+        avatarUrl: users.avatarUrl,
+        avatarGenerating: users.avatarGenerating,
+        avatarVersion: users.avatarVersion,
+        linkedAccountsJson: users.linkedAccountsJson,
+        notificationsJson: users.notificationsJson,
+        channelsJson: users.channelsJson,
+        createdAt: users.createdAt,
+        passwordHash: users.passwordHash,
+      })
+      .from(users)
+      .innerJoin(userProjects, eq(users.id, userProjects.userId))
+      .where(and(eq(userProjects.projectId, projectId), eq(userProjects.role, 'owner')))
+      .get();
+    return row ? rowToUser(row) : null;
+  },
+
+  setOwner(userId: string, projectId: string): void {
+    // Mutex: clear any existing owner first
+    getDrizzle()
+      .update(userProjects)
+      .set({ role: 'member' })
+      .where(and(eq(userProjects.projectId, projectId), eq(userProjects.role, 'owner')))
+      .run();
+    // Set new owner
+    this.assign(userId, projectId, 'owner');
+  },
+
+  unsetOwner(projectId: string): void {
+    getDrizzle()
+      .update(userProjects)
+      .set({ role: 'member' })
+      .where(and(eq(userProjects.projectId, projectId), eq(userProjects.role, 'owner')))
+      .run();
   },
 };

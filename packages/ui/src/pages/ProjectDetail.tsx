@@ -709,7 +709,9 @@ function MembersTab({ projectId, users: initialUsers }: { projectId: string; use
   const [allUsers, setAllUsers] = useState<ArmadaUser[]>([]);
   const [adding, setAdding] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState('');
+  const [makeOwner, setMakeOwner] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
+  const [makingOwner, setMakingOwner] = useState<string | null>(null);
 
   useEffect(() => {
     // Load all users for the add dropdown
@@ -724,15 +726,33 @@ function MembersTab({ projectId, users: initialUsers }: { projectId: string; use
     try {
       const resp = await apiFetch<{ users: ArmadaUser[] }>(`/api/projects/${projectId}/users`, {
         method: 'POST',
-        body: JSON.stringify({ userId: selectedUserId }),
+        body: JSON.stringify({ userId: selectedUserId, role: makeOwner ? 'owner' : 'member' }),
       });
       setUsers(resp.users);
       setSelectedUserId('');
-      toast.success('User added to project');
+      setMakeOwner(false);
+      toast.success(makeOwner ? 'User added as project owner' : 'User added to project');
     } catch (err: any) {
       toast.error(`Failed: ${err.message}`);
     } finally {
       setAdding(false);
+    }
+  }
+
+  async function handleMakeOwner(userId: string) {
+    if (!confirm('Make this user the project owner? The current owner (if any) will become a member.')) return;
+    setMakingOwner(userId);
+    try {
+      const resp = await apiFetch<{ users: ArmadaUser[] }>(`/api/projects/${projectId}/users`, {
+        method: 'POST',
+        body: JSON.stringify({ userId, role: 'owner' }),
+      });
+      setUsers(resp.users);
+      toast.success('Project owner updated');
+    } catch (err: any) {
+      toast.error(`Failed: ${err.message}`);
+    } finally {
+      setMakingOwner(null);
     }
   }
 
@@ -779,6 +799,19 @@ function MembersTab({ projectId, users: initialUsers }: { projectId: string; use
             {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Add'}
           </Button>
         </div>
+        <div className="flex items-center gap-2 mt-3">
+          <input
+            type="checkbox"
+            id="makeOwner"
+            checked={makeOwner}
+            onChange={(e) => setMakeOwner(e.target.checked)}
+            disabled={!selectedUserId || adding}
+            className="rounded border-zinc-600 bg-zinc-800 text-violet-600 focus:ring-violet-500"
+          />
+          <label htmlFor="makeOwner" className="text-xs text-zinc-400 cursor-pointer select-none">
+            Make owner (replaces current owner)
+          </label>
+        </div>
       </div>
 
       {/* Members list */}
@@ -800,7 +833,10 @@ function MembersTab({ projectId, users: initialUsers }: { projectId: string; use
                     ) : user.displayName[0].toUpperCase()}
                   </div>
                   <div>
-                    <div className="text-sm font-medium text-zinc-200">{user.displayName}</div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-medium text-zinc-200">{user.displayName}</span>
+                      {user.role === 'owner' && <span title="Project Owner">👑</span>}
+                    </div>
                     <div className="text-xs text-zinc-500">@{user.name} · {user.type}</div>
                   </div>
                 </div>
@@ -814,6 +850,17 @@ function MembersTab({ projectId, users: initialUsers }: { projectId: string; use
                   }`}>
                     {user.role}
                   </Badge>
+                  {user.role !== 'owner' && (
+                    <Button
+                      variant="ghost"
+                      onClick={() => handleMakeOwner(user.id)}
+                      disabled={makingOwner === user.id}
+                      className="text-xs px-2 py-1 text-amber-500 hover:text-amber-400 hover:bg-amber-500/10 disabled:opacity-40"
+                      title="Make owner"
+                    >
+                      {makingOwner === user.id ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Make Owner'}
+                    </Button>
+                  )}
                   <Button
                     variant="ghost" onClick={() => handleRemove(user.id)}
                     disabled={removing === user.id}
