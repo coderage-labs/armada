@@ -31,47 +31,50 @@ const sharedStyles = `
 
 function ExhaustTrails({ size }: { size: 'sm' | 'lg' }) {
   const isLg = size === 'lg';
-  const h = isLg ? 'h-[14px]' : 'h-[6px]';
-  const w = isLg ? 'w-[3px]' : 'w-[2px]';
+  const w = isLg ? '3px' : '2px';
   const anim = isLg ? 'exhaust-pulse' : 'exhaust-pulse-sm';
-  const bottom = isLg ? '-bottom-[6px]' : '-bottom-[3px]';
+  const bottom = isLg ? '-6px' : '-3px';
   const dur = '0.6s';
 
   return (
     <>
       <span
-        className={`absolute ${bottom} left-1/2 ${w} ${h} -translate-x-1/2 rounded-sm opacity-80`}
+        className="absolute rounded-sm opacity-80"
         style={{
+          bottom,
+          left: '50%',
+          width: w,
+          height: isLg ? '14px' : '6px',
+          transform: 'translateX(-50%)',
+          transformOrigin: 'top center',
           background: 'linear-gradient(to bottom, #8b5cf6, #6d28d9 40%, transparent)',
           animation: `${anim} ${dur} ease-in-out infinite alternate`,
-          transform: 'translateX(-50%) rotate(-45deg)',
-          transformOrigin: 'top center',
         }}
       />
       <span
-        className={`absolute ${bottom} rounded-sm opacity-50`}
+        className="absolute rounded-sm opacity-50"
         style={{
+          bottom,
           left: 'calc(50% - 5px)',
-          width: isLg ? '3px' : '2px',
+          width: w,
           height: isLg ? '10px' : '5px',
+          transformOrigin: 'top center',
           background: 'linear-gradient(to bottom, #8b5cf6, #6d28d9 40%, transparent)',
           animation: `${anim} ${dur} ease-in-out infinite alternate`,
           animationDelay: '0.15s',
-          transform: 'rotate(-45deg)',
-          transformOrigin: 'top center',
         }}
       />
       <span
-        className={`absolute ${bottom} rounded-sm opacity-40`}
+        className="absolute rounded-sm opacity-40"
         style={{
+          bottom,
           left: 'calc(50% + 5px)',
-          width: isLg ? '3px' : '2px',
+          width: w,
           height: isLg ? '8px' : '4px',
+          transformOrigin: 'top center',
           background: 'linear-gradient(to bottom, #8b5cf6, #6d28d9 40%, transparent)',
           animation: `${anim} ${dur} ease-in-out infinite alternate`,
           animationDelay: '0.3s',
-          transform: 'rotate(-45deg)',
-          transformOrigin: 'top center',
         }}
       />
     </>
