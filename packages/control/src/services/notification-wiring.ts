@@ -45,6 +45,15 @@ export function wireNotificationEvents(): void {
     }).catch(() => {});
   });
 
+  // ── Triage lifecycle ─────────────────────────────────────────────
+  eventBus.on('triage.operator_fallback', ({ data }) => {
+    sendNotification({
+      event: 'triage.operator_fallback',
+      message: `Issue <code>#${data?.issueNumber ?? 'unknown'}</code> in project <b>${data?.projectName ?? 'unknown'}</b> requires manual triage: ${data?.reason ?? 'unknown reason'}`,
+      data,
+    }).catch(() => {});
+  });
+
   // ── Instance lifecycle ───────────────────────────────────────────
   eventBus.on('instance.upgrade_failed', ({ data }) => {
     sendNotification({

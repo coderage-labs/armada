@@ -18,7 +18,25 @@ import { getCachedIssues } from './github-sync.js';
 import { logActivity } from './activity-service.js';
 import { eventBus } from '../infrastructure/event-bus.js';
 import { getNodeClient } from '../infrastructure/node-client.js';
+import { notifyTriageOperatorFallback } from './user-notifier.js';
 import type { GitHubIssue } from '@coderage-labs/armada-shared';
+
+// ── Rate limiting for operator fallback notifications ─────────────────────────
+// Prevents notification spam when many issues fall back at once.
+// Each unique (projectId, issueNumber) pair is debounced: the first fallback triggers
+// a notification immediately; subsequent fallbacks within COOLDOWN_MS are silently skipped.
+
+const FALLBACK_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+const fallbackNotifiedAt = new Map<string, number>(); // key: `${projectId}:${issueNumber}`
+
+function shouldNotifyFallback(projectId: string, issueNumber: number): boolean {
+  const key = `${projectId}:${issueNumber}`;
+  const last = fallbackNotifiedAt.get(key);
+  const now = Date.now();
+  if (last !== undefined && now - last < FALLBACK_COOLDOWN_MS) return false;
+  fallbackNotifiedAt.set(key, now);
+  return true;
+}
 
 const CONTROL_PLANE_URL = process.env.ARMADA_API_URL || 'http://armada-control:3001';
 
@@ -86,16 +104,39 @@ export async function triageIssue(
     return { triaged: false, by: 'operator' };
   }
 
+  const project = projectsRepo.get(projectId);
+  const projectName = project?.name ?? projectId;
+
   const pm = resolveProjectManager(projectId);
   const workflows = getWorkflowsForProject(projectId).filter(w => w.enabled);
 
   if (!pm) {
     // No PM — operator (Robin) handles triage
+    const reason = 'No PM-tier agent is assigned and running for this project';
+    if (shouldNotifyFallback(projectId, issue.number)) {
+      notifyTriageOperatorFallback({
+        issueNumber: issue.number,
+        issueTitle: issue.title,
+        projectId,
+        projectName,
+        reason,
+      }).catch((err: Error) => console.error('[triage] Failed to send operator fallback notification:', err.message));
+    }
     return { triaged: false, by: 'operator' };
   }
 
   if (workflows.length === 0) {
     // No workflows defined — can't auto-triage
+    const reason = 'No enabled workflows are configured for this project';
+    if (shouldNotifyFallback(projectId, issue.number)) {
+      notifyTriageOperatorFallback({
+        issueNumber: issue.number,
+        issueTitle: issue.title,
+        projectId,
+        projectName,
+        reason,
+      }).catch((err: Error) => console.error('[triage] Failed to send operator fallback notification:', err.message));
+    }
     return { triaged: false, by: 'operator' };
   }
 
@@ -139,11 +180,21 @@ If none of the workflows fit, respond with:
   const pmAgent = agentsRepo.getAll().find(a => a.name === pm.name);
   if (!pmAgent?.instanceId) {
     console.error(`[triage] PM ${pm.name} has no instanceId`);
+    const reason = `PM agent "${pm.name}" has no associated instance`;
+    if (shouldNotifyFallback(projectId, issue.number)) {
+      notifyTriageOperatorFallback({ issueNumber: issue.number, issueTitle: issue.title, projectId, projectName, reason })
+        .catch((err: Error) => console.error('[triage] Failed to send operator fallback notification:', err.message));
+    }
     return { triaged: false, by: 'operator' };
   }
   const pmInstance = instancesRepo.getById(pmAgent.instanceId);
   if (!pmInstance?.nodeId) {
     console.error(`[triage] Instance for PM ${pm.name} has no nodeId`);
+    const reason = `PM agent "${pm.name}" instance has no associated node`;
+    if (shouldNotifyFallback(projectId, issue.number)) {
+      notifyTriageOperatorFallback({ issueNumber: issue.number, issueTitle: issue.title, projectId, projectName, reason })
+        .catch((err: Error) => console.error('[triage] Failed to send operator fallback notification:', err.message));
+    }
     return { triaged: false, by: 'operator' };
   }
   const pmContainerName = `armada-instance-${pmInstance.name}`;
@@ -171,6 +222,11 @@ If none of the workflows fit, respond with:
 
     if (status >= 400) {
       console.error(`[triage] PM ${pm.name} rejected triage task: ${JSON.stringify(resp)}`);
+      const reason = `PM agent "${pm.name}" rejected the triage task (HTTP ${status})`;
+      if (shouldNotifyFallback(projectId, issue.number)) {
+        notifyTriageOperatorFallback({ issueNumber: issue.number, issueTitle: issue.title, projectId, projectName, reason })
+          .catch((err: Error) => console.error('[triage] Failed to send operator fallback notification:', err.message));
+      }
       return { triaged: false, by: 'operator' };
     }
 
@@ -196,6 +252,11 @@ If none of the workflows fit, respond with:
     return { triaged: true, by: 'pm' };
   } catch (err: any) {
     console.error(`[triage] Failed to reach PM ${pm.name}:`, err.message);
+    const reason = `Could not reach PM agent "${pm.name}": ${err.message}`;
+    if (shouldNotifyFallback(projectId, issue.number)) {
+      notifyTriageOperatorFallback({ issueNumber: issue.number, issueTitle: issue.title, projectId, projectName, reason })
+        .catch((notifyErr: Error) => console.error('[triage] Failed to send operator fallback notification:', notifyErr.message));
+    }
     return { triaged: false, by: 'operator' };
   }
 }
