@@ -36,8 +36,13 @@ const _tools: ToolDefinition[] = [];
 
 /**
  * Register a tool definition. Called by route setup functions.
+ * Skips registration if a tool with the same name is already registered,
+ * preventing duplicates when routes are initialised more than once.
  */
 export function registerToolDef(def: ToolDefinition): void {
+  if (_tools.some(t => t.name === def.name)) {
+    return;
+  }
   _tools.push(def);
 }
 
