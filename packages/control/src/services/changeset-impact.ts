@@ -286,6 +286,50 @@ export function analyseChangesetImpact(mutations: PendingMutation[]): ChangesetI
 }
 
 /**
+ * Get the set of instance IDs that are affected by the given mutations.
+ * Used for scoped config-push — only push to instances that need it.
+ */
+export function getAffectedInstanceIds(mutations: PendingMutation[]): string[] {
+  const affected = new Set<string>();
+
+  for (const m of mutations) {
+    const { entityType, entityId, payload } = m;
+
+    if (entityType === 'agent') {
+      // Agent mutation: affect the agent's instance
+      if (entityId) {
+        const agent = agentsRepo.getById(entityId);
+        if (agent?.instanceId) affected.add(agent.instanceId);
+      } else if (payload?.instanceId) {
+        affected.add(payload.instanceId);
+      }
+    } else if (entityType === 'instance') {
+      if (entityId) affected.add(entityId);
+    } else if (entityType === 'template') {
+      // Template mutation: affect instances running agents on this template
+      const templateId = entityId ?? '';
+      const runningAgents = runningAgentsForTemplates([templateId]);
+      for (const a of runningAgents) {
+        if (a.instanceId) affected.add(a.instanceId);
+      }
+    } else if (entityType === 'model') {
+      const modelName = payload?.name ?? entityId ?? '';
+      const usingTemplates = templatesUsingModel(modelName);
+      const runningAgents = runningAgentsForTemplates(usingTemplates.map(t => t.id));
+      for (const a of runningAgents) {
+        if (a.instanceId) affected.add(a.instanceId);
+      }
+    } else if (entityType === 'provider' || entityType === 'api_key' || entityType === 'plugin') {
+      // These affect all running instances
+      const runningInstances = getRunningInstances();
+      for (const i of runningInstances) affected.add(i.id);
+    }
+  }
+
+  return Array.from(affected);
+}
+
+/**
  * Get the set of agent IDs that are actually affected by the given mutations.
  * Used for scoped restarts — only restart agents that need it.
  */
