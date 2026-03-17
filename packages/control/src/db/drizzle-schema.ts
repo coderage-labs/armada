@@ -586,6 +586,12 @@ export const changesets = sqliteTable('changesets', {
   error: text('error'),
   /** Schema version when this changeset was created — used to detect stale drafts after migrations */
   schemaVersion: integer('schema_version'),
+  /** Impact level calculated at creation time: none | low | medium | high (#83) */
+  impactLevel: text('impact_level').notNull().default('none'),
+  /** JSON array of AffectedResource objects (#83) */
+  affectedResourcesJson: text('affected_resources_json').notNull().default('[]'),
+  /** Whether this changeset requires an agent/instance restart (#83) */
+  requiresRestart: integer('requires_restart').notNull().default(0),
 });
 
 // ── changeset_operations ─────────────────────────────────────────────

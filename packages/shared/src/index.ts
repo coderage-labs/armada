@@ -723,6 +723,16 @@ export interface ChangesetPlan {
   approvedConfigVersion?: number;
 }
 
+// ── Changeset Impact Analysis (#83) ────────────────────────────────
+
+export type ImpactLevel = 'none' | 'low' | 'medium' | 'high';
+
+export interface AffectedResource {
+  type: string;
+  name: string;
+  reason: string;
+}
+
 export interface Changeset {
   id: string;
   status: 'draft' | 'approved' | 'applying' | 'completed' | 'failed' | 'rolled_back' | 'cancelled';
@@ -738,6 +748,12 @@ export interface Changeset {
   error?: string;
   /** Schema version when this changeset was created — stale if current version is higher */
   schemaVersion?: number;
+  /** Impact level: none | low | medium | high (#83) */
+  impactLevel?: ImpactLevel;
+  /** Resources affected by this changeset (#83) */
+  affectedResources?: AffectedResource[];
+  /** Whether any agents/instances need to restart (#83) */
+  requiresRestart?: boolean;
 }
 
 // ── Changeset Conflict Resolution (#320) ───────────────────────────

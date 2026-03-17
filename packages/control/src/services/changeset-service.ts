@@ -14,6 +14,7 @@ import { changesetValidator, type ChangesetValidationResult } from './changeset-
 import { applyChangeset, retryFailedInstances } from './changeset-apply.js';
 import { computeMutationDiffs } from './diff-computer.js';
 import { buildStepsForInstance, dagToSteps } from './step-planner.js';
+import { analyseChangesetImpact } from './changeset-impact.js';
 import type { StateChange, ChangesetPlan, Changeset, ArmadaInstance } from '@coderage-labs/armada-shared';
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -77,6 +78,9 @@ function rowToChangeset(row: ChangesetRow): Changeset {
     completedAt: row.completedAt ?? undefined,
     error: row.error ?? undefined,
     schemaVersion: row.schemaVersion ?? undefined,
+    impactLevel: (row.impactLevel ?? 'none') as Changeset['impactLevel'],
+    affectedResources: JSON.parse(row.affectedResourcesJson ?? '[]'),
+    requiresRestart: row.requiresRestart === 1,
   };
 }
 
@@ -289,6 +293,11 @@ export function createChangesetService(): ChangesetService {
       schemaVersion = getCurrentSchemaVersion(getDb());
     } catch { /* non-fatal */ }
 
+    // ── Impact analysis (#83) ──────────────────────────────────────
+    const allMutations = pendingMutationRepo.getAll();
+    const impact = analyseChangesetImpact(allMutations);
+    const isZeroImpact = impact.impactLevel === 'none';
+
     getDrizzle().insert(changesets).values({
       id,
       status: 'draft',
@@ -298,9 +307,33 @@ export function createChangesetService(): ChangesetService {
       createdBy: opts?.createdBy ?? null,
       createdAt: now,
       schemaVersion,
+      impactLevel: impact.impactLevel,
+      affectedResourcesJson: JSON.stringify(impact.affectedResources),
+      requiresRestart: impact.requiresRestart ? 1 : 0,
     }).run();
 
     const changeset = get(id)!;
+
+    // ── Auto-apply zero-impact changesets (#83) ─────────────────────
+    // If nothing has real impact (e.g. just adding a new model), skip review
+    // and apply immediately so operators aren't bothered for low-friction ops.
+    if (isZeroImpact && intraConflicts.filter(c => c.type === 'error').length === 0) {
+      console.log(`[changeset] Auto-approving zero-impact changeset ${id}`);
+      getDrizzle().update(changesets).set({
+        status: 'approved',
+        approvedBy: 'system (auto: zero-impact)',
+        approvedAt: new Date().toISOString(),
+      }).where(eq(changesets.id, id)).run();
+      eventBus.emit('changeset.auto_approved', { changesetId: id, reason: 'zero-impact' });
+      // Apply asynchronously so we don't block the create call
+      Promise.resolve().then(() =>
+        applyChangeset(id, {}, get).catch((err: Error) => {
+          console.error(`[changeset] Auto-apply failed for zero-impact changeset ${id}: ${err.message}`);
+        })
+      );
+      const autoApproved = get(id)!;
+      return autoApproved;
+    }
 
     // Attach warnings to result (informational — does not block creation)
     if (intraConflicts.length > 0) {

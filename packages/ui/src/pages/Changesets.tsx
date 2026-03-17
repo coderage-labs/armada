@@ -8,6 +8,8 @@ import {
   MutationsList,
   InstanceOpRow,
   ChangesetActions,
+  ImpactBadge,
+  AffectedResourcesList,
   relativeTime,
 } from '../components/changeset';
 import type { Changeset } from '@coderage-labs/armada-shared';
@@ -84,9 +86,17 @@ function ChangesetRow({ cs, onRefresh }: { cs: Changeset; onRefresh: () => void 
           <StatusBadge status={cs.status} />
         </TableCell>
 
-        {/* Summary: changes / instances / restarts */}
+        {/* Summary: impact badge + changes / instances / restarts */}
         <TableCell className="hidden sm:table-cell">
           <div className="flex items-center gap-3 flex-wrap">
+            {/* Impact badge (#83) */}
+            {cs.impactLevel && (
+              <ImpactBadge
+                impactLevel={cs.impactLevel}
+                requiresRestart={cs.requiresRestart}
+                compact
+              />
+            )}
             {totalChanges > 0 && (
               <span className="text-xs">
                 <span className="text-zinc-300">{totalChanges}</span>{' '}
@@ -104,7 +114,7 @@ function ChangesetRow({ cs, onRefresh }: { cs: Changeset; onRefresh: () => void 
                 {totalRestarts} restart{totalRestarts !== 1 ? 's' : ''}
               </span>
             )}
-            {totalChanges === 0 && totalInstances === 0 && (
+            {totalChanges === 0 && totalInstances === 0 && !cs.impactLevel && (
               <span className="text-xs text-zinc-600">—</span>
             )}
           </div>
@@ -165,6 +175,27 @@ function ChangesetRow({ cs, onRefresh }: { cs: Changeset; onRefresh: () => void 
                 <div className="flex items-start gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2">
                   <XCircle className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" />
                   <p className="text-xs text-red-400">{cs.error}</p>
+                </div>
+              )}
+
+              {/* Impact analysis (#83) */}
+              {cs.impactLevel && (cs.status === 'draft' || cs.status === 'approved') && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Impact</div>
+                    <ImpactBadge impactLevel={cs.impactLevel} requiresRestart={cs.requiresRestart} />
+                    {cs.impactLevel === 'none' && (
+                      <span className="text-[11px] text-emerald-500/80">Auto-applying…</span>
+                    )}
+                  </div>
+                  {cs.affectedResources && cs.affectedResources.length > 0 && (
+                    <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 px-3 py-2">
+                      <AffectedResourcesList
+                        resources={cs.affectedResources}
+                        requiresRestart={cs.requiresRestart}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
 
