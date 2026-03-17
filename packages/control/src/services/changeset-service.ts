@@ -57,6 +57,9 @@ export interface ChangesetService {
 
   /** Cancel a changeset */
   cancel(id: string): Changeset;
+
+  /** Remove (delete) a failed or cancelled changeset */
+  remove(id: string): void;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────

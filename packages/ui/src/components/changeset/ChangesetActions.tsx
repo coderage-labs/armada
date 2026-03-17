@@ -29,8 +29,12 @@ export function ChangesetActions({ cs, onRefresh, stopPropagation = true }: Chan
     setLoading(true);
     try {
       if (action === 'cancel') {
-        // Use draft discard for draft changesets, legacy cancel for others
-        await apiFetch('/api/draft/discard', { method: 'POST' });
+        // Use draft discard for draft changesets, cancel endpoint for others
+        if (cs.status === 'draft') {
+          await apiFetch('/api/draft/discard', { method: 'POST' });
+        } else {
+          await apiFetch(`/api/changesets/${cs.id}/cancel`, { method: 'POST' });
+        }
         // Invalidate ALL entity caches so pending indicators clear immediately
         queryClient.invalidateQueries();
       } else {
