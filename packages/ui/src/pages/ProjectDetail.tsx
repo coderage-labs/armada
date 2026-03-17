@@ -11,6 +11,7 @@ import {
   Workflow, Activity, Pencil, Zap, Loader2, AlertCircle,
   Hash, Circle, BarChart3, CheckCircle2, Timer, TrendingUp,
   Settings, Package, X, Plug, GitBranch, Plus, FolderKanban,
+  Crown, User,
 } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { Button } from '../components/ui/button';
@@ -712,6 +713,7 @@ function MembersTab({ projectId, users: initialUsers }: { projectId: string; use
   const [makeOwner, setMakeOwner] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
   const [makingOwner, setMakingOwner] = useState<string | null>(null);
+  const [confirmOwner, setConfirmOwner] = useState<{ userId: string; name: string } | null>(null);
 
   useEffect(() => {
     // Load all users for the add dropdown
@@ -740,7 +742,6 @@ function MembersTab({ projectId, users: initialUsers }: { projectId: string; use
   }
 
   async function handleMakeOwner(userId: string) {
-    if (!confirm('Make this user the project owner? The current owner (if any) will become a member.')) return;
     setMakingOwner(userId);
     try {
       const resp = await apiFetch<{ users: ArmadaUser[] }>(`/api/projects/${projectId}/users`, {
@@ -753,6 +754,7 @@ function MembersTab({ projectId, users: initialUsers }: { projectId: string; use
       toast.error(`Failed: ${err.message}`);
     } finally {
       setMakingOwner(null);
+      setConfirmOwner(null);
     }
   }
 
@@ -834,31 +836,29 @@ function MembersTab({ projectId, users: initialUsers }: { projectId: string; use
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5">
+                      <span title={user.type === 'operator' ? 'Operator' : 'Human'}>
+                        {user.type === 'operator' ? (
+                          <Bot className="w-3.5 h-3.5 text-violet-400 shrink-0" />
+                        ) : (
+                          <User className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                        )}
+                      </span>
                       <span className="text-sm font-medium text-zinc-200">{user.displayName}</span>
-                      {user.role === 'owner' && <span title="Project Owner">👑</span>}
+                      {user.role === 'owner' && <span title="Project Owner"><Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" /></span>}
                     </div>
-                    <div className="text-xs text-zinc-500">@{user.name} · {user.type}</div>
+                    <div className="text-xs text-zinc-500 ml-5">@{user.name}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge className={`text-[10px] px-2 py-0.5 rounded-full ${
-                    user.role === 'owner'
-                      ? 'bg-amber-500/20 text-amber-300'
-                      : user.role === 'operator'
-                        ? 'bg-violet-500/20 text-violet-300'
-                        : 'bg-zinc-500/20 text-zinc-400'
-                  }`}>
-                    {user.role}
-                  </Badge>
                   {user.role !== 'owner' && (
                     <Button
                       variant="ghost"
-                      onClick={() => handleMakeOwner(user.id)}
+                      onClick={() => setConfirmOwner({ userId: user.id, name: user.displayName })}
                       disabled={makingOwner === user.id}
                       className="text-xs px-2 py-1 text-amber-500 hover:text-amber-400 hover:bg-amber-500/10 disabled:opacity-40"
                       title="Make owner"
                     >
-                      {makingOwner === user.id ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Make Owner'}
+                      {makingOwner === user.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Crown className="w-3.5 h-3.5" />}
                     </Button>
                   )}
                   <Button
@@ -875,6 +875,15 @@ function MembersTab({ projectId, users: initialUsers }: { projectId: string; use
         )}
       </div>
 
+      <ConfirmDialog
+        open={!!confirmOwner}
+        title="Change Project Owner"
+        message={`Make ${confirmOwner?.name ?? 'this user'} the project owner? The current owner (if any) will become a regular member.`}
+        confirmLabel="Make Owner"
+        destructive={false}
+        onConfirm={() => confirmOwner && handleMakeOwner(confirmOwner.userId)}
+        onCancel={() => setConfirmOwner(null)}
+      />
     </div>
   );
 }
