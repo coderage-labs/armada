@@ -6,6 +6,7 @@ import {
   modelRegistryRepo,
   pluginLibraryRepo,
   instancesRepo,
+  assignmentRepo,
 } from '../repositories/index.js';
 import type { PendingMutation } from '../repositories/pending-mutation-repo.js';
 import { pluginManager } from './plugin-manager.js';
@@ -102,7 +103,15 @@ function executeMutation(mutation: PendingMutation): void {
       } else if (action === 'update' && entityId) {
         agentsRepo.update(entityId, payload as any);
       } else if (action === 'delete' && entityId) {
+        // Capture name before deletion for assignment cleanup
+        const agentToDelete = agentsRepo.getById(entityId);
         agentsRepo.remove(entityId);
+        if (agentToDelete?.name) {
+          const cleaned = assignmentRepo.removeAssignmentsForAssignee('agent', agentToDelete.name);
+          if (cleaned > 0) {
+            console.log(`[mutation-executor] Cleaned ${cleaned} stale assignment(s) for deleted agent "${agentToDelete.name}"`);
+          }
+        }
       }
       break;
 

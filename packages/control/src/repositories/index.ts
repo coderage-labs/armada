@@ -33,3 +33,5 @@ export { usageRepo } from './usage-repo.js';
 export type { UsageEntry, UsageTotals, UsageByDimension, UsagePeriod } from './usage-repo.js';
 export { notificationChannelRepo } from './notification-channel-repo.js';
 export type { NotificationChannel, NotificationChannelType } from './notification-channel-repo.js';
+export { assignmentRepo, migrateOwnerAssignments } from './assignment-repo.js';
+export type { Assignment, AssignmentType, AssigneeType, ResolvedAssignee } from './assignment-repo.js';

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireScope } from '../middleware/scopes.js';
-import { usersRepo, userProjectsRepo } from '../repositories/index.js';
+import { usersRepo, userProjectsRepo, assignmentRepo } from '../repositories/index.js';
 import { registerToolDef } from '../utils/tool-registry.js';
 import { generateAvatar, avatarExists, deleteAvatar, readAvatar, getDefaultAvatarUrl } from '../services/avatar-generator.js';
 import { logActivity } from '../services/activity-service.js';
@@ -178,6 +178,11 @@ router.delete('/:id', requireScope('users:write'), (req, res) => {
   }
   usersRepo.delete(req.params.id);
   deleteAvatar(existing.name, 'user').catch(() => {});
+  // Clean up any project assignments for this user
+  const cleaned = assignmentRepo.removeAssignmentsForAssignee('user', req.params.id);
+  if (cleaned > 0) {
+    console.log(`[users] Cleaned ${cleaned} stale project assignment(s) for deleted user "${existing.name}"`);
+  }
   res.status(204).end();
 });
 

@@ -20,6 +20,7 @@ import { createSkillRoutes } from './routes/skills.js';
 import taskRoutes from './routes/tasks.js';
 import activityRoutes from './routes/activity.js';
 import projectRoutes from './routes/projects.js';
+import assignmentRoutes from './routes/assignments.js';
 import integrationsRoutes, { projectIntegrationsRouter } from './routes/integrations.js';
 import proxyRoutes from './routes/proxy.js';
 import prProxyRoutes from './routes/proxy-prs.js';
@@ -106,6 +107,7 @@ export function createApp(opts: AppOptions): express.Express {
   app.use('/api/proxy/issues', proxyRoutes);
   app.use('/api/proxy/prs', prProxyRoutes);
   app.use('/api/projects', projectRoutes);
+  app.use('/api/projects/:id/assignments', assignmentRoutes);
   app.use('/api/projects/:id/integrations', projectIntegrationsRouter);
   app.use('/api/webhooks', webhookRoutes);
   app.use('/api/webhooks/inbound', webhooksInboundMgmtRouter);

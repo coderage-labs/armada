@@ -4,7 +4,7 @@ import { getDb } from './db/index.js';
 import { NodeManager } from './node-manager.js';
 import { createApp, attachWebSocketUpgrade } from './app.js';
 import { generateInstallScript } from './install-script.js';
-import { nodesRepo, agentsRepo } from './repositories/index.js';
+import { nodesRepo, agentsRepo, migrateOwnerAssignments } from './repositories/index.js';
 import { startHealthMonitor, stopHealthMonitor } from './services/health-monitor.js';
 import { startWorkspaceRetention, stopWorkspaceRetention } from './services/workspace-retention.js';
 import { startGithubSyncScheduler, stopGithubSyncScheduler } from './services/github-sync.js';
@@ -29,6 +29,13 @@ async function start() {
 
   // Seed default plugins
   pluginManager.seed();
+
+  // Migrate legacy owner assignments to project_assignments table (#77)
+  try {
+    migrateOwnerAssignments();
+  } catch (err: any) {
+    console.warn('[startup] Owner assignment migration failed (non-fatal):', err.message);
+  }
 
   // Register integration providers
   console.log('🔌 Registering integration providers…');
