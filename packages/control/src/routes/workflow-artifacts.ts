@@ -302,7 +302,7 @@ export async function getArtifactContextBlock(
 
     const lines = [
       '## File Artifacts',
-      'When you produce files (code, configs, reports, etc.), upload them using armada_artifact_upload so subsequent workflow steps can access them.',
+      'If your work produces files that subsequent steps need to review or build upon, upload them using armada_artifact_upload. Only upload files that are relevant to the workflow — not every file you touch.',
     ];
 
     if (others.length > 0) {
