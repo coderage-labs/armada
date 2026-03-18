@@ -116,6 +116,9 @@ export function buildWorkflowContextBlock(
         if (repos.length > 0) {
           lines.push(`Repositories: ${repos.map(r => r.url).join(', ')}`);
         }
+        if (project.contextMd?.trim()) {
+          lines.push('', '## Project Context', project.contextMd.trim());
+        }
       }
     } catch { /* non-fatal */ }
   }
