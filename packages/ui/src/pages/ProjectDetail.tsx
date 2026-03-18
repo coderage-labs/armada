@@ -1729,49 +1729,18 @@ function SettingsTab({ project, onUpdated }: { project: Project; onUpdated: (p: 
       {/* Basic Details */}
       <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 space-y-4">
         <h3 className="text-sm font-semibold text-zinc-200">Project Details</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="text-[10px] uppercase text-zinc-500 tracking-wider block mb-1">Name</label>
-            <Input
-              value={name}
-              onChange={e => { setName(e.target.value); setSaved(false); }}
-              className="w-full rounded-lg bg-zinc-800/50 border border-zinc-800 text-zinc-200 text-sm px-3 py-2 focus:outline-none focus:border-violet-500/50"
-            />
-          </div>
-          <div>
-            <label className="text-[10px] uppercase text-zinc-500 tracking-wider block mb-1">Icon</label>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-2xl w-8 text-center">{icon || '—'}</span>
-              {icon && (
-                <button
-                  type="button"
-                  onClick={() => { setIcon(''); setSaved(false); }}
-                  className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700"
-                >
-                  Clear
-                </button>
-              )}
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-[10px] uppercase text-zinc-500 tracking-wider block mb-1">Name</label>
+              <Input
+                value={name}
+                onChange={e => { setName(e.target.value); setSaved(false); }}
+                className="w-full rounded-lg bg-zinc-800/50 border border-zinc-800 text-zinc-200 text-sm px-3 py-2 focus:outline-none focus:border-violet-500/50"
+              />
             </div>
-            <div className="flex flex-wrap gap-1 p-2 rounded-lg bg-zinc-800/50 border border-zinc-800">
-              {PROJECT_EMOJIS.map(emoji => (
-                <button
-                  key={emoji}
-                  type="button"
-                  onClick={() => { setIcon(emoji); setSaved(false); }}
-                  title={emoji}
-                  className={`w-8 h-8 flex items-center justify-center rounded text-lg transition-all hover:bg-zinc-700 ${
-                    icon === emoji
-                      ? 'bg-violet-600/40 ring-1 ring-violet-500'
-                      : ''
-                  }`}
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="text-[10px] uppercase text-zinc-500 tracking-wider block mb-1">Color</label>
+            <div>
+              <label className="text-[10px] uppercase text-zinc-500 tracking-wider block mb-1">Color</label>
             <div className="flex flex-wrap gap-1.5 p-2 rounded-lg bg-zinc-800/50 border border-zinc-800">
               {PROJECT_COLOURS.map(c => (
                 <button
@@ -1791,6 +1760,37 @@ function SettingsTab({ project, onUpdated }: { project: Project; onUpdated: (p: 
                       <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
                   )}
+                </button>
+              ))}
+            </div>
+          </div>
+          </div>
+          <div>
+            <label className="text-[10px] uppercase text-zinc-500 tracking-wider block mb-1">Icon</label>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xl w-6 text-center">{icon || '—'}</span>
+              {icon && (
+                <button
+                  type="button"
+                  onClick={() => { setIcon(''); setSaved(false); }}
+                  className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-0.5 p-1.5 rounded-lg bg-zinc-800/50 border border-zinc-800">
+              {PROJECT_EMOJIS.map(emoji => (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => { setIcon(emoji); setSaved(false); }}
+                  title={emoji}
+                  className={`w-7 h-7 flex items-center justify-center rounded text-base transition-all hover:bg-zinc-700 ${
+                    icon === emoji ? 'bg-violet-600/40 ring-1 ring-violet-500' : ''
+                  }`}
+                >
+                  {emoji}
                 </button>
               ))}
             </div>
