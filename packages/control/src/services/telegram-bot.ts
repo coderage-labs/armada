@@ -205,29 +205,32 @@ export async function initTelegramBot(): Promise<void> {
       try {
         // ── Triage actions ──────────────────────────────────────────────────
         if (namespace === 'triage') {
-          if (action === 'dispatch' && parts.length === 4) {
-            // triage:dispatch:<projectId>:<issueNumber>
+          if (action === 'dispatch' && parts.length >= 4) {
+            // triage:dispatch:<projectId>:<issueNumber>[:<workflowId>]
             const projectId = parts[2];
             const issueNumber = parseInt(parts[3], 10);
+            const workflowId = parts[4]; // may be undefined for legacy buttons
 
             await ctx.answerCallbackQuery({ text: '🔄 Dispatching workflow...' });
 
-            // Dynamic import to avoid circular dependency (triage → user-notifier → telegram-bot)
             const { triageDispatch } = await import('./triage.js');
-            const { getWorkflowsForProject } = await import('./workflow-engine.js');
-            const workflows = getWorkflowsForProject(projectId).filter((w: any) => w.enabled);
 
-            if (workflows.length === 0) {
-              await ctx.answerCallbackQuery({ text: '❌ No enabled workflows found for this project' });
-              await ctx.reply('❌ No enabled workflows are configured for this project.');
-              return;
+            let resolvedWorkflowId = workflowId;
+            if (!resolvedWorkflowId) {
+              // Legacy: no workflow ID in callback — pick first enabled
+              const { getWorkflowsForProject } = await import('./workflow-engine.js');
+              const workflows = getWorkflowsForProject(projectId).filter((w: any) => w.enabled);
+              if (workflows.length === 0) {
+                await ctx.reply('❌ No enabled workflows are configured for this project.');
+                return;
+              }
+              resolvedWorkflowId = workflows[0].id;
             }
 
-            const firstWorkflow = workflows[0];
             const result = await triageDispatch({
               projectId,
               issueNumber,
-              workflowId: firstWorkflow.id,
+              workflowId: resolvedWorkflowId,
             });
 
             if (result.error) {
@@ -505,9 +508,15 @@ export async function sendTriageNotification(
     return;
   }
 
-  const keyboard = new InlineKeyboard()
-    .text('🔄 Run Workflow', `triage:dispatch:${projectId}:${issueNumber}`)
-    .text('✅ Mark Triaged', `triage:mark:${projectId}:${issueNumber}`);
+  // List available workflows as individual buttons
+  const { getWorkflowsForProject } = await import('./workflow-engine.js');
+  const workflows = getWorkflowsForProject(projectId).filter(w => w.enabled);
+  
+  const keyboard = new InlineKeyboard();
+  for (const wf of workflows) {
+    keyboard.text(`🔄 ${wf.name}`, `triage:dispatch:${projectId}:${issueNumber}:${wf.id}`).row();
+  }
+  keyboard.text('✅ Mark Triaged', `triage:mark:${projectId}:${issueNumber}`);
 
   if (issueUrl) {
     keyboard.row().url('🔗 View Issue', issueUrl);
