@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { apiFetch } from '../hooks/useApi';
-import { Shield, Fingerprint, Trash2, User, Key, Lock, Save, Loader2, Bell, Link, Unlink, CheckCircle, MessageCircle } from 'lucide-react';
+import { Shield, Fingerprint, Trash2, User, Key, Lock, Save, Loader2, Bell, Link, Unlink, CheckCircle, MessageCircle, Send } from 'lucide-react';
 import { LoadingState } from '../components/LoadingState';
 import { PageHeader } from '../components/PageHeader';
 import RegisterPasskey from '../components/RegisterPasskey';
@@ -95,6 +95,8 @@ export default function Account() {
   const [linkError, setLinkError] = useState('');
   const [linkSuccess, setLinkSuccess] = useState('');
   const [unlinkingChannel, setUnlinkingChannel] = useState<string | null>(null);
+  const [testingChannel, setTestingChannel] = useState<string | null>(null);
+  const [channelIds, setChannelIds] = useState<Record<string, string>>({});
 
   // Password state
   const [showPasswordForm, setShowPasswordForm] = useState(false);
@@ -119,10 +121,17 @@ export default function Account() {
       setPasskeys(pks);
       setTokens(tks);
       if (sysChannels) {
-        const chList = Array.isArray(sysChannels)
-          ? sysChannels.map((c: any) => typeof c === 'string' ? c : c.type).filter(Boolean)
-          : (sysChannels.channels ?? Object.keys(sysChannels));
-        setSystemChannels(chList.filter((c: any) => typeof c === 'string'));
+        if (Array.isArray(sysChannels)) {
+          setSystemChannels(sysChannels.map((c: any) => typeof c === 'string' ? c : c.type).filter(Boolean));
+          const idMap: Record<string, string> = {};
+          for (const c of sysChannels) {
+            if (c && typeof c === 'object' && c.type && c.id) idMap[c.type] = c.id;
+          }
+          setChannelIds(idMap);
+        } else {
+          const chList = sysChannels.channels ?? Object.keys(sysChannels);
+          setSystemChannels(chList.filter((c: any) => typeof c === 'string'));
+        }
       }
     } finally {
       setLoading(false);
@@ -242,6 +251,20 @@ export default function Account() {
   function getChannelIcon(type: string) {
     if (type === 'telegram') return <MessageCircle className="w-4 h-4 text-blue-400" />;
     return <MessageCircle className="w-4 h-4 text-zinc-400" />;
+  }
+
+  async function handleTestChannel(channelType: string) {
+    const channelId = channelIds[channelType];
+    if (!channelId) return;
+    setTestingChannel(channelType);
+    try {
+      await apiFetch(`/api/notification-channels/${channelId}/test`, { method: 'POST' });
+      setLinkSuccess(`Test message sent via ${channelType}`);
+    } catch (err: any) {
+      setLinkError(err.message || `Failed to send test via ${channelType}`);
+    } finally {
+      setTestingChannel(null);
+    }
   }
 
   async function deletePasskey(id: string) {
@@ -461,8 +484,18 @@ export default function Account() {
                         </Badge>
                       )}
                     </div>
-                    <div>
+                    <div className="flex items-center gap-1.5">
                       {linked ? (
+                        <>
+                        <Button
+                          variant="ghost"
+                          onClick={() => handleTestChannel(channelType)}
+                          disabled={testingChannel === channelType}
+                          className="flex items-center gap-1.5 text-xs font-medium text-emerald-300 hover:text-emerald-200 bg-emerald-500/10 hover:bg-emerald-500/20 px-3 py-1.5 rounded-lg transition disabled:opacity-50"
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                          {testingChannel === channelType ? 'Sending…' : 'Test'}
+                        </Button>
                         <Button
                           variant="ghost"
                           onClick={() => handleUnlink(channelType)}
@@ -472,6 +505,7 @@ export default function Account() {
                           <Unlink className="w-3.5 h-3.5" />
                           {isUnlinking ? 'Unlinking…' : 'Unlink'}
                         </Button>
+                        </>
                       ) : (
                         <Button
                           variant="ghost"
