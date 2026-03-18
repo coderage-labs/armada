@@ -210,8 +210,8 @@ export async function notifyTriageOperatorFallback(opts: NotifyTriageOperatorFal
     users = usersRepo.getAll();
   }
 
-  // Only notify operators — triage fallback requires operator action
-  const operators = users.filter(u => u.type === 'operator');
+  // Notify users with operator or owner roles — triage fallback requires human action
+  const operators = users.filter(u => u.role === 'operator' || u.role === 'owner');
 
   for (const user of operators) {
     try {
