@@ -175,6 +175,22 @@ export const tasksRepo = {
       .map(r => r.githubIssueNumber!);
   },
 
+  /**
+   * Count tasks in 'running' or 'pending' state assigned to a given agent.
+   * Used by the health monitor to override the stale heartbeat activeTasks count.
+   */
+  countActiveByAgent(agentName: string): number {
+    const rows = getDrizzle()
+      .select({ id: tasks.id })
+      .from(tasks)
+      .where(and(
+        eq(tasks.toAgent, agentName),
+        sql`${tasks.status} IN ('running', 'pending')`,
+      ))
+      .all();
+    return rows.length;
+  },
+
   remove(id: string): boolean {
     const result = getDrizzle().delete(tasks).where(eq(tasks.id, id)).run();
     return result.changes > 0;

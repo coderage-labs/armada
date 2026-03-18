@@ -1,4 +1,4 @@
-import { agentsRepo } from '../repositories/index.js';
+import { agentsRepo, tasksRepo } from '../repositories/index.js';
 import { eventBus } from '../infrastructure/event-bus.js';
 import type { HealthStatus } from '@coderage-labs/armada-shared';
 
@@ -124,9 +124,10 @@ function checkHealth() {
       }
     }
 
-    // Update capacity from heartbeat meta
-    const meta = agent.heartbeatMeta as Record<string, unknown> | null;
-    const taskCount = (meta?.activeTasks as number) ?? 0;
+    // Override heartbeat's stale activeTasks with the actual running task count from the DB.
+    // The agent plugin counts OpenClaw sessions, which remain open after a workflow step
+    // completes — so the heartbeat value is unreliable. The control plane task DB is authoritative.
+    const taskCount = tasksRepo.countActiveByAgent(agent.name);
     capacityMap.set(agent.name, {
       taskCount,
       responseMs: 0,
