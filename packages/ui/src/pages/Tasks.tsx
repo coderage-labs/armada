@@ -1371,7 +1371,7 @@ export default function Tasks() {
     <div className="space-y-6 h-full flex flex-col">
       {/* Header */}
       <div className="shrink-0">
-        <PageHeader icon={Zap} title="Task Activity" subtitle="Real-time Armada task monitoring & network topology">
+        <PageHeader icon={Zap} title="Task Activity" subtitle="Real-time Armada task monitoring">
           <Button
             onClick={() => setShowSendModal(true)}
             className="bg-violet-600 hover:bg-violet-700 text-white text-sm px-4 h-9 flex items-center gap-2"
@@ -1383,23 +1383,7 @@ export default function Tasks() {
         </PageHeader>
       </div>
 
-      {/* Topology Graph - Hero Section */}
-      <div className="shrink-0 rounded-lg border border-zinc-800 bg-zinc-950 backdrop-blur overflow-visible relative">
-        {/* Subtle gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-b from-violet-500/[0.02] to-blue-500/[0.02] pointer-events-none" />
-        <div className="absolute top-4 left-5 z-10">
-          <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Network Topology</h3>
-        </div>
-        {agents.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-zinc-600 text-sm">
-            No agents registered
-          </div>
-        ) : (
-          <TopologyGraph agents={agents} tasks={tasks} onTaskClick={setSelectedTask} roleColor={getRoleColor} getTier={getRoleTier} />
-        )}
-      </div>
-
-      {/* Bottom section: Feed + Stats */}
+      {/* Main section: Feed + Stats */}
       <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
         {/* Stats Panel - shown first on mobile */}
         <div className="order-1 lg:order-2 lg:flex-[2] rounded-lg border border-zinc-800 bg-zinc-900/50 backdrop-blur p-4 overflow-auto">
