@@ -135,6 +135,17 @@ router.post('/me/link', (req, res) => {
   };
 
   usersRepo.update(req.caller.id, { channels });
+
+  // Send a confirmation message to the newly linked channel
+  try {
+    if (result.channelType === 'telegram') {
+      const { sendPlainNotification } = await import('../services/telegram-bot.js');
+      await sendPlainNotification(result.platformId, `✅ Account linked! You're now connected as <b>${user.displayName}</b> on Armada.\n\nYou'll receive notifications here for gate approvals, workflow completions, and failures (based on your preferences).`);
+    }
+  } catch (err: any) {
+    console.warn(`[auth] Failed to send link confirmation to ${result.channelType}: ${err.message}`);
+  }
+
   res.json({ ok: true, channel: result.channelType, platformId: result.platformId });
 });
 
