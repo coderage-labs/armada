@@ -8,7 +8,7 @@ import { getDrizzle } from '../db/drizzle.js';
 import { sql } from 'drizzle-orm';
 import { agentsRepo } from '../repositories/index.js';
 import { projectsRepo, tasksRepo } from '../repositories/index.js';
-import { getCachedIssues } from './github-sync.js';
+import { getCachedIssues } from './issue-sync.js';
 
 export interface ProjectMetrics {
   tasks: {

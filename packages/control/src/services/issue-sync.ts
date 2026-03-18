@@ -54,7 +54,7 @@ function resolveGitHubToken(projectId: string): string {
       }
     }
   } catch (err: any) {
-    console.warn(`[github-sync] Failed to resolve integration token for project ${projectId}:`, err.message);
+    console.warn(`[issue-sync] Failed to resolve integration token for project ${projectId}:`, err.message);
   }
   return process.env.GITHUB_TOKEN || '';
 }
@@ -156,29 +156,29 @@ export async function syncProjectIssues(projectId: string): Promise<{ fetched: n
 
 /**
  * Resolve sync interval for a specific project:
- * 1. Project config `githubSyncIntervalMinutes`
- * 2. Global setting `github_sync_interval_minutes`
+ * 1. Project config `issueSyncIntervalMinutes`
+ * 2. Global setting `issue_sync_interval_minutes`
  * 3. Default (5 minutes)
  *
  * Returns milliseconds. Returns 0 if explicitly disabled.
  */
 function resolveProjectIntervalMs(projectConfig: Record<string, any>): number {
   // Check project-level setting
-  if (projectConfig.githubSyncIntervalMinutes !== undefined) {
-    const minutes = Number(projectConfig.githubSyncIntervalMinutes);
+  if (projectConfig.issueSyncIntervalMinutes !== undefined) {
+    const minutes = Number(projectConfig.issueSyncIntervalMinutes);
     if (minutes === 0) return 0; // Explicitly disabled
     if (Number.isFinite(minutes) && minutes > 0) return minutes * 60 * 1000;
   }
 
   // Fall back to global setting
   try {
-    const raw = settingsRepo.get('github_sync_interval_minutes');
+    const raw = settingsRepo.get('issue_sync_interval_minutes');
     if (raw) {
       const minutes = parseFloat(raw);
       if (Number.isFinite(minutes) && minutes > 0) return minutes * 60 * 1000;
     }
   } catch (err: any) {
-    console.warn('[github-sync] Failed to read global sync interval setting:', err.message);
+    console.warn('[issue-sync] Failed to read global sync interval setting:', err.message);
   }
 
   return DEFAULT_SYNC_INTERVAL_MINUTES * 60 * 1000;
@@ -188,7 +188,7 @@ function resolveProjectIntervalMs(projectConfig: Record<string, any>): number {
 
 let syncInterval: ReturnType<typeof setInterval> | null = null;
 
-export function startGithubSyncScheduler() {
+export function startIssueSyncScheduler() {
   if (syncInterval) clearInterval(syncInterval);
 
   // Tick every 60s and check which projects are due for sync
@@ -238,7 +238,7 @@ export function startGithubSyncScheduler() {
             .map(i => i.number);
 
           if (untriagedNew.length > 0) {
-            console.log(`[github-sync] ${untriagedNew.length} new untriaged issue(s) for project "${project.name}":`, untriagedNew);
+            console.log(`[issue-sync] ${untriagedNew.length} new untriaged issue(s) for project "${project.name}":`, untriagedNew);
             eventBus.emit('github.new_issues', {
               projectId: project.id,
               projectName: project.name,
@@ -247,7 +247,7 @@ export function startGithubSyncScheduler() {
           }
         }
       } catch (err: any) {
-        console.error(`[github-sync] Sync failed for ${project.name}:`, err.message);
+        console.error(`[issue-sync] Sync failed for ${project.name}:`, err.message);
         // Reset last sync so it retries next tick
         lastSyncAt.delete(project.id);
       }
@@ -255,7 +255,7 @@ export function startGithubSyncScheduler() {
   }, SCHEDULER_TICK_MS);
 }
 
-export function stopGithubSyncScheduler() {
+export function stopIssueSyncScheduler() {
   if (syncInterval) {
     clearInterval(syncInterval);
     syncInterval = null;

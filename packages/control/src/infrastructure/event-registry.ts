@@ -275,7 +275,7 @@ export const EVENT_REGISTRY = {
   // ── GitHub sync ────────────────────────────────────────────────────
 
   [EVENT_NAMES.GITHUB_NEW_ISSUES]: {
-    emitters:  ['services/github-sync.ts (polling loop, on new untriaged issues)'],
+    emitters:  ['services/issue-sync.ts (polling loop, on new untriaged issues)'],
     listeners: ['services/triage.ts (routes issues to PM-tier agents)'],
   },
 

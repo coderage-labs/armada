@@ -66,7 +66,7 @@ registerToolDef({
 });
 
 import { triageIssue, handleTriageResult, triageNewIssues, markIssueTriaged, triageDispatch, triageDismiss } from '../services/triage.js';
-import { getCachedIssues } from '../services/github-sync.js';
+import { getCachedIssues } from '../services/issue-sync.js';
 
 const router = Router();
 
