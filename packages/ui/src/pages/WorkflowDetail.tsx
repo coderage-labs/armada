@@ -6,10 +6,12 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import { Checkbox } from '../components/ui/checkbox';
 import StepRunModal from '../components/StepRunModal';
 import PipelineView from '../components/PipelineView';
+import WorkflowDAG from '../components/WorkflowDAG';
 import {
   Workflow as WorkflowIcon, Play, Power, PowerOff, Plus, Trash2,
   Pencil, X, ChevronRight, Clock, RotateCcw, CheckCircle2,
   XCircle, Pause, Ban, SkipForward, ArrowLeft, Save,
+  LayoutList, GitBranch,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
 import CollaborationThread from '../components/CollaborationThread';
@@ -582,6 +584,7 @@ function RunDetailView({
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [reworkCount, setReworkCount] = useState(0);
+  const [viewMode, setViewMode] = useState<'graph' | 'list'>('graph');
 
   const loadStepRuns = useCallback(async () => {
     try {
@@ -701,13 +704,56 @@ function RunDetailView({
           {loading ? (
             <LoadingState size="sm" message="Loading steps…" />
           ) : (
-            <PipelineView
-              steps={workflow.steps}
-              stepRuns={stepRuns}
-              selectedStepId={selectedStepId}
-              onSelectStep={setSelectedStepId}
-              vertical
-            />
+            <div className="space-y-3">
+              {/* View toggle */}
+              <div className="flex items-center gap-1 p-0.5 rounded-lg bg-zinc-800/50 border border-zinc-800 w-fit">
+                <button
+                  onClick={() => setViewMode('graph')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                    viewMode === 'graph'
+                      ? 'bg-zinc-700 text-zinc-100 shadow-sm'
+                      : 'text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  <GitBranch className="w-3.5 h-3.5" />
+                  Graph view
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                    viewMode === 'list'
+                      ? 'bg-zinc-700 text-zinc-100 shadow-sm'
+                      : 'text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  <LayoutList className="w-3.5 h-3.5" />
+                  List view
+                </button>
+              </div>
+
+              {/* Graph view */}
+              {viewMode === 'graph' && (
+                <WorkflowDAG
+                  steps={workflow.steps}
+                  runId={run.id}
+                  stepRuns={stepRuns}
+                  selectedStepId={selectedStepId}
+                  onSelectStep={setSelectedStepId}
+                  isRunning={run.status === 'running' || run.status === 'paused'}
+                />
+              )}
+
+              {/* List view */}
+              {viewMode === 'list' && (
+                <PipelineView
+                  steps={workflow.steps}
+                  stepRuns={stepRuns}
+                  selectedStepId={selectedStepId}
+                  onSelectStep={setSelectedStepId}
+                  vertical
+                />
+              )}
+            </div>
           )}
         </TabsContent>
 
