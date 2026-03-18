@@ -299,6 +299,7 @@ export async function getArtifactContextBlock(
     const db = getDrizzle();
     const rows = await db
       .select({
+        id: workflowArtifacts.id,
         stepId: workflowArtifacts.stepId,
         filename: workflowArtifacts.filename,
         mimeType: workflowArtifacts.mimeType,
@@ -318,9 +319,9 @@ export async function getArtifactContextBlock(
     if (others.length > 0) {
       lines.push('', 'Available artifacts from completed steps:');
       for (const a of others) {
-        lines.push(`- ${a.stepId}/${a.filename} (${formatBytes(a.size)}, ${a.mimeType})`);
+        lines.push(`- ${a.stepId}/${a.filename} (${formatBytes(a.size)}, ${a.mimeType}) — artifactId: ${a.id}`);
       }
-      lines.push('Use armada_artifact_download to retrieve any artifact you need.');
+      lines.push(`Use armada_artifact_download with runId="${runId}" and the artifactId above to download files to your workspace.`);
     }
 
     return lines.join('\n');
