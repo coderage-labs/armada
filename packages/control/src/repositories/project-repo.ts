@@ -133,17 +133,32 @@ export const projectsRepo = {
     if (!project) return [];
     const allTemplates = db.select().from(templates).all();
     const allAgents = db.select().from(agents).all();
-    const memberNames: string[] = [];
+    const memberNames = new Set<string>();
+
+    // 1. Agents whose template has this project in projects_json
     for (const agent of allAgents) {
       if (!agent.templateId) continue;
       const tmpl = allTemplates.find(t => t.id === agent.templateId);
       if (!tmpl) continue;
       const projectsList = parseJsonWithSchema('[project-repo] projectsJson', tmpl.projectsJson || '[]', stringArraySchema, []);
-      if (projectsList.includes(project.name)) {
-        memberNames.push(agent.name);
+      if (projectsList.includes(project.name) || projectsList.includes(project.id)) {
+        memberNames.add(agent.name);
       }
     }
-    return memberNames;
+
+    // 2. Agents that have run workflow steps for this project
+    const workflowAgentRows = db.all<{ agent_name: string }>(
+      sql`SELECT DISTINCT wsr.agent_name
+          FROM workflow_step_runs wsr
+          INNER JOIN workflow_runs wr ON wr.id = wsr.run_id
+          WHERE wr.project_id = ${project.id}
+            AND wsr.agent_name IS NOT NULL`,
+    );
+    for (const row of workflowAgentRows) {
+      if (row.agent_name) memberNames.add(row.agent_name);
+    }
+
+    return Array.from(memberNames);
   },
 };
 

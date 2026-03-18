@@ -52,6 +52,11 @@ function findAgentByRole(role: string): { name: string; url: string; targetAgent
 export function initWorkflowDispatcher() {
   setWorkflowDispatcher(async (opts) => {
     const agent = findAgentByRole(opts.role);
+    // Resolve project UUID → project name (tasks table stores name as project_id)
+    const projectName = opts.projectId
+      ? (projectsRepo.get(opts.projectId)?.name ?? opts.projectId)
+      : undefined;
+
     if (!agent) {
       const errMsg = `No running agent with role "${opts.role}" available`;
       // Create the task record as failed so checkWorkflowStep can advance the workflow
@@ -63,6 +68,7 @@ export function initWorkflowDispatcher() {
         result: errMsg,
         status: 'failed',
         workflowRunId: opts.runId,
+        projectId: projectName,
       });
       checkWorkflowStep(opts.taskId, 'failed', errMsg);
       return { error: errMsg };
@@ -77,6 +83,7 @@ export function initWorkflowDispatcher() {
       result: null,
       status: 'pending',
       workflowRunId: opts.runId,
+      projectId: projectName,
     });
 
     // Dispatch via node relay (routes through node agent → container)
