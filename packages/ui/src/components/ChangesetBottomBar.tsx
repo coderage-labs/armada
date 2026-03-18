@@ -26,8 +26,21 @@ export function ChangesetBottomBar() {
     }
   }, [changeset?.id, changeset?.status]);
 
+  // Track which changesets we saw transition to a terminal state (don't show stale completed ones on page load)
+  const [seenActiveIds, setSeenActiveIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (changeset && ACTIVE_STATUSES.includes(changeset.status)) {
+      setSeenActiveIds(prev => {
+        if (prev.has(changeset.id)) return prev;
+        return new Set(prev).add(changeset.id);
+      });
+    }
+  }, [changeset?.id, changeset?.status]);
+
   if (!changeset) return null;
   if (!ACTIVE_STATUSES.includes(changeset.status) && changeset.id === dismissedId) return null;
+  // Only show completed/failed changesets if we saw them while they were active
+  if (!ACTIVE_STATUSES.includes(changeset.status) && !seenActiveIds.has(changeset.id)) return null;
   if (!ACTIVE_STATUSES.includes(changeset.status) && changeset.status !== 'completed' && changeset.status !== 'failed') return null;
 
   const isApplying = changeset.status === 'applying';
