@@ -479,8 +479,8 @@ router.post('/runs/:runId/rework', requireScope('workflows:write'), async (req, 
 });
 
 /** POST /api/workflow-runs/:runId/cancel */
-router.post('/runs/:runId/cancel', requireScope('workflows:write'), (req, res) => {
-  cancelRun(req.params.runId);
+router.post('/runs/:runId/cancel', requireScope('workflows:write'), async (req, res) => {
+  await cancelRun(req.params.runId);
   logAudit(req, 'workflow.run_cancel', 'workflow_run', req.params.runId);
   res.json({ cancelled: true });
 });
