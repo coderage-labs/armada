@@ -659,12 +659,117 @@ export default function register(api: any) {
     },
   });
 
-  // ── Auto-generated tools from API metadata ───────────────────────
+  // ── Dynamic tool loading via armada_find_tools ─────────────────────
 
-  // Fetch tool definitions from armada API and register them dynamically.
-  // This keeps the plugin in sync with the API — adding a new endpoint
-  // with a registerToolDef() call makes it instantly available as a tool.
-  loadApiTools().catch(err => _logger.warn(`[armada-control] Failed to load API tools: ${err.message}`));
+  // Instead of loading all 200+ tools at startup (bloating LLM context),
+  // register a single meta-tool that lets the agent discover and load
+  // tools on demand by query or category.
+
+  let _allToolDefs: ToolDef[] | null = null;
+  const _dynamicallyRegistered = new Set<string>();
+  const MANUAL_TOOLS = new Set(['armada_task', 'armada_status', 'armada_find_tools']);
+
+  async function fetchAllToolDefs(): Promise<ToolDef[]> {
+    if (_allToolDefs) return _allToolDefs;
+    const defs = await armadaApiGet('/api/meta/tools') as ToolDef[];
+    if (!Array.isArray(defs)) return [];
+    _allToolDefs = defs;
+    return _allToolDefs;
+  }
+
+  function registerToolsFromDefs(defs: ToolDef[]): string[] {
+    const registered: string[] = [];
+    for (const def of defs) {
+      if (MANUAL_TOOLS.has(def.name) || _dynamicallyRegistered.has(def.name)) continue;
+
+      const properties: Record<string, any> = {};
+      const required: string[] = [];
+      for (const p of def.parameters) {
+        properties[p.name] = {
+          type: p.type,
+          description: p.description,
+          ...(p.enum && { enum: p.enum }),
+        };
+        if (p.required) required.push(p.name);
+      }
+
+      _api.registerTool({
+        name: def.name,
+        description: def.description,
+        parameters: {
+          type: 'object',
+          properties,
+          ...(required.length > 0 && { required }),
+        },
+        execute: async (_id: string, args: Record<string, any>) => executeApiTool(def, args),
+      });
+
+      _dynamicallyRegistered.add(def.name);
+      registered.push(def.name);
+    }
+    return registered;
+  }
+
+  api.registerTool({
+    name: 'armada_find_tools',
+    description: 'Search and load Armada tools on demand. Call with a search query (e.g. "create issue", "manage workflows") or a category name (instances, projects, issues, workflows, git, changesets, integrations, notifications, system, hierarchy, plugins, admin, tasks, tools). Matching tools are registered and available on your NEXT turn. Call armada_find_tools("all") to load everything.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search query, category name, or "all" to load everything' },
+      },
+      required: ['query'],
+    },
+    execute: async (_id: string, args: { query: string }) => {
+      const query = (args.query || '').trim().toLowerCase();
+      if (!query) return { error: 'Provide a search query, category name, or "all"' };
+
+      const allDefs = await fetchAllToolDefs();
+      if (!allDefs.length) return { error: 'Failed to fetch tool definitions from control plane' };
+
+      let matches: ToolDef[];
+
+      if (query === 'all') {
+        matches = allDefs;
+      } else {
+        // First try exact category match
+        const categoryMatch = allDefs.filter(t => (t as any).category === query);
+        if (categoryMatch.length > 0) {
+          matches = categoryMatch;
+        } else {
+          // Fuzzy search: match query words against tool name + description
+          const queryWords = query.split(/\s+/);
+          matches = allDefs.filter(t => {
+            const haystack = `${t.name} ${t.description} ${(t as any).category || ''}`.toLowerCase();
+            return queryWords.every(w => haystack.includes(w));
+          });
+        }
+      }
+
+      if (!matches.length) {
+        const categories = [...new Set(allDefs.map(t => (t as any).category).filter(Boolean))].sort();
+        return {
+          found: 0,
+          message: `No tools matching "${args.query}". Available categories: ${categories.join(', ')}`,
+        };
+      }
+
+      const registered = registerToolsFromDefs(matches);
+      const alreadyLoaded = matches.length - registered.length;
+
+      return {
+        found: matches.length,
+        newlyRegistered: registered.length,
+        alreadyLoaded,
+        tools: matches.map(t => t.name),
+        message: registered.length > 0
+          ? `Loaded ${registered.length} new tool(s). They'll be available on your next turn.${alreadyLoaded > 0 ? ` (${alreadyLoaded} already loaded)` : ''}`
+          : `All ${matches.length} matching tools already loaded.`,
+      };
+    },
+  });
+
+  _logger.info('[armada-control] Registered armada_find_tools (dynamic tool loading)');
 
   // ── HTTP: Receive results ───────────────────────────────────────
 
