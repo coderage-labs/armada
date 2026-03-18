@@ -8,6 +8,7 @@ import type { NodeManager } from '../node-manager.js';
 import type { Agent, Template, TemplateSkill } from '@coderage-labs/armada-shared';
 
 registerToolDef({
+  category: 'workflows',
   name: 'armada_template_drift',
   description: 'Check if an agent\'s running config has drifted from its template. Shows differences.',
   method: 'GET', path: '/api/templates/:name/drift',
@@ -17,6 +18,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'workflows',
   name: 'armada_template_sync',
   description: 'Sync an agent\'s config back to match its template. Fixes drift.',
   method: 'POST', path: '/api/templates/:name/sync',

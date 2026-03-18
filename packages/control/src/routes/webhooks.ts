@@ -14,6 +14,7 @@ const router = Router();
 // ── Tool definitions ─────────────────────────────────────────────────
 
 registerToolDef({
+  category: 'integrations',
   name: 'armada_webhooks_list',
   description: 'List all configured webhooks.',
   method: 'GET',
@@ -23,6 +24,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'integrations',
   name: 'armada_webhooks_create',
   description: 'Create a new webhook that receives POST notifications for armada events.',
   method: 'POST',
@@ -36,6 +38,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'integrations',
   name: 'armada_webhooks_update',
   description: 'Update a webhook configuration.',
   method: 'PUT',
@@ -51,6 +54,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'integrations',
   name: 'armada_webhooks_delete',
   description: 'Delete a webhook.',
   method: 'DELETE',
@@ -62,6 +66,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'integrations',
   name: 'armada_webhooks_test',
   description: 'Send a test payload to a webhook to verify it is reachable.',
   method: 'POST',
@@ -73,6 +78,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'integrations',
   name: 'armada_webhooks_events',
   description: 'List all available webhook event types, grouped by category.',
   method: 'GET',

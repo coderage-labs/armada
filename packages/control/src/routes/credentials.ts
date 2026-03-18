@@ -97,6 +97,7 @@ export function createCredentialRoutes(nodeManager: NodeManager): Router {
   // ── Tool definitions ──────────────────────────────────────────────
 
   registerToolDef({
+  category: 'integrations',
     name: 'armada_agent_credentials_sync',
     description: 'Trigger git credential sync for a agent. Pushes VCS tokens from integrations to the agent container.',
     method: 'POST',

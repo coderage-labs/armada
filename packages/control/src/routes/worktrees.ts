@@ -15,6 +15,7 @@ const router = Router();
 // ── Tool definition ─────────────────────────────────────────────────
 
 registerToolDef({
+  category: 'git',
   name: 'armada_worktrees',
   description: 'List active Git worktrees created for workflow step isolation. Shows step ID, branch, path, and creation time.',
   method: 'GET',

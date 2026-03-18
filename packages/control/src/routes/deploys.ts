@@ -5,6 +5,7 @@ import { registerToolDef } from '../utils/tool-registry.js';
 const router = Router();
 
 registerToolDef({
+  category: 'admin',
   name: 'armada_deploys',
   description: 'List recent deployment history for agents.',
   method: 'GET', path: '/api/deploys',

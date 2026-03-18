@@ -512,6 +512,13 @@ export interface WorkflowStep {
    * operate on the same repository.
    */
   isolateGit?: boolean;
+  /**
+   * Restrict tool loading to these categories for this step.
+   * When set, the agent plugin only loads tools from the specified categories
+   * instead of all available tools. Reduces context window usage.
+   * E.g. ['git', 'issues'] loads only git and issue-tracking tools.
+   */
+  toolCategories?: string[];
 }
 
 export interface Workflow {

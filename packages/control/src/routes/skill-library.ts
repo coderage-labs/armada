@@ -7,6 +7,7 @@ import { logActivity } from '../services/activity-service.js';
 // ── Tool definitions ────────────────────────────────────────────────
 
 registerToolDef({
+  category: 'plugins',
   name: 'armada_skill_library_list',
   description: 'List all skills in the armada skill library.',
   method: 'GET', path: '/api/skills/library',
@@ -14,6 +15,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'plugins',
   name: 'armada_skill_library_get',
   description: 'Get a single skill from the library by ID or name.',
   method: 'GET', path: '/api/skills/library/:id',
@@ -23,6 +25,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'plugins',
   name: 'armada_skill_library_add',
   description: 'Add a skill to the armada skill library.',
   method: 'POST', path: '/api/skills/library',
@@ -37,6 +40,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'plugins',
   name: 'armada_skill_library_update',
   description: 'Update a skill in the armada skill library.',
   method: 'PUT', path: '/api/skills/library/:id',
@@ -52,6 +56,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'plugins',
   name: 'armada_skill_library_delete',
   description: 'Remove a skill from the armada skill library.',
   method: 'DELETE', path: '/api/skills/library/:id',
@@ -62,6 +67,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'plugins',
   name: 'armada_skill_library_usage',
   description: 'Get which templates use a library skill.',
   method: 'GET', path: '/api/skills/library/:id/usage',
@@ -71,6 +77,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'plugins',
   name: 'armada_skill_library_pull',
   description: 'Pull the latest version of a library skill.',
   method: 'POST', path: '/api/skills/library/:id/update',

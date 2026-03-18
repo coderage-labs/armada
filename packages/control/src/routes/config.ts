@@ -3,6 +3,7 @@ import { configDiffService } from '../services/config-diff.js';
 import { registerToolDef } from '../utils/tool-registry.js';
 
 registerToolDef({
+  category: 'system',
   name: 'armada_config_status',
   description: 'Get the current config version, stale instances, and pending restarts.',
   method: 'GET', path: '/api/config/status', parameters: [],
@@ -10,6 +11,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'system',
   name: 'armada_config_snapshot',
   description: 'Take a snapshot of the current config state (providers, models, plugins, template models).',
   method: 'GET', path: '/api/config/snapshot', parameters: [],

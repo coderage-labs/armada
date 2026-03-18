@@ -12,6 +12,7 @@ import { nodeRemovalService } from '../services/node-removal.js';
 
 
 registerToolDef({
+  category: 'admin',
   name: 'armada_nodes',
   description: 'List all armada nodes (Docker hosts). Shows node name, URL, status, and agent count.',
   method: 'GET', path: '/api/nodes',
@@ -20,6 +21,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'admin',
   name: 'armada_node_get',
   description: 'Get details of a specific armada node.',
   method: 'GET', path: '/api/nodes/:id',
@@ -30,6 +32,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'admin',
   name: 'armada_node_create',
   description: 'Register a new armada node (Docker host). Nodes connect via WebSocket using an install token.',
   method: 'POST', path: '/api/nodes',
@@ -40,6 +43,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'admin',
   name: 'armada_node_update',
   description: 'Update an existing armada node.',
   method: 'PUT', path: '/api/nodes/:id',
@@ -51,6 +55,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'admin',
   name: 'armada_node_delete',
   description: 'Remove a armada node. Fails if agents are still running on it.',
   method: 'DELETE', path: '/api/nodes/:id',
@@ -61,6 +66,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'admin',
   name: 'armada_node_test',
   description: 'Test connectivity to a armada node.',
   method: 'POST', path: '/api/nodes/:id/test',
@@ -71,6 +77,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'admin',
   name: 'armada_node_stats',
   description: 'Get resource stats (CPU, memory, disk) from a armada node.',
   method: 'GET', path: '/api/nodes/:id/stats',
@@ -81,6 +88,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'admin',
   name: 'armada_node_capacity',
   description: 'Get capacity overview for a armada node — total resources, used, available, and per-agent breakdown.',
   method: 'GET', path: '/api/nodes/:id/capacity',

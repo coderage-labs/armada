@@ -4,6 +4,7 @@ import { registerToolDef } from '../utils/tool-registry.js';
 import type { NodeManager } from '../node-manager.js';
 
 registerToolDef({
+  category: 'tools',
   name: 'armada_tools_ensure',
   description: 'Ensure binary tools are installed on a node for agents. Uses eget to download from GitHub releases.',
   method: 'POST',
@@ -15,6 +16,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'tools',
   name: 'armada_tools_list',
   description: 'List binary tools installed on the node agent.',
   method: 'GET',
@@ -23,6 +25,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'tools',
   name: 'armada_tools_update',
   description: 'Force re-download the latest version of a specific tool on the node.',
   method: 'POST',

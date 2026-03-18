@@ -7,6 +7,7 @@ import { mutationService } from '../services/mutation-service.js';
 // ── Tool definitions ────────────────────────────────────────────────
 
 registerToolDef({
+  category: 'plugins',
   name: 'armada_plugin_library_list',
   description: 'List all plugins in the plugin library.',
   method: 'GET', path: '/api/plugins/library',
@@ -14,6 +15,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'plugins',
   name: 'armada_plugin_library_get',
   description: 'Get a single plugin from the library by ID or name.',
   method: 'GET', path: '/api/plugins/library/:id',
@@ -23,6 +25,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'plugins',
   name: 'armada_plugin_library_add',
   description: 'Add a plugin to the plugin library.',
   method: 'POST', path: '/api/plugins/library',
@@ -37,6 +40,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'plugins',
   name: 'armada_plugin_library_update',
   description: 'Update a plugin in the plugin library.',
   method: 'PUT', path: '/api/plugins/library/:id',
@@ -52,6 +56,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'plugins',
   name: 'armada_plugin_library_delete',
   description: 'Remove a plugin from the plugin library.',
   method: 'DELETE', path: '/api/plugins/library/:id',
@@ -62,6 +67,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'plugins',
   name: 'armada_plugin_library_usage',
   description: 'Get which templates use a library plugin.',
   method: 'GET', path: '/api/plugins/library/:id/usage',
@@ -71,6 +77,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'plugins',
   name: 'armada_plugin_library_pull',
   description: 'Pull the latest version of a library plugin.',
   method: 'POST', path: '/api/plugins/library/:id/update',
@@ -81,6 +88,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'plugins',
   name: 'armada_plugin_library_rollout',
   description: 'Update a plugin and rolling-restart all affected agents. Rolls back on failure.',
   method: 'POST', path: '/api/plugins/library/batch-rollout',

@@ -18,6 +18,7 @@ const pkgPath = resolve(__dirname, '..', '..', '..', '..', 'package.json');
 const armadaVersion: string = JSON.parse(readFileSync(pkgPath, 'utf-8')).version;
 
 registerToolDef({
+  category: 'system',
   name: 'armada_health',
   description: 'Quick health check — agent count and uptime.',
   method: 'GET', path: '/api/health',
@@ -25,6 +26,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'system',
   name: 'armada_system_status',
   description: 'Full armada system status — agent counts, node health, resource usage (CPU, memory, disk).',
   method: 'GET', path: '/api/status',

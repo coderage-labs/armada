@@ -15,6 +15,7 @@ import type { TelegramNotification } from '../services/user-notifier.js';
 // ── Tool definitions ────────────────────────────────────────────────
 
 registerToolDef({
+  category: 'workflows',
   name: 'armada_workflows_list',
   description: 'List all workflows. Optional projectId filter.',
   method: 'GET', path: '/api/workflows',
@@ -23,6 +24,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'workflows',
   name: 'armada_workflow_get',
   description: 'Get a workflow by ID. Returns steps, projectIds, enabled status.',
   method: 'GET', path: '/api/workflows/:id',
@@ -31,6 +33,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'workflows',
   name: 'armada_workflow_create',
   description: 'Create a new workflow with steps and project assignments.',
   method: 'POST', path: '/api/workflows',
@@ -44,6 +47,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'workflows',
   name: 'armada_workflow_update',
   description: 'Update a workflow (name, description, steps, enabled, projectIds).',
   method: 'PUT', path: '/api/workflows/:id',
@@ -59,6 +63,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'workflows',
   name: 'armada_workflow_delete',
   description: 'Delete a workflow.',
   method: 'DELETE', path: '/api/workflows/:id',
@@ -67,6 +72,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'workflows',
   name: 'armada_workflow_run',
   description: 'Start a workflow run. Dispatches steps to agents by role.',
   method: 'POST', path: '/api/workflows/:id/run',
@@ -80,6 +86,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'workflows',
   name: 'armada_workflow_runs',
   description: 'List recent runs for a workflow.',
   method: 'GET', path: '/api/workflows/:id/runs',
@@ -91,6 +98,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'workflows',
   name: 'armada_workflow_run_get',
   description: 'Get details of a workflow run including step outputs and context.',
   method: 'GET', path: '/api/workflows/runs/:runId',
@@ -99,6 +107,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'workflows',
   name: 'armada_workflow_run_steps',
   description: 'Get step runs for a workflow run.',
   method: 'GET', path: '/api/workflows/runs/:runId/steps',
@@ -107,6 +116,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'workflows',
   name: 'armada_workflow_run_approve',
   description: 'Approve a manual gate step to continue the workflow.',
   method: 'POST', path: '/api/workflows/runs/:runId/approve/:stepId',
@@ -118,6 +128,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'workflows',
   name: 'armada_workflow_run_reject',
   description: 'Reject a manual gate step. Fails the run if the gate is required, skips downstream if optional.',
   method: 'POST', path: '/api/workflows/runs/:runId/reject/:stepId',
@@ -130,6 +141,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'workflows',
   name: 'armada_workflow_run_retry',
   description: 'Retry a workflow step with optional feedback. Cascades reset to downstream steps.',
   method: 'POST', path: '/api/workflows/runs/:runId/retry/:stepId',
@@ -142,6 +154,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'workflows',
   name: 'armada_workflow_run_cancel',
   description: 'Cancel a workflow run.',
   method: 'POST', path: '/api/workflows/runs/:runId/cancel',
@@ -150,6 +163,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'workflows',
   name: 'armada_workflow_run_context',
   description: 'Get the full workflow context for a run — all steps, their outputs, agents, and rework history. Agents use this to inspect the workflow state.',
   method: 'GET', path: '/api/workflows/runs/:runId/context',
@@ -158,6 +172,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'workflows',
   name: 'armada_workflow_run_rework',
   description: 'Request rework on a previously completed step. The requesting step is paused, the target step is reset and re-dispatched with feedback.',
   method: 'POST', path: '/api/workflows/runs/:runId/rework',
@@ -171,6 +186,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'workflows',
   name: 'armada_workflow_runs_active',
   description: 'Get all active (running/paused) workflow runs with step data.',
   method: 'GET', path: '/api/workflows/runs/active',
@@ -179,6 +195,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'workflows',
   name: 'armada_workflow_runs_recent',
   description: 'Get completed/failed/cancelled workflow runs from the last 24 hours.',
   method: 'GET', path: '/api/workflows/runs/recent',

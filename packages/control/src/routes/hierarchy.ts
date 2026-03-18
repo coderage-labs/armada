@@ -8,6 +8,7 @@ import { logActivity } from '../services/activity-service.js';
 const router = Router();
 
 registerToolDef({
+  category: 'hierarchy',
   name: 'armada_hierarchy',
   description: 'Get the task routing rules. Shows which roles can assign tasks to which other roles.',
   method: 'GET', path: '/api/hierarchy',
@@ -15,6 +16,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'hierarchy',
   name: 'armada_hierarchy_update',
   description: 'Update the task routing rules. Each role maps to an array of roles it can assign tasks to.',
   method: 'PUT', path: '/api/hierarchy',
@@ -23,6 +25,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'hierarchy',
   name: 'armada_hierarchy_role_upsert',
   description: 'Create or update role metadata (colour, description, tier, icon).',
   method: 'PUT', path: '/api/hierarchy/roles/:role',
@@ -37,6 +40,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'hierarchy',
   name: 'armada_hierarchy_role_delete',
   description: 'Delete role metadata.',
   method: 'DELETE', path: '/api/hierarchy/roles/:role',

@@ -10,6 +10,7 @@ import { logActivity } from '../services/activity-service.js';
 const router = Router();
 
 registerToolDef({
+  category: 'plugins',
   name: 'armada_plugins',
   description: 'List all plugins available in the armada shared plugins directory.',
   method: 'GET', path: '/api/plugins',
@@ -17,6 +18,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'plugins',
   name: 'armada_plugin_update',
   description: 'Update a specific plugin in the armada shared plugins directory.',
   method: 'POST', path: '/api/plugins/:id/update',
@@ -27,6 +29,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'plugins',
   name: 'armada_plugins_update_all',
   description: 'Update all plugins in the armada shared plugins directory.',
   method: 'POST', path: '/api/plugins/update-all',

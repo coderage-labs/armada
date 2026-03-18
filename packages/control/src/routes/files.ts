@@ -122,6 +122,7 @@ router.get('/list/:agent', async (req, res) => {
 // ── Tool definitions ─────────────────────────────────────────────────
 
 registerToolDef({
+  category: 'git',
   name: 'armada_transfer',
   description: 'Transfer a file from one agent\'s workspace to another. The file is copied via the node agent — works across machines.',
   method: 'POST',
@@ -136,6 +137,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'git',
   name: 'armada_share',
   description: 'Share a file from an agent\'s workspace. Returns a ref that can be used to download or deliver the file.',
   method: 'POST',

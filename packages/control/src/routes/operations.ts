@@ -90,6 +90,7 @@ router.get('/:id/stream', (req, res) => {
 // ── Tool definitions ─────────────────────────────────────────────────
 
 registerToolDef({
+  category: 'tasks',
   name: 'armada_operations_list',
   description: 'List armada operations with optional status filter',
   method: 'GET',
@@ -101,6 +102,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'tasks',
   name: 'armada_operation_get',
   description: 'Get details of a specific armada operation',
   method: 'GET',

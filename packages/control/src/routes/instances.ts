@@ -19,6 +19,7 @@ import { setupSSE } from '../utils/sse.js';
 // ── Tool definitions ────────────────────────────────────────────────
 
 registerToolDef({
+  category: 'instances',
   name: 'armada_instance_list',
   description: 'List all armada instances. Shows instance name, node, status, and agent count.',
   method: 'GET', path: '/api/instances',
@@ -27,6 +28,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'instances',
   name: 'armada_instance_get',
   description: 'Get details of a specific armada instance.',
   method: 'GET', path: '/api/instances/:id',
@@ -37,6 +39,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'instances',
   name: 'armada_instance_create',
   description: 'Create a new armada instance.',
   method: 'POST', path: '/api/instances',
@@ -54,6 +57,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'instances',
   name: 'armada_instance_update',
   description: 'Update an existing armada instance.',
   method: 'PUT', path: '/api/instances/:id',
@@ -71,6 +75,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'instances',
   name: 'armada_instance_destroy',
   description: 'Destroy a armada instance. Fails if agents are still assigned unless force=true.',
   method: 'DELETE', path: '/api/instances/:id',
@@ -81,6 +86,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'instances',
   name: 'armada_instance_health',
   description: 'Check health of a instance by pinging its gateway URL.',
   method: 'GET', path: '/api/instances/:id/health',
@@ -91,6 +97,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'instances',
   name: 'armada_logs',
   description: 'Tail logs from an agent instance. Returns recent log lines.',
   method: 'GET',
@@ -105,6 +112,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'instances',
   name: 'armada_logs_stream',
   description: 'Stream live logs from an agent instance via SSE.',
   method: 'GET',
@@ -119,6 +127,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'instances',
   name: 'armada_instance_events',
   description: 'Stream real-time events from an agent instance via SSE. Events include session activity, tool calls, agent status changes, and heartbeats.',
   method: 'GET',

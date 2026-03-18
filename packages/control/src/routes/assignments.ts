@@ -26,6 +26,7 @@ const router = Router({ mergeParams: true });
 // ── Tool definitions ─────────────────────────────────────────────────
 
 registerToolDef({
+  category: 'projects',
   name: 'armada_project_assignments_list',
   description: 'List all responsibility assignments for a project (triager, approver, owner).',
   method: 'GET',
@@ -37,6 +38,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'projects',
   name: 'armada_project_assignment_set',
   description: 'Set a responsibility assignment for a project. Assignment types: triager, approver, owner. Assignee types: user, agent, role.',
   method: 'PUT',
@@ -51,6 +53,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'projects',
   name: 'armada_project_assignment_remove',
   description: 'Remove a responsibility assignment from a project.',
   method: 'DELETE',
@@ -63,6 +66,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'projects',
   name: 'armada_project_assignment_resolve',
   description: 'Resolve the effective assignee for a triager or approver slot, following the full priority chain.',
   method: 'GET',

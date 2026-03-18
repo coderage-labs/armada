@@ -83,7 +83,12 @@ async function start() {
       if (agent?.role) {
         const allowedScopes = getScopesForAgentRole(agent.role);
         if (!allowedScopes.includes('*')) {
-          const filtered = allTools.filter(t => !t.scope || allowedScopes.includes(t.scope));
+          let filtered = allTools.filter(t => !t.scope || allowedScopes.includes(t.scope));
+          // Apply category filter after scope filter
+          const categories = (req.query.categories as string)?.split(',').filter(Boolean);
+          if (categories?.length) {
+            filtered = filtered.filter(t => t.category && categories.includes(t.category));
+          }
           return res.json(filtered);
         }
       }
@@ -95,12 +100,25 @@ async function start() {
     // No scopes = return all (backward compat: unauthenticated or operator without scope restriction)
     // Wildcard = return all
     if (callerScopes.length === 0 || callerScopes.includes('*')) {
-      return res.json(allTools);
+      let result = allTools;
+      // Apply category filter if requested
+      const categories = (req.query.categories as string)?.split(',').filter(Boolean);
+      if (categories?.length) {
+        result = result.filter(t => t.category && categories.includes(t.category));
+      }
+      return res.json(result);
     }
     
     // Filter tools to only those the caller has scope for
     // Tools without a scope field are accessible to everyone
-    const filtered = allTools.filter(t => !t.scope || callerScopes.includes(t.scope));
+    let filtered = allTools.filter(t => !t.scope || callerScopes.includes(t.scope));
+
+    // Apply category filter after scope filter
+    const categories = (req.query.categories as string)?.split(',').filter(Boolean);
+    if (categories?.length) {
+      filtered = filtered.filter(t => t.category && categories.includes(t.category));
+    }
+
     res.json(filtered);
   });
 

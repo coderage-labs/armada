@@ -6,6 +6,7 @@ import { registerToolDef } from '../utils/tool-registry.js';
 import type { NodeManager } from '../node-manager.js';
 
 registerToolDef({
+  category: 'plugins',
   name: 'armada_skills',
   description: 'List all available skills across armada nodes.',
   method: 'GET', path: '/api/skills',
@@ -13,6 +14,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'plugins',
   name: 'armada_agent_skills',
   description: 'List skills installed on a specific agent.',
   method: 'GET', path: '/api/agents/:name/skills',
@@ -22,6 +24,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'plugins',
   name: 'armada_agent_skill_install',
   description: 'Install a skill on a specific agent.',
   method: 'POST', path: '/api/agents/:name/skills',
@@ -33,6 +36,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'plugins',
   name: 'armada_agent_skill_remove',
   description: 'Remove a skill from a specific agent.',
   method: 'DELETE', path: '/api/agents/:name/skills/:skill',
@@ -44,6 +48,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'plugins',
   name: 'armada_agent_skills_sync',
   description: 'Sync an agent\'s installed skills with its template. Installs missing, optionally removes extras.',
   method: 'POST', path: '/api/agents/:name/skills/sync',
@@ -54,6 +59,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'plugins',
   name: 'armada_skill_install',
   description: 'Install a skill to the shared library on a node.',
   method: 'POST', path: '/api/skills/install',
@@ -64,6 +70,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'plugins',
   name: 'armada_skill_update',
   description: 'Update a skill in the shared library.',
   method: 'POST', path: '/api/skills/update',

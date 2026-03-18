@@ -4,6 +4,7 @@ import { Router } from 'express';
 import { registerToolDef } from '../utils/tool-registry.js';
 
 registerToolDef({
+  category: 'admin',
   name: 'armada_badges',
   description: 'Get badge counts for nav items (pending gates, active operations, error instances).',
   method: 'GET', path: '/api/badges', parameters: [],

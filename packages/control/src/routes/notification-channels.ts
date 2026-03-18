@@ -8,6 +8,7 @@ import { registerToolDef } from '../utils/tool-registry.js';
 // ── Tool definitions ─────────────────────────────────────────────────
 
 registerToolDef({
+  category: 'notifications',
   name: 'armada_notification_channels_list',
   description: 'List all configured notification channels.',
   method: 'GET',
@@ -16,6 +17,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'notifications',
   name: 'armada_notification_channels_create',
   description: 'Create a new notification channel (telegram, slack, discord, email).',
   method: 'POST',
@@ -30,6 +32,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'notifications',
   name: 'armada_notification_channels_update',
   description: 'Update a notification channel.',
   method: 'PUT',
@@ -44,6 +47,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'notifications',
   name: 'armada_notification_channels_delete',
   description: 'Delete a notification channel.',
   method: 'DELETE',
@@ -55,6 +59,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'notifications',
   name: 'armada_notification_channels_test',
   description: 'Send a test message to a notification channel.',
   method: 'POST',

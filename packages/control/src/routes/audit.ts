@@ -4,6 +4,7 @@ import { queryAudit } from '../services/audit.js';
 import { registerToolDef } from '../utils/tool-registry.js';
 
 registerToolDef({
+  category: 'admin',
   name: 'armada_audit_list',
   description: 'Query the audit log. Returns recent audit entries with optional filters.',
   method: 'GET',

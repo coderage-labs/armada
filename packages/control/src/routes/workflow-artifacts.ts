@@ -19,6 +19,7 @@ import { registerToolDef } from '../utils/tool-registry.js';
 // ── Tool definitions ────────────────────────────────────────────────
 
 registerToolDef({
+  category: 'workflows',
   name: 'armada_artifact_upload',
   description: 'Upload a file as a workflow artifact. Other steps can download it later. Use this to share code files, configs, reports between workflow steps. Content must be base64-encoded.',
   method: 'POST',
@@ -34,6 +35,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'workflows',
   name: 'armada_artifact_list',
   description: 'List all artifacts for a workflow run. Shows files uploaded by all completed steps.',
   method: 'GET',
@@ -46,6 +48,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'workflows',
   name: 'armada_artifact_download',
   description: 'Download a workflow artifact by ID. Returns the file content.',
   method: 'GET',

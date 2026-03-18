@@ -605,6 +605,7 @@ router.delete('/:id/comments/:commentId', requireScope('tasks:write'), (req, res
 // ── Tool definitions ─────────────────────────────────────────────────
 
 registerToolDef({
+  category: 'tasks',
   name: 'armada_tasks_list',
   description: 'List recent armada tasks with optional filtering by agent or status',
   method: 'GET',
@@ -618,6 +619,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'tasks',
   name: 'armada_task_detail',
   description: 'Get details of a specific armada task',
   method: 'GET',
@@ -629,6 +631,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'tasks',
   name: 'armada_task_create',
   description: 'Record a new armada task',
   method: 'POST',
@@ -645,6 +648,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'tasks',
   name: 'armada_task_update',
   description: 'Update a armada task status',
   method: 'PUT',
@@ -658,6 +662,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'tasks',
   name: 'armada_task_unblock',
   description: 'Unblock a blocked task, restoring it to pending or running',
   method: 'POST',
@@ -669,6 +674,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'tasks',
   name: 'armada_task_comments_list',
   description: 'List comments/annotations on a armada task',
   method: 'GET',
@@ -680,6 +686,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'tasks',
   name: 'armada_task_comment_add',
   description: 'Add a comment/annotation to a armada task',
   method: 'POST',
@@ -693,6 +700,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'tasks',
   name: 'armada_task_comment_delete',
   description: 'Delete a comment from a armada task',
   method: 'DELETE',
@@ -705,6 +713,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'tasks',
   name: 'armada_steer',
   description: 'Inject a message into an agent\'s active task. Use this to course-correct, provide additional info, or tell the agent to retry something mid-task.',
   method: 'POST',
@@ -717,6 +726,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'tasks',
   name: 'armada_task_send',
   description: 'Send a task to an agent via the control plane relay. Resolves agent to instance to node.',
   method: 'POST',
@@ -729,6 +739,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'tasks',
   name: 'armada_escalate',
   description: 'Escalate a task — horizontally to a peer agent with different skills, or vertically to a human operator for a decision.',
   method: 'POST',
@@ -745,6 +756,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'tasks',
   name: 'armada_escalation_resolve',
   description: 'Resolve a vertically escalated task. Approve to resume, reject to fail, or reassign to another agent.',
   method: 'POST',

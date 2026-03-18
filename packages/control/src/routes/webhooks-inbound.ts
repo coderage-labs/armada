@@ -19,6 +19,7 @@ import { eventBus } from '../infrastructure/event-bus.js';
 const mgmtRouter = Router();
 
 registerToolDef({
+  category: 'integrations',
   name: 'armada_inbound_webhooks_list',
   description: 'List all configured inbound webhooks.',
   method: 'GET',
@@ -27,6 +28,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'integrations',
   name: 'armada_inbound_webhooks_create',
   description: 'Create an inbound webhook that external services can POST to, triggering a workflow, task, or event.',
   method: 'POST',
@@ -41,6 +43,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'integrations',
   name: 'armada_inbound_webhooks_update',
   description: 'Update an inbound webhook configuration.',
   method: 'PUT',
@@ -57,6 +60,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'integrations',
   name: 'armada_inbound_webhooks_delete',
   description: 'Delete an inbound webhook.',
   method: 'DELETE',

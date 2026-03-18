@@ -78,6 +78,7 @@ router.get('/stream', (req, res) => {
 // ── Tool definitions ─────────────────────────────────────────────────
 
 registerToolDef({
+  category: 'tasks',
   name: 'armada_activity_list',
   description: 'List recent armada activity events with optional filtering by agent or event type',
   method: 'GET',

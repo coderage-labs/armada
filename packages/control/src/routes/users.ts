@@ -13,6 +13,7 @@ const router = Router();
 // ── Tool definitions ─────────────────────────────────────────────────
 
 registerToolDef({
+  category: 'admin',
   name: 'armada_users_list',
   description: 'List all users.',
   method: 'GET',
@@ -22,6 +23,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'admin',
   name: 'armada_user_get',
   description: 'Get a armada user by ID or name.',
   method: 'GET',
@@ -33,6 +35,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'admin',
   name: 'armada_user_create',
   description: 'Create a new armada user.',
   method: 'POST',
@@ -49,6 +52,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'admin',
   name: 'armada_user_update',
   description: 'Update a armada user.',
   method: 'PUT',
@@ -66,6 +70,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'admin',
   name: 'armada_user_delete',
   description: 'Delete a armada user.',
   method: 'DELETE',
@@ -200,6 +205,7 @@ router.get('/:id/projects', requireScope('users:read'), (req, res) => {
 // ── Avatar routes ────────────────────────────────────────────────────
 
 registerToolDef({
+  category: 'admin',
   name: 'armada_user_avatar_generate',
   description: 'Generate an AI avatar for a armada user.',
   method: 'POST', path: '/api/users/:id/avatar/generate',
@@ -208,6 +214,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'admin',
   name: 'armada_user_avatar_delete',
   description: 'Delete the avatar for a armada user.',
   method: 'DELETE', path: '/api/users/:id/avatar',

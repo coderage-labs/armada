@@ -3,6 +3,7 @@ import { requireScope } from '../middleware/scopes.js';
 import { registerToolDef } from '../utils/tool-registry.js';
 
 registerToolDef({
+  category: 'issues',
   name: 'armada_triage_dismiss',
   description: 'Dismiss a GitHub issue — mark it as triaged and optionally close it on GitHub with a wontfix label.',
   method: 'POST',
@@ -17,6 +18,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'issues',
   name: 'armada_triage_scan',
   description: 'Scan all projects for untriaged GitHub issues and dispatch triage to PM agents.',
   method: 'POST', path: '/api/triage/scan',
@@ -25,6 +27,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'issues',
   name: 'armada_triage_issue',
   description: 'Triage a specific GitHub issue. If project has a PM agent, it triages. Otherwise returns to operator.',
   method: 'POST', path: '/api/triage/issue',
@@ -36,6 +39,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'issues',
   name: 'armada_triage_mark',
   description: 'Mark an issue as triaged (when operator handles it manually).',
   method: 'POST', path: '/api/triage/mark',
@@ -47,6 +51,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'issues',
   name: 'armada_triage_dispatch',
   description: 'Triage a GitHub issue by selecting a workflow and launching it. Auto-populates issue details as template variables. Marks the issue as triaged.',
   method: 'POST',

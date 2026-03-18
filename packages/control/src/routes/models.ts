@@ -16,6 +16,7 @@ function parsePeriod(raw: unknown): UsagePeriod {
 const router = Router();
 
 registerToolDef({
+  category: 'system',
   name: 'armada_models_list',
   description: 'List all models in the armada model registry.',
   method: 'GET', path: '/api/models',
@@ -24,6 +25,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'system',
   name: 'armada_model_get',
   description: 'Get a single model from the registry by ID.',
   method: 'GET', path: '/api/models/:id',
@@ -34,6 +36,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'system',
   name: 'armada_model_create',
   description: 'Add a new model to the registry.',
   method: 'POST', path: '/api/models',
@@ -51,6 +54,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'system',
   name: 'armada_model_update',
   description: 'Update a model in the registry.',
   method: 'PUT', path: '/api/models/:id',
@@ -69,6 +73,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'system',
   name: 'armada_model_delete',
   description: 'Delete a model from the registry.',
   method: 'DELETE', path: '/api/models/:id',
