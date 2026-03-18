@@ -135,7 +135,7 @@ export async function triageIssue(
         : null;
       if (owner) {
         import('./user-notifier.js').then(({ deliverToUser }) => {
-          const message = `🔔 **Triage Required**\n\nIssue #${issue.number}: ${issue.title}\nProject: ${projectName}\n\nNo triager agent available. As project owner, please triage this issue manually.\n\nReason: ${reason}`;
+          const message = `🔔 <b>Triage Required</b>\n\nIssue #${issue.number}: ${issue.title}\nProject: ${projectName}\n\nNo triager agent available. As project owner, please triage this issue manually.\n\nReason: ${reason}`;
           deliverToUser(owner, message, { event: 'triage.owner_fallback', issueNumber: issue.number, issueTitle: issue.title, projectId, projectName, reason });
         }).catch((err: Error) => console.error('[triage] Failed to notify owner:', err.message));
       }
@@ -166,7 +166,7 @@ export async function triageIssue(
         : null;
       if (owner) {
         import('./user-notifier.js').then(({ deliverToUser }) => {
-          const message = `🔔 **Triage Required**\n\nIssue #${issue.number}: ${issue.title}\nProject: ${projectName}\n\nNo workflows configured. As project owner, please triage this issue manually.\n\nReason: ${reason}`;
+          const message = `🔔 <b>Triage Required</b>\n\nIssue #${issue.number}: ${issue.title}\nProject: ${projectName}\n\nNo workflows configured. As project owner, please triage this issue manually.\n\nReason: ${reason}`;
           deliverToUser(owner, message, { event: 'triage.owner_fallback', issueNumber: issue.number, issueTitle: issue.title, projectId, projectName, reason });
         }).catch((err: Error) => console.error('[triage] Failed to notify owner:', err.message));
       }
