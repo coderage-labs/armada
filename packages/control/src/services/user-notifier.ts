@@ -206,10 +206,11 @@ export async function notifyCompletion(opts: NotifyCompletionOptions): Promise<v
 export async function notifyTriageOperatorFallback(opts: NotifyTriageOperatorFallbackOptions): Promise<void> {
   const { issueNumber, issueTitle, projectId, projectName, reason, excludeUserIds } = opts;
 
-  // Get users assigned to project (or all users if none assigned)
+  // Get users assigned to project — only notify project members
   let users = userProjectsRepo.getUsersForProject(projectId);
   if (users.length === 0) {
-    users = usersRepo.getAll();
+    // No project members — fall back to system owners only
+    users = usersRepo.getAll().filter(u => u.role === 'owner');
   }
 
   // Notify users with operator or owner roles — triage fallback requires human action
