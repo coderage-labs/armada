@@ -14,7 +14,7 @@
 import { randomUUID } from 'node:crypto';
 import { getDrizzle } from '../db/drizzle.js';
 import { workflows as workflowsTable, workflowRuns, workflowStepRuns, workflowProjects } from '../db/drizzle-schema.js';
-import { eq, desc, sql, inArray } from 'drizzle-orm';
+import { eq, and, desc, sql, inArray } from 'drizzle-orm';
 import { dispatchWebhook } from './webhook-dispatcher.js';
 import { broadcast } from '../utils/event-bus.js';
 import { getArtifactContextBlock } from '../routes/workflow-artifacts.js';
