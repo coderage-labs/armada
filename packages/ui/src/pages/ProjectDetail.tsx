@@ -21,6 +21,7 @@ import {
   ResponsiveDialogFooter as DialogFooter,
 } from '../components/ui/responsive-dialog';
 import { PageHeader } from '../components/PageHeader';
+import ProjectAssignments from '../components/ProjectAssignments';
 import TriageModal, { type TriageIssue } from '../components/TriageModal';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -2136,6 +2137,9 @@ export default function ProjectDetail() {
               </span>
             )}
           </TabsTrigger>
+          <TabsTrigger value="assignments" className="flex items-center gap-2">
+            <Crown className="w-4 h-4" /> Assignments
+          </TabsTrigger>
           <TabsTrigger value="integrations" className="flex items-center gap-2">
             <Plug className="w-4 h-4" /> Integrations
           </TabsTrigger>
@@ -2168,6 +2172,9 @@ export default function ProjectDetail() {
         </TabsContent>
         <TabsContent value="members">
           <MembersTab projectId={project.id} users={members} />
+        </TabsContent>
+        <TabsContent value="assignments">
+          <ProjectAssignments projectId={project.id} />
         </TabsContent>
         <TabsContent value="integrations">
           <IntegrationsTab projectId={project.id} />
