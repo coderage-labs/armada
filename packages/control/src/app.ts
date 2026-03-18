@@ -82,6 +82,9 @@ export function createApp(opts: AppOptions): express.Express {
   // ── Public install script endpoint (no auth required) ────────────────
   app.use('/install', installScriptRoutes);
 
+  // ── Control plane install script + compose template (no auth required) ──
+  app.use('/api/install', installScriptRoutes);
+
   app.use('/api', authMiddleware);
 
   // ── Pending overlay — merge pending mutations into GET responses ──
