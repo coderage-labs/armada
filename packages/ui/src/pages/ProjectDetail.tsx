@@ -7,12 +7,19 @@ import { Checkbox } from '../components/ui/checkbox';
 import ConfirmDialog from '../components/ConfirmDialog';
 import {
   ArrowLeft, RefreshCw, GitPullRequest, Tag, Users, Clock,
-  Search, ChevronDown, ChevronRight, ExternalLink, Bot,
+  Search, ExternalLink, Bot,
   Workflow, Activity, Pencil, Zap, Loader2, AlertCircle,
   Hash, Circle, BarChart3, CheckCircle2, Timer, TrendingUp,
   Settings, Package, X, Plug, GitBranch, Plus, FolderKanban,
   Crown, User,
 } from 'lucide-react';
+import {
+  ResponsiveDialog as Dialog,
+  ResponsiveDialogContent as DialogContent,
+  ResponsiveDialogHeader as DialogHeader,
+  ResponsiveDialogTitle as DialogTitle,
+  ResponsiveDialogFooter as DialogFooter,
+} from '../components/ui/responsive-dialog';
 import { PageHeader } from '../components/PageHeader';
 import TriageModal, { type TriageIssue } from '../components/TriageModal';
 import { Button } from '../components/ui/button';
@@ -181,109 +188,272 @@ function truncate(s: string, max: number) {
   return s.length > max ? s.slice(0, max) + '…' : s;
 }
 
-/* ── Issue Row ─────────────────────────────────────── */
+/* ── Issue Detail Modal ────────────────────────────── */
 
-function IssueRow({
+function IssueDetailModal({
   issue,
-  expanded,
-  onToggle,
+  onClose,
   onTriage,
-  triaging,
 }: {
-  issue: GitHubIssue;
-  expanded: boolean;
-  onToggle: () => void;
-  onTriage: () => void;
-  triaging: boolean;
+  issue: GitHubIssue | null;
+  onClose: () => void;
+  onTriage: (issue: GitHubIssue) => void;
 }) {
+  if (!issue) return null;
+
   return (
-    <div className="border-b border-zinc-800 last:border-0">
-      <div
-        className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-900/50 transition-colors cursor-pointer group"
-        onClick={onToggle}
-      >
-        {/* Expand chevron */}
-        <Button variant="ghost" className="text-zinc-600 group-hover:text-zinc-400 transition-colors shrink-0">
-          {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-        </Button>
-
-        {/* Issue icon */}
-        <Circle className={`w-4 h-4 shrink-0 ${
-          issue.state === 'open' ? 'text-emerald-400' : 'text-zinc-500'
-        }`} />
-
-        {/* Number */}
-        <span className="text-xs text-zinc-500 font-mono shrink-0 w-12">
-          #{issue.number}
-        </span>
-
-        {/* Title */}
-        <span className="text-sm text-zinc-200 font-medium flex-1 truncate">
-          {issue.title}
-        </span>
+    <Dialog open={!!issue} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-start gap-2 text-base leading-snug pr-6">
+            <Circle className={`w-4 h-4 mt-0.5 shrink-0 ${issue.state === 'open' ? 'text-emerald-400' : 'text-zinc-500'}`} />
+            <span>
+              <span className="text-zinc-500 font-mono text-sm mr-1.5">#{issue.number}</span>
+              {issue.title}
+            </span>
+          </DialogTitle>
+          <div className="flex items-center gap-3 mt-1 text-xs text-zinc-500 flex-wrap">
+            {issue.author && <span>by {issue.author}</span>}
+            {issue.createdAt && (
+              <span>opened {formatDate(issue.createdAt)}</span>
+            )}
+            <a
+              href={issue.htmlUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-violet-400 hover:text-violet-300 transition-colors ml-auto"
+            >
+              View on GitHub <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
+        </DialogHeader>
 
         {/* Labels */}
-        <div className="hidden sm:flex items-center gap-1 shrink-0">
-          {issue.labels.slice(0, 3).map((label) => (
-            <span
-              key={label}
-              className={`text-[10px] px-1.5 py-0.5 rounded-full border ${labelStyle(label)}`}
-            >
-              {label}
-            </span>
-          ))}
-          {issue.labels.length > 3 && (
-            <span className="text-[10px] text-zinc-600">+{issue.labels.length - 3}</span>
-          )}
-        </div>
-
-        {/* Author & date */}
-        <span className="text-[11px] text-zinc-600 shrink-0 hidden md:block">
-          {issue.author && <span>{issue.author} · </span>}
-          {relativeTime(issue.createdAt || issue.updatedAt)}
-        </span>
-
-        {/* Actions */}
-        <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
-          <Button
-            variant="ghost" onClick={onTriage}
-            disabled={triaging}
-            className="opacity-0 group-hover:opacity-100 px-2 py-1 text-[10px] font-medium rounded-lg bg-violet-600/80 hover:bg-violet-500 text-white transition-all disabled:opacity-40"
-            title="Triage this issue"
-          >
-            {triaging ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Triage'}
-          </Button>
-          <a
-            href={issue.htmlUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-zinc-300 transition-all"
-            title="Open on GitHub"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-          </a>
-        </div>
-      </div>
-
-      {/* Expanded body */}
-      {expanded && issue.body && (
-        <div className="px-14 pb-4">
-          <div className="text-xs text-zinc-400 leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto rounded-lg bg-zinc-900/50 border border-zinc-800 p-3 font-mono">
-            {truncate(issue.body, 2000)}
-          </div>
-          {/* Mobile labels */}
-          <div className="flex flex-wrap gap-1 mt-2 sm:hidden">
+        {issue.labels.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 px-1">
             {issue.labels.map((label) => (
               <span
                 key={label}
-                className={`text-[10px] px-1.5 py-0.5 rounded-full border ${labelStyle(label)}`}
+                className={`text-[11px] px-2 py-0.5 rounded-full border font-medium ${labelStyle(label)}`}
               >
                 {label}
               </span>
             ))}
           </div>
+        )}
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto rounded-lg bg-zinc-950 border border-zinc-800 p-4 min-h-0">
+          {issue.body ? (
+            <IssueBodyRenderer body={issue.body} />
+          ) : (
+            <p className="text-sm text-zinc-600 italic">No description provided.</p>
+          )}
         </div>
-      )}
+
+        <DialogFooter>
+          <Button
+            variant="ghost"
+            onClick={onClose}
+            className="text-zinc-400 hover:text-zinc-200"
+          >
+            Close
+          </Button>
+          <Button
+            onClick={() => {
+              onClose();
+              onTriage(issue);
+            }}
+            className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-500 text-white font-medium"
+          >
+            <Zap className="w-4 h-4" />
+            Triage Issue
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Minimal inline markdown renderer for issue bodies — no external deps */
+function IssueBodyRenderer({ body }: { body: string }) {
+  const lines = body.split('\n');
+  const elements: React.ReactNode[] = [];
+  let i = 0;
+  let key = 0;
+
+  function inlineFormat(line: string): React.ReactNode {
+    const parts = line.split(/(`[^`]+`)/);
+    return parts.map((part, pi) => {
+      if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
+        return (
+          <code key={pi} className="px-1 py-0.5 rounded bg-zinc-800 text-violet-300 font-mono text-[11px]">
+            {part.slice(1, -1)}
+          </code>
+        );
+      }
+      const formatted = part
+        .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        .replace(/_(.+?)_/g, '<em>$1</em>');
+      if (formatted !== part) {
+        return <span key={pi} dangerouslySetInnerHTML={{ __html: formatted }} />;
+      }
+      return part;
+    });
+  }
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Fenced code blocks
+    if (line.startsWith('```')) {
+      const lang = line.slice(3).trim();
+      const codeLines: string[] = [];
+      i++;
+      while (i < lines.length && !lines[i].startsWith('```')) {
+        codeLines.push(lines[i]);
+        i++;
+      }
+      elements.push(
+        <pre key={key++} className="rounded-lg bg-zinc-900 border border-zinc-800 p-3 overflow-x-auto my-2">
+          <code className="text-xs text-zinc-300 font-mono">{codeLines.join('\n')}</code>
+        </pre>
+      );
+      i++;
+      continue;
+    }
+
+    // Headings
+    const headingMatch = line.match(/^(#{1,6})\s+(.*)/);
+    if (headingMatch) {
+      const level = headingMatch[1].length;
+      const cls = level === 1 ? 'text-base font-bold text-zinc-100 mt-3 mb-1' :
+                  level === 2 ? 'text-sm font-bold text-zinc-200 mt-2 mb-1' :
+                                'text-xs font-semibold text-zinc-300 mt-2 mb-0.5';
+      elements.push(<div key={key++} className={cls}>{inlineFormat(headingMatch[2])}</div>);
+      i++;
+      continue;
+    }
+
+    // HR
+    if (/^---+$/.test(line.trim()) || /^\*\*\*+$/.test(line.trim())) {
+      elements.push(<hr key={key++} className="border-zinc-800 my-2" />);
+      i++;
+      continue;
+    }
+
+    // List items
+    const listMatch = line.match(/^(\s*)[-*+]\s+(.*)/);
+    if (listMatch) {
+      const indent = listMatch[1].length;
+      elements.push(
+        <div key={key++} className="flex gap-2 text-sm text-zinc-300 leading-relaxed" style={{ paddingLeft: `${indent * 12}px` }}>
+          <span className="text-zinc-600 shrink-0">•</span>
+          <span>{inlineFormat(listMatch[2])}</span>
+        </div>
+      );
+      i++;
+      continue;
+    }
+
+    // Numbered list
+    const numListMatch = line.match(/^(\s*)\d+\.\s+(.*)/);
+    if (numListMatch) {
+      const numMatch = line.match(/^(\s*)(\d+)\.\s+(.*)/);
+      if (numMatch) {
+        elements.push(
+          <div key={key++} className="flex gap-2 text-sm text-zinc-300 leading-relaxed" style={{ paddingLeft: `${numMatch[1].length * 12}px` }}>
+            <span className="text-zinc-600 shrink-0">{numMatch[2]}.</span>
+            <span>{inlineFormat(numMatch[3])}</span>
+          </div>
+        );
+      }
+      i++;
+      continue;
+    }
+
+    // Blank line
+    if (line.trim() === '') {
+      elements.push(<div key={key++} className="h-2" />);
+      i++;
+      continue;
+    }
+
+    // Regular paragraph
+    elements.push(
+      <p key={key++} className="text-sm text-zinc-300 leading-relaxed">
+        {inlineFormat(line)}
+      </p>
+    );
+    i++;
+  }
+
+  return <div className="space-y-0.5">{elements}</div>;
+}
+
+/* ── Issue Row ─────────────────────────────────────── */
+
+function IssueRow({
+  issue,
+  onOpen,
+}: {
+  issue: GitHubIssue;
+  onOpen: () => void;
+}) {
+  return (
+    <div
+      className="flex items-center gap-3 px-4 py-3 border-b border-zinc-800 last:border-0 hover:bg-zinc-900/50 transition-colors cursor-pointer"
+      onClick={onOpen}
+    >
+      {/* Issue state icon */}
+      <Circle className={`w-4 h-4 shrink-0 ${
+        issue.state === 'open' ? 'text-emerald-400' : 'text-zinc-500'
+      }`} />
+
+      {/* Number */}
+      <span className="text-xs text-zinc-500 font-mono shrink-0 w-12">
+        #{issue.number}
+      </span>
+
+      {/* Title */}
+      <span className="text-sm text-zinc-200 font-medium flex-1 truncate">
+        {issue.title}
+      </span>
+
+      {/* Labels */}
+      <div className="hidden sm:flex items-center gap-1 shrink-0">
+        {issue.labels.slice(0, 3).map((label) => (
+          <span
+            key={label}
+            className={`text-[10px] px-1.5 py-0.5 rounded-full border ${labelStyle(label)}`}
+          >
+            {label}
+          </span>
+        ))}
+        {issue.labels.length > 3 && (
+          <span className="text-[10px] text-zinc-600">+{issue.labels.length - 3}</span>
+        )}
+      </div>
+
+      {/* Author & date */}
+      <span className="text-[11px] text-zinc-600 shrink-0 hidden md:block">
+        {issue.author && <span>{issue.author} · </span>}
+        {relativeTime(issue.createdAt || issue.updatedAt)}
+      </span>
+
+      {/* GitHub link — always visible, stops row click propagation */}
+      <a
+        href={issue.htmlUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="shrink-0 text-zinc-600 hover:text-zinc-300 transition-colors"
+        title="Open on GitHub"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <ExternalLink className="w-3.5 h-3.5" />
+      </a>
     </div>
   );
 }
@@ -307,7 +477,7 @@ function IssuesTab({
 }) {
   const [search, setSearch] = useState('');
   const [labelFilter, setLabelFilter] = useState<string | null>(null);
-  const [expandedIssue, setExpandedIssue] = useState<number | null>(null);
+  const [selectedIssue, setSelectedIssue] = useState<GitHubIssue | null>(null);
   const [triagingAll, setTriagingAll] = useState(false);
 
   // All unique labels
@@ -434,16 +604,21 @@ function IssuesTab({
             <IssueRow
               key={issue.number}
               issue={issue}
-              expanded={expandedIssue === issue.number}
-              onToggle={() =>
-                setExpandedIssue((prev) => (prev === issue.number ? null : issue.number))
-              }
-              onTriage={() => onTriageOne(issue)}
-              triaging={false}
+              onOpen={() => setSelectedIssue(issue)}
             />
           ))
         )}
       </div>
+
+      {/* Issue detail modal */}
+      <IssueDetailModal
+        issue={selectedIssue}
+        onClose={() => setSelectedIssue(null)}
+        onTriage={(issue) => {
+          setSelectedIssue(null);
+          onTriageOne(issue);
+        }}
+      />
 
     </div>
   );
