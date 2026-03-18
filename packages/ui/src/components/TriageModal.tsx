@@ -116,7 +116,7 @@ export default function TriageModal({
           if (wf.projectId) {
             return wf.projectId === projectId;
           }
-          return true; // no project restriction — show to all projects
+          return false; // only show workflows explicitly linked to this project
         });
         setWorkflows(enabled);
       })

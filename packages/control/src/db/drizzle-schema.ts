@@ -385,6 +385,7 @@ export const githubIssueCache = sqliteTable('github_issue_cache', {
   repo: text('repo').notNull(),
   issueNumber: integer('issue_number').notNull(),
   title: text('title'),
+  body: text('body'),
   state: text('state'),
   labelsJson: text('labels_json'),
   assigneesJson: text('assignees_json'),

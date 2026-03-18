@@ -415,6 +415,13 @@ const migrations: Migration[] = [
       'ALTER TABLE changesets ADD COLUMN requires_restart INTEGER NOT NULL DEFAULT 0',
     ],
   },
+  {
+    version: 35,
+    description: 'Add body column to github_issue_cache for triage modal',
+    sql: [
+      'ALTER TABLE github_issue_cache ADD COLUMN body TEXT',
+    ],
+  },
 ];
 
 /**

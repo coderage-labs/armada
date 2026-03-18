@@ -19,7 +19,7 @@ export function getCachedIssues(projectId: string): GitHubIssue[] {
   return rows.map(r => ({
     number: r.issueNumber,
     title: r.title || '',
-    body: '',
+    body: r.body || '',
     url: '',
     htmlUrl: '',
     labels: r.labelsJson ? JSON.parse(r.labelsJson) : [],
@@ -97,6 +97,7 @@ export async function syncProjectIssues(projectId: string): Promise<{ fetched: n
       repo: issue.repo || '',
       issueNumber: issue.number,
       title: issue.title,
+      body: issue.body || '',
       state: issue.state,
       labelsJson: JSON.stringify(issue.labels || []),
       assigneesJson: '[]',
@@ -107,6 +108,7 @@ export async function syncProjectIssues(projectId: string): Promise<{ fetched: n
       target: [githubIssueCache.projectId, githubIssueCache.repo, githubIssueCache.issueNumber],
       set: {
         title: sql`excluded.title`,
+        body: sql`excluded.body`,
         state: sql`excluded.state`,
         labelsJson: sql`excluded.labels_json`,
         assigneesJson: sql`excluded.assignees_json`,
