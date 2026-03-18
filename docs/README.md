@@ -74,6 +74,43 @@ The `armada-agent` plugin handles task execution, heartbeats, progress reporting
 
 ## Quick Start
 
+### Control Plane — One Command
+
+```bash
+docker run -d \
+  --name armada-control \
+  -p 3001:3001 \
+  -v armada-data:/data \
+  --restart unless-stopped \
+  ghcr.io/coderage-labs/armada:latest
+```
+
+That's it. Armada is now running at `http://<your-host>:3001`.
+
+- **`-v armada-data:/data`** — persists the SQLite database and encryption key across restarts/upgrades
+- **Port 3001** — the combined API and UI
+- **First visit** triggers the setup wizard (create your admin account)
+- **Node install** is separate — get the install command from the UI: Nodes → Add Node
+
+#### Or use the install script
+
+```bash
+curl -fsSL http://<your-host>:3001/api/install/control | bash
+```
+
+#### Or use Docker Compose
+
+Download a ready-to-use `docker-compose.yml` (includes optional Cloudflare Tunnel):
+
+```bash
+curl -fsSL http://<your-host>:3001/api/install/compose -o docker-compose.yml
+docker compose up -d
+```
+
+---
+
+### Development Setup
+
 ### Prerequisites
 
 - Node.js 20+
