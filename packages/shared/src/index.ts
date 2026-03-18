@@ -497,6 +497,12 @@ export interface WorkflowStep {
   loopBackToStep?: string;
   /** Maximum loop iterations (default 5) */
   maxLoopIterations?: number;
+  /**
+   * If true, an isolated Git worktree is created on the node before this step
+   * runs, and merged/cleaned up after. Prevents conflicts when parallel steps
+   * operate on the same repository.
+   */
+  isolateGit?: boolean;
 }
 
 export interface Workflow {

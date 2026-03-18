@@ -30,6 +30,7 @@ import { skillLibraryRoutes } from './routes/skill-library.js';
 import { pluginLibraryRoutes } from './routes/plugin-library.js';
 import fileRoutes from './routes/files.js';
 import workflowRoutes from './routes/workflows.js';
+import worktreeRoutes from './routes/worktrees.js';
 import triageRoutes from './routes/triage.js';
 import { createToolRoutes } from './routes/tools.js';
 import userRoutes from './routes/users.js';
@@ -115,6 +116,7 @@ export function createApp(opts: AppOptions): express.Express {
   app.use('/api/tools', createToolRoutes(nodeManager));
   app.use('/api/files', fileRoutes);
   app.use('/api/workflows', workflowRoutes);
+  app.use('/api/worktrees', worktreeRoutes);
   app.use('/api/triage', triageRoutes);
   app.use('/api/users', userRoutes);
   app.use('/api/models', modelRoutes);
