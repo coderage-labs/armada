@@ -1,12 +1,10 @@
 import { Router } from 'express';
-import { randomUUID } from 'node:crypto';
 import { requireScope } from '../middleware/scopes.js';
 import { integrationsRepo, maskAuthConfig } from '../services/integrations/integrations-repo.js';
 import { projectIntegrationsRepo } from '../services/integrations/project-integrations-repo.js';
 import { getProvider, listProviders } from '../services/integrations/registry.js';
 import { registerToolDef } from '../utils/tool-registry.js';
 import { logActivity } from '../services/activity-service.js';
-import { workingCopy } from '../services/working-copy.js';
 
 const router = Router();
 
@@ -217,8 +215,7 @@ router.post('/', requireScope('integrations:write'), (req, res, next) => {
     const parsedAuthConfig = typeof authConfig === 'string' ? JSON.parse(authConfig) : authConfig;
     const parsedCapabilities = typeof capabilities === 'string' ? JSON.parse(capabilities) : capabilities;
 
-    const id = randomUUID();
-    workingCopy.create('integration', id, {
+    const integration = integrationsRepo.create({
       name,
       provider,
       authType,
@@ -226,8 +223,8 @@ router.post('/', requireScope('integrations:write'), (req, res, next) => {
       capabilities: parsedCapabilities ?? [],
     });
 
-    logActivity({ eventType: 'integration.created', detail: `Integration "${name}" staged for creation (${provider})` });
-    res.status(201).json({ ok: true, action: 'create', message: 'Staged in working copy' });
+    logActivity({ eventType: 'integration.created', detail: `Integration "${name}" created (${provider})` });
+    res.status(201).json({ ...integration, authConfig: maskAuthConfig(integration.authConfig) });
   } catch (err) {
     next(err);
   }
@@ -252,9 +249,9 @@ router.put('/:id', requireScope('integrations:write'), (req, res, next) => {
       updateData.capabilities = typeof capabilities === 'string' ? JSON.parse(capabilities) : capabilities;
     }
 
-    workingCopy.update('integration', req.params.id, updateData);
-    logActivity({ eventType: 'integration.updated', detail: `Integration "${existing.name}" staged for update` });
-    res.json({ ok: true, action: 'update', message: 'Staged in working copy' });
+    const updated = integrationsRepo.update(req.params.id, updateData);
+    logActivity({ eventType: 'integration.updated', detail: `Integration "${existing.name}" updated` });
+    res.json({ ...updated, authConfig: maskAuthConfig(updated.authConfig) });
   } catch (err) {
     next(err);
   }
@@ -278,9 +275,9 @@ router.delete('/:id', requireScope('integrations:write'), (req, res) => {
     return;
   }
 
-  workingCopy.delete('integration', req.params.id);
-  logActivity({ eventType: 'integration.deleted', detail: `Integration "${integration.name}" staged for deletion` });
-  res.json({ ok: true, action: 'delete', message: 'Staged in working copy' });
+  integrationsRepo.delete(req.params.id);
+  logActivity({ eventType: 'integration.deleted', detail: `Integration "${integration.name}" deleted` });
+  res.status(204).end();
 });
 
 // POST /api/integrations/:id/test — test connection
