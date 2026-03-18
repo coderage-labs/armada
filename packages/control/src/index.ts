@@ -75,10 +75,10 @@ async function start() {
   app.get('/api/meta/tools', optionalAuthMiddleware, (req, res) => {
     const allTools = getToolDefs();
 
-    // Try to resolve agent role from X-Agent-Name header
-    const agentName = req.headers['x-agent-name'] as string | undefined;
+    // ?agent=<name> — resolve agent → role → scopes → filtered tools
+    // Plugin can call this per-agent once per-agent tool filtering is supported
+    const agentName = req.query.agent as string | undefined;
     if (agentName) {
-      // Look up agent → get role
       const agent = agentsRepo.getAll().find(a => a.name === agentName);
       if (agent?.role) {
         const allowedScopes = getScopesForAgentRole(agent.role);
