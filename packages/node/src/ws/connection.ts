@@ -288,35 +288,68 @@ function onUnexpectedResponse(
   res: import('http').IncomingMessage,
   nodeId: string | null,
 ): void {
-  console.warn(`[ws] Unexpected HTTP response: ${res.statusCode} ${res.statusMessage}`);
+  const statusCode = res.statusCode ?? 0;
+  console.warn(`[ws] Unexpected HTTP response during upgrade: ${statusCode} ${res.statusMessage}`);
 
-  // If we got a 403 and we were using session credentials, track it
-  if (res.statusCode === 403 && nodeId !== null) {
-    sessionAuthFailureCount++;
-    console.warn(`[ws] Session credential rejected (${sessionAuthFailureCount}/${MAX_SESSION_AUTH_FAILURES} failures)`);
+  // Consume response body to avoid memory leaks / hanging sockets
+  res.resume();
 
-    if (sessionAuthFailureCount >= MAX_SESSION_AUTH_FAILURES) {
-      console.warn(
-        `[ws] Max session auth failures reached — credentials may be stale (e.g., control DB wiped). ` +
-        `Falling back to install token mode.`
-      );
-
-      // Delete the stale credentials file to trigger fallback to install token
-      try {
-        if (existsSync(CREDENTIALS_PATH)) {
-          unlinkSync(CREDENTIALS_PATH);
-          console.log(`[ws] Deleted stale credentials file: ${CREDENTIALS_PATH}`);
-        }
-        // Reset counter so we don't immediately fall back again if install token also fails
-        sessionAuthFailureCount = 0;
-      } catch (err) {
-        console.error(`[ws] Failed to delete credentials file: ${err instanceof Error ? err.message : String(err)}`);
-      }
-    }
+  // Clean up ws reference — it never reached OPEN state
+  if (ws) {
+    ws.removeAllListeners();
+    ws.terminate();
+    ws = null;
   }
 
-  // Drain the response body to avoid hanging
-  res.resume();
+  // Handle auth errors (401 Unauthorized, 403 Forbidden)
+  if (statusCode === 401 || statusCode === 403) {
+    if (nodeId !== null) {
+      sessionAuthFailureCount++;
+      console.warn(`[ws] Session credential rejected (HTTP ${statusCode}) — failure ${sessionAuthFailureCount}/${MAX_SESSION_AUTH_FAILURES}`);
+
+      if (sessionAuthFailureCount >= MAX_SESSION_AUTH_FAILURES) {
+        console.warn(
+          `[ws] Max session auth failures reached — credentials may be stale (e.g., control DB wiped). ` +
+          `Falling back to install token mode.`
+        );
+
+        // Delete the stale credentials file to trigger fallback to install token
+        try {
+          if (existsSync(CREDENTIALS_PATH)) {
+            unlinkSync(CREDENTIALS_PATH);
+            console.log(`[ws] Deleted stale credentials file: ${CREDENTIALS_PATH}`);
+          }
+          // Reset counter so we don't immediately fall back again if install token also fails
+          sessionAuthFailureCount = 0;
+        } catch (err) {
+          console.error(`[ws] Failed to delete credentials file: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+    } else {
+      console.warn(`[ws] Install token rejected (HTTP ${statusCode}) — check ARMADA_NODE_TOKEN`);
+    }
+    // Still retry — credentials may rotate or the server may recover
+    scheduleReconnect();
+    return;
+  }
+
+  // 502/503/504 — gateway/proxy is temporarily unavailable (e.g. Cloudflare during deploy)
+  if (statusCode === 502 || statusCode === 503 || statusCode === 504) {
+    console.warn(`[ws] Reconnect got HTTP ${statusCode} — will retry`);
+    scheduleReconnect();
+    return;
+  }
+
+  // Any other 4xx/5xx — log and retry; the server may recover
+  if (statusCode >= 400) {
+    console.warn(`[ws] Reconnect got HTTP ${statusCode} — will retry`);
+    scheduleReconnect();
+    return;
+  }
+
+  // Unexpected 1xx/2xx/3xx during WS upgrade — shouldn't happen, but retry anyway
+  console.warn(`[ws] Unexpected HTTP ${statusCode} during WS upgrade — will retry`);
+  scheduleReconnect();
 }
 
 // ── Heartbeat ─────────────────────────────────────────────────────────────────
