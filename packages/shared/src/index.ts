@@ -232,13 +232,22 @@ export interface TaskPayload {
   metadata?: Record<string, unknown>;
 }
 
+export interface EscalationRequest {
+  taskId: string;
+  type: 'horizontal' | 'vertical';
+  reason: string;
+  targetAgent?: string;    // for horizontal escalation
+  priority?: 'normal' | 'urgent';
+  context?: Record<string, unknown>; // additional context for the handler
+}
+
 export interface MeshTask {
   id: string;
   fromAgent: string;
   toAgent: string;
   taskText: string;
   result: string | null;
-  status: 'pending' | 'running' | 'completed' | 'failed' | 'blocked';
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'blocked' | 'escalated' | 'awaiting_escalation';
   createdAt: string;
   completedAt: string | null;
   lastProgressAt?: string | null;

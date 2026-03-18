@@ -17,6 +17,8 @@ import { checkWorkflowStep } from '../services/workflow-dispatcher.js';
 import { taskManager } from '../services/task-manager.js';
 import { eventBus } from '../infrastructure/event-bus.js';
 import type { MeshTask, TaskComment, BoardColumn, TaskType, TaskPayload } from '@coderage-labs/armada-shared';
+import { usersRepo, userProjectsRepo } from '../repositories/index.js';
+import { deliverToUser } from '../services/user-notifier.js';
 
 // ── SSE event bus ────────────────────────────────────────────────────
 
@@ -413,6 +415,155 @@ router.delete('/:id', requireScope('tasks:write'), (req, res) => {
   res.status(204).send();
 });
 
+// POST /api/tasks/:id/escalate — escalate a task horizontally or vertically
+router.post('/:id/escalate', requireScope('tasks:write'), async (req, res) => {
+  const task = tasksRepo.getById(req.params.id);
+  if (!task) {
+    res.status(404).json({ error: 'Task not found' });
+    return;
+  }
+
+  const { type, reason, targetAgent, priority = 'normal', context } = req.body;
+  if (!type || !['horizontal', 'vertical'].includes(type)) {
+    res.status(400).json({ error: 'type must be "horizontal" or "vertical"' });
+    return;
+  }
+  if (!reason || typeof reason !== 'string') {
+    res.status(400).json({ error: 'reason is required' });
+    return;
+  }
+  if (type === 'horizontal' && !targetAgent) {
+    res.status(400).json({ error: 'targetAgent is required for horizontal escalation' });
+    return;
+  }
+
+  if (type === 'horizontal') {
+    // Reassign task to target agent, mark as escalated
+    const updated = tasksRepo.update(req.params.id, {
+      status: 'escalated',
+      toAgent: targetAgent,
+    });
+    if (!updated) {
+      res.status(404).json({ error: 'Task not found' });
+      return;
+    }
+
+    emitTaskEvent('task:updated', updated);
+    logActivity({
+      eventType: 'task.escalated',
+      agentName: task.toAgent,
+      detail: `Task escalated horizontally to ${targetAgent}: ${reason}`,
+      metadata: JSON.stringify({ type: 'horizontal', targetAgent, priority, context }),
+    });
+    logAudit(req, 'task.escalate', 'task', req.params.id, { type, targetAgent, reason });
+    res.json(updated);
+    return;
+  }
+
+  // Vertical escalation — pause and notify operators
+  const updated = tasksRepo.update(req.params.id, { status: 'awaiting_escalation' });
+  if (!updated) {
+    res.status(404).json({ error: 'Task not found' });
+    return;
+  }
+
+  emitTaskEvent('task:updated', updated);
+  logActivity({
+    eventType: 'task.escalated',
+    agentName: task.toAgent,
+    detail: `Task escalated vertically for human decision: ${reason}`,
+    metadata: JSON.stringify({ type: 'vertical', priority, context }),
+  });
+  logAudit(req, 'task.escalate', 'task', req.params.id, { type, reason, priority });
+
+  // Notify operator users
+  const projectId = task.projectId;
+  let operators = projectId
+    ? userProjectsRepo.getUsersForProject(projectId).filter(u => u.type === 'operator')
+    : usersRepo.getAll().filter(u => u.type === 'operator');
+
+  if (operators.length === 0) {
+    operators = usersRepo.getAll().filter(u => u.type === 'operator');
+  }
+
+  const notificationPayload = {
+    event: 'task.escalation',
+    taskId: req.params.id,
+    taskText: task.taskText,
+    fromAgent: task.fromAgent,
+    toAgent: task.toAgent,
+    reason,
+    priority,
+    context,
+  };
+  const priorityLabel = priority === 'urgent' ? '🚨 URGENT — ' : '';
+  const message =
+    `${priorityLabel}⬆️ <b>Task escalation requires human decision</b>\n\n` +
+    `<b>Task:</b> <code>${req.params.id}</code>\n` +
+    `<b>Agent:</b> ${task.toAgent}\n` +
+    `<b>Reason:</b> ${reason}`;
+
+  for (const user of operators) {
+    deliverToUser(user, message, notificationPayload).catch(() => {});
+  }
+
+  res.json(updated);
+});
+
+// POST /api/tasks/:id/escalation/resolve — resolve a vertical escalation
+router.post('/:id/escalation/resolve', requireScope('tasks:write'), (req, res) => {
+  const task = tasksRepo.getById(req.params.id);
+  if (!task) {
+    res.status(404).json({ error: 'Task not found' });
+    return;
+  }
+  if (task.status !== 'awaiting_escalation') {
+    res.status(400).json({ error: `Task is not awaiting escalation (status: ${task.status})` });
+    return;
+  }
+
+  const { action, feedback, targetAgent } = req.body;
+  if (!action || !['approve', 'reject', 'reassign'].includes(action)) {
+    res.status(400).json({ error: 'action must be "approve", "reject", or "reassign"' });
+    return;
+  }
+  if (action === 'reassign' && !targetAgent) {
+    res.status(400).json({ error: 'targetAgent is required for reassign action' });
+    return;
+  }
+
+  let newStatus: MeshTask['status'];
+  let updates: Partial<MeshTask> = {};
+
+  if (action === 'approve') {
+    newStatus = 'running';
+    updates = { status: newStatus };
+  } else if (action === 'reject') {
+    newStatus = 'failed';
+    updates = { status: newStatus, result: feedback || 'Escalation rejected by operator' };
+  } else {
+    // reassign
+    newStatus = 'escalated';
+    updates = { status: newStatus, toAgent: targetAgent };
+  }
+
+  const updated = tasksRepo.update(req.params.id, updates);
+  if (!updated) {
+    res.status(404).json({ error: 'Task not found' });
+    return;
+  }
+
+  emitTaskEvent('task:updated', updated);
+  logActivity({
+    eventType: 'task.escalation_resolved',
+    agentName: task.toAgent,
+    detail: `Escalation resolved: ${action}${feedback ? ` — ${feedback}` : ''}${targetAgent ? ` → ${targetAgent}` : ''}`,
+    metadata: JSON.stringify({ action, feedback, targetAgent }),
+  });
+  logAudit(req, 'task.escalation.resolve', 'task', req.params.id, { action, feedback, targetAgent });
+  res.json(updated);
+});
+
 // ── Comment routes ───────────────────────────────────────────────────
 
 // GET /api/tasks/:id/comments — list comments for a task
@@ -567,6 +718,36 @@ registerToolDef({
   parameters: [
     { name: 'target', type: 'string', description: 'Agent name to send the task to', required: true },
     { name: 'message', type: 'string', description: 'Task message/instructions', required: true },
+  ],
+  scope: 'tasks:write',
+});
+
+registerToolDef({
+  name: 'armada_escalate',
+  description: 'Escalate a task — horizontally to a peer agent with different skills, or vertically to a human operator for a decision.',
+  method: 'POST',
+  path: '/api/tasks/:id/escalate',
+  parameters: [
+    { name: 'id', type: 'string', description: 'Task ID to escalate', required: true },
+    { name: 'type', type: 'string', description: 'Escalation direction', enum: ['horizontal', 'vertical'], required: true },
+    { name: 'reason', type: 'string', description: 'Why the task is being escalated', required: true },
+    { name: 'targetAgent', type: 'string', description: 'Agent name to reassign to (required for horizontal escalation)' },
+    { name: 'priority', type: 'string', description: 'Escalation priority', enum: ['normal', 'urgent'] },
+    { name: 'context', type: 'string', description: 'Additional context for the handler as JSON object' },
+  ],
+  scope: 'tasks:write',
+});
+
+registerToolDef({
+  name: 'armada_escalation_resolve',
+  description: 'Resolve a vertically escalated task. Approve to resume, reject to fail, or reassign to another agent.',
+  method: 'POST',
+  path: '/api/tasks/:id/escalation/resolve',
+  parameters: [
+    { name: 'id', type: 'string', description: 'Task ID', required: true },
+    { name: 'action', type: 'string', description: 'Resolution action', enum: ['approve', 'reject', 'reassign'], required: true },
+    { name: 'feedback', type: 'string', description: 'Optional feedback or rejection reason' },
+    { name: 'targetAgent', type: 'string', description: 'Agent to reassign to (required for reassign action)' },
   ],
   scope: 'tasks:write',
 });
