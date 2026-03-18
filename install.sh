@@ -13,6 +13,22 @@ REGISTRY="ghcr.io/coderage-labs"
 ARMADA_NODE_TOKEN="__NODE_TOKEN__"
 CONTROL_URL="__CONTROL_URL__"
 
+# Detect host architecture
+ARCH=$(uname -m)
+case "$ARCH" in
+  x86_64|amd64)
+    PLATFORM="linux/amd64"
+    ;;
+  aarch64|arm64)
+    PLATFORM="linux/arm64"
+    ;;
+  *)
+    echo "❌ Unsupported architecture: $ARCH"
+    echo "   Armada supports linux/amd64 and linux/arm64."
+    exit 1
+    ;;
+esac
+
 # Parse arguments
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -40,9 +56,10 @@ fi
 
 echo "🚀 Armada Node Installer"
 echo "==========================="
-echo "Version: $ARMADA_VERSION"
-echo "Directory: $ARMADA_DIR"
-echo "Control: $CONTROL_URL"
+echo "Version:      $ARMADA_VERSION"
+echo "Architecture: $PLATFORM"
+echo "Directory:    $ARMADA_DIR"
+echo "Control:      $CONTROL_URL"
 echo ""
 
 # Create data directory for persistence

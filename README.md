@@ -81,6 +81,8 @@ graph TD
 
 ## Quick Start
 
+> **Supported platforms:** `linux/amd64` (x86-64) and `linux/arm64` (Apple Silicon, Raspberry Pi, AWS Graviton).
+
 ### Docker Compose
 
 ```bash
