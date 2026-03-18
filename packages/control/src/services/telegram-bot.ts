@@ -169,7 +169,7 @@ export async function initTelegramBot(): Promise<void> {
       );
     });
 
-    // Handle callback queries (approve/reject/retry buttons)
+    // Handle callback queries (approve/reject/retry buttons, triage actions)
     bot.on('callback_query:data', async (ctx) => {
       const data = ctx.callbackQuery.data;
       const telegramUserId = ctx.from?.id.toString();
@@ -181,12 +181,12 @@ export async function initTelegramBot(): Promise<void> {
 
       // Parse callback data
       const parts = data.split(':');
-      if (parts.length < 3 || parts[0] !== 'gate') {
+      const namespace = parts[0];
+
+      if (parts.length < 3 || (namespace !== 'gate' && namespace !== 'triage')) {
         await ctx.answerCallbackQuery({ text: 'Invalid callback data' });
         return;
       }
-
-      const action = parts[1];
 
       // Auth: verify the Telegram user ID matches a linked Armada user
       const users = usersRepo.getAll();
@@ -200,7 +200,68 @@ export async function initTelegramBot(): Promise<void> {
         return;
       }
 
+      const action = parts[1];
+
       try {
+        // ── Triage actions ──────────────────────────────────────────────────
+        if (namespace === 'triage') {
+          if (action === 'dispatch' && parts.length === 4) {
+            // triage:dispatch:<projectId>:<issueNumber>
+            const projectId = parts[2];
+            const issueNumber = parseInt(parts[3], 10);
+
+            await ctx.answerCallbackQuery({ text: '🔄 Dispatching workflow...' });
+
+            // Dynamic import to avoid circular dependency (triage → user-notifier → telegram-bot)
+            const { triageDispatch } = await import('./triage.js');
+            const { getWorkflowsForProject } = await import('./workflow-engine.js');
+            const workflows = getWorkflowsForProject(projectId).filter((w: any) => w.enabled);
+
+            if (workflows.length === 0) {
+              await ctx.answerCallbackQuery({ text: '❌ No enabled workflows found for this project' });
+              await ctx.reply('❌ No enabled workflows are configured for this project.');
+              return;
+            }
+
+            const firstWorkflow = workflows[0];
+            const result = await triageDispatch({
+              projectId,
+              issueNumber,
+              workflowId: firstWorkflow.id,
+            });
+
+            if (result.error) {
+              await ctx.reply(`❌ Dispatch failed: ${escapeHtml(result.error)}`, { parse_mode: 'HTML' });
+            } else {
+              const originalText = ctx.callbackQuery.message?.text ?? '';
+              await ctx.editMessageText(
+                `${originalText}\n\n🔄 Workflow <b>${escapeHtml(result.workflowName ?? firstWorkflow.name)}</b> dispatched by ${escapeHtml(user.displayName)}`,
+                { parse_mode: 'HTML', reply_markup: undefined },
+              );
+            }
+
+          } else if (action === 'mark' && parts.length === 4) {
+            // triage:mark:<projectId>:<issueNumber>
+            const projectId = parts[2];
+            const issueNumber = parseInt(parts[3], 10);
+
+            const { markIssueTriaged } = await import('./triage.js');
+            markIssueTriaged(projectId, issueNumber);
+
+            const originalText = ctx.callbackQuery.message?.text ?? '';
+            await ctx.editMessageText(
+              `${originalText}\n\n✅ Triaged by ${escapeHtml(user.displayName)}`,
+              { parse_mode: 'HTML', reply_markup: undefined },
+            );
+            await ctx.answerCallbackQuery({ text: '✅ Marked as triaged' });
+
+          } else {
+            await ctx.answerCallbackQuery({ text: 'Unknown triage action' });
+          }
+          return;
+        }
+
+        // ── Gate actions ────────────────────────────────────────────────────
         if (action === 'approve' && parts.length === 4) {
           const [, , runId, stepId] = parts;
           await approveGate(runId, stepId, user.displayName);
@@ -426,4 +487,34 @@ export async function sendPlainNotification(chatId: string, message: string): Pr
   }
 
   await bot.api.sendMessage(chatId, message, { parse_mode: 'HTML' });
+}
+
+/**
+ * Send a triage fallback notification with inline action buttons.
+ * Buttons allow the operator to dispatch a workflow or mark the issue triaged directly from Telegram.
+ */
+export async function sendTriageNotification(
+  chatId: string,
+  message: string,
+  projectId: string,
+  issueNumber: number,
+  issueUrl: string,
+): Promise<void> {
+  if (!bot) {
+    console.warn('[telegram-bot] Bot not initialized, cannot send triage notification');
+    return;
+  }
+
+  const keyboard = new InlineKeyboard()
+    .text('🔄 Run Workflow', `triage:dispatch:${projectId}:${issueNumber}`)
+    .text('✅ Mark Triaged', `triage:mark:${projectId}:${issueNumber}`);
+
+  if (issueUrl) {
+    keyboard.row().url('🔗 View Issue', issueUrl);
+  }
+
+  await bot.api.sendMessage(chatId, message, {
+    parse_mode: 'HTML',
+    reply_markup: keyboard,
+  });
 }
