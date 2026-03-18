@@ -55,6 +55,8 @@ export interface NotifyTriageOperatorFallbackOptions {
   projectId: string;
   projectName: string;
   reason: string;
+  /** User IDs to exclude (already notified, e.g. project owner) */
+  excludeUserIds?: string[];
 }
 
 // ── Quiet hours ─────────────────────────────────────────────────────
@@ -202,7 +204,7 @@ export async function notifyCompletion(opts: NotifyCompletionOptions): Promise<v
  * - Rate-limited: at most one notification per issue (caller responsibility via cooldown map)
  */
 export async function notifyTriageOperatorFallback(opts: NotifyTriageOperatorFallbackOptions): Promise<void> {
-  const { issueNumber, issueTitle, projectId, projectName, reason } = opts;
+  const { issueNumber, issueTitle, projectId, projectName, reason, excludeUserIds } = opts;
 
   // Get users assigned to project (or all users if none assigned)
   let users = userProjectsRepo.getUsersForProject(projectId);
@@ -211,7 +213,9 @@ export async function notifyTriageOperatorFallback(opts: NotifyTriageOperatorFal
   }
 
   // Notify users with operator or owner roles — triage fallback requires human action
-  const operators = users.filter(u => u.role === 'operator' || u.role === 'owner');
+  // Skip users already notified (e.g. project owner was notified separately)
+  const exclude = new Set(excludeUserIds ?? []);
+  const operators = users.filter(u => (u.role === 'operator' || u.role === 'owner') && !exclude.has(u.id));
 
   for (const user of operators) {
     try {

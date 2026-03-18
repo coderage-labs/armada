@@ -148,13 +148,16 @@ export async function triageIssue(
           }).catch((err: Error) => console.error('[triage] Failed to notify owner candidate:', err.message));
         }
       }
-      // Also notify operators
+      // Also notify operators (excluding already-notified owner)
+      const alreadyNotified: string[] = [];
+      if (owner) alreadyNotified.push(owner.id);
       notifyTriageOperatorFallback({
         issueNumber: issue.number,
         issueTitle: issue.title,
         projectId,
         projectName,
         reason,
+        excludeUserIds: alreadyNotified,
       }).catch((err: Error) => console.error('[triage] Failed to send operator fallback notification:', err.message));
     }
     return { triaged: false, by: 'operator' };
