@@ -203,23 +203,35 @@ export async function initTelegramBot(): Promise<void> {
       const action = parts[1];
 
       try {
-        // ── Triage actions ──────────────────────────────────────────────────
-        if (namespace === 'triage') {
-          if (action === 'dispatch' && parts.length >= 4) {
-            // triage:dispatch:<projectId>:<issueNumber>[:<workflowId>]
-            const projectId = parts[2];
+        // ── Triage actions (short format: t:d:pid8:num:wfid8 or legacy triage:dispatch:...) ──
+        if (namespace === 'triage' || namespace === 't') {
+          const isShort = namespace === 't';
+          if ((isShort ? action === 'd' : action === 'dispatch') && parts.length >= 4) {
+            // Short: t:d:<pid8>:<issueNumber>:<wfid8>
+            // Legacy: triage:dispatch:<projectId>:<issueNumber>[:<workflowId>]
+            const pidFragment = parts[2];
             const issueNumber = parseInt(parts[3], 10);
-            const workflowId = parts[4]; // may be undefined for legacy buttons
+            const wfFragment = parts[4]; // may be undefined for legacy without workflow
 
             await ctx.answerCallbackQuery({ text: '🔄 Dispatching workflow...' });
 
-            const { triageDispatch } = await import('./triage.js');
+            // Resolve short IDs to full UUIDs
+            const { projectsRepo } = await import('../repositories/index.js');
+            const allProjects = projectsRepo.getAll();
+            const project = allProjects.find(p => p.id.startsWith(pidFragment)) ?? allProjects.find(p => p.id === pidFragment);
+            const projectId = project?.id ?? pidFragment;
 
-            let resolvedWorkflowId = workflowId;
+            const { triageDispatch } = await import('./triage.js');
+            const { getWorkflowsForProject } = await import('./workflow-engine.js');
+            const workflows = getWorkflowsForProject(projectId).filter((w: any) => w.enabled);
+
+            let resolvedWorkflowId: string | undefined;
+            if (wfFragment) {
+              // Match workflow by ID prefix (short format) or full ID (legacy)
+              const match = workflows.find(w => w.id.startsWith(wfFragment) || w.id === wfFragment);
+              resolvedWorkflowId = match?.id;
+            }
             if (!resolvedWorkflowId) {
-              // Legacy: no workflow ID in callback — pick first enabled
-              const { getWorkflowsForProject } = await import('./workflow-engine.js');
-              const workflows = getWorkflowsForProject(projectId).filter((w: any) => w.enabled);
               if (workflows.length === 0) {
                 await ctx.reply('❌ No enabled workflows are configured for this project.');
                 return;
@@ -243,10 +255,15 @@ export async function initTelegramBot(): Promise<void> {
               );
             }
 
-          } else if (action === 'mark' && parts.length === 4) {
-            // triage:mark:<projectId>:<issueNumber>
-            const projectId = parts[2];
+          } else if ((isShort ? action === 'm' : action === 'mark') && parts.length >= 4) {
+            // Short: t:m:<pid8>:<issueNumber>  Legacy: triage:mark:<projectId>:<issueNumber>
+            const pidFragment = parts[2];
             const issueNumber = parseInt(parts[3], 10);
+
+            // Resolve short ID
+            const { projectsRepo: pr } = await import('../repositories/index.js');
+            const proj = pr.getAll().find(p => p.id.startsWith(pidFragment)) ?? pr.getAll().find(p => p.id === pidFragment);
+            const projectId = proj?.id ?? pidFragment;
 
             const { markIssueTriaged } = await import('./triage.js');
             markIssueTriaged(projectId, issueNumber);
@@ -512,11 +529,13 @@ export async function sendTriageNotification(
   const { getWorkflowsForProject } = await import('./workflow-engine.js');
   const workflows = getWorkflowsForProject(projectId).filter(w => w.enabled);
   
+  // Telegram callback data limit is 64 bytes — use short IDs (first 8 chars of UUID)
+  const pid = projectId.slice(0, 8);
   const keyboard = new InlineKeyboard();
   for (const wf of workflows) {
-    keyboard.text(`🔄 ${wf.name}`, `triage:dispatch:${projectId}:${issueNumber}:${wf.id}`).row();
+    keyboard.text(`🔄 ${wf.name}`, `t:d:${pid}:${issueNumber}:${wf.id.slice(0, 8)}`).row();
   }
-  keyboard.text('✅ Mark Triaged', `triage:mark:${projectId}:${issueNumber}`);
+  keyboard.text('✅ Mark Triaged', `t:m:${pid}:${issueNumber}`);
 
   if (issueUrl) {
     keyboard.row().url('🔗 View Issue', issueUrl);
