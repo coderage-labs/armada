@@ -263,7 +263,7 @@ export async function deliverToUser(
   const telegramId = userChannels.telegram?.platformId;
   if (enabledTypes.has('telegram') && telegramId) {
     const isGate = payload.event === 'workflow.gate';
-    const isTriage = payload.event === 'triage.operator_fallback';
+    const isTriage = payload.event === 'triage.operator_fallback' || payload.event === 'triage.owner_fallback';
     deliveries.push(
       sendTelegram(telegramId, message, isGate, payload.runId, payload.stepId, isTriage, payload.projectId, payload.issueNumber, payload.issueUrl).then(msgId => {
         if (msgId !== null) telegramResult = { chatId: telegramId, messageId: msgId };
