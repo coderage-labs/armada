@@ -51,6 +51,7 @@ interface Project {
   archived: boolean;
   repositories: ProjectRepository[];
   maxConcurrent: number;
+  githubSyncIntervalMinutes?: number;
   createdAt: string;
 }
 
@@ -1646,6 +1647,7 @@ function SettingsTab({ project, onUpdated }: { project: Project; onUpdated: (p: 
   const [newRepoBranch, setNewRepoBranch] = useState('');
   const [newRepoDir, setNewRepoDir] = useState('');
   const [wipLimit, setWipLimit] = useState(project.maxConcurrent || 3);
+  const [syncInterval, setSyncInterval] = useState(project.githubSyncIntervalMinutes ?? 5);
   const [saving, setSaving] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
   const [saved, setSaved] = useState(false);
@@ -1659,6 +1661,7 @@ function SettingsTab({ project, onUpdated }: { project: Project; onUpdated: (p: 
     setContextMd(project.contextMd || '');
     setRepos(project.repositories || []);
     setWipLimit(project.maxConcurrent || 3);
+    setSyncInterval(project.githubSyncIntervalMinutes ?? 5);
     setSaved(false);
   }, [project.id]);
 
@@ -1667,7 +1670,7 @@ function SettingsTab({ project, onUpdated }: { project: Project; onUpdated: (p: 
     try {
       const updated = await apiFetch<Project>(`/api/projects/${project.id}`, {
         method: 'PUT',
-        body: JSON.stringify({ name, description, icon, color, context_md: contextMd, maxConcurrent: wipLimit }),
+        body: JSON.stringify({ name, description, icon, color, context_md: contextMd, maxConcurrent: wipLimit, githubSyncIntervalMinutes: syncInterval }),
       });
       onUpdated(updated);
       setSaved(true);
@@ -1818,6 +1821,22 @@ function SettingsTab({ project, onUpdated }: { project: Project; onUpdated: (p: 
             />
             <span className="text-xs text-zinc-500">Max concurrent tasks</span>
           </div>
+        </div>
+      </div>
+
+      {/* GitHub Sync */}
+      <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 space-y-3">
+        <h3 className="text-sm font-semibold text-zinc-200">GitHub Sync</h3>
+        <div className="flex items-center gap-3">
+          <Input
+            type="number"
+            min={0}
+            max={1440}
+            value={syncInterval}
+            onChange={e => { setSyncInterval(Number(e.target.value)); setSaved(false); }}
+            className="w-20 rounded-lg bg-zinc-800/50 border border-zinc-800 text-zinc-200 text-sm px-3 py-2 focus:outline-none focus:border-violet-500/50"
+          />
+          <span className="text-xs text-zinc-500">Polling interval (minutes). Set to 0 to disable. Uses project integration token if available.</span>
         </div>
       </div>
 

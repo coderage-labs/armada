@@ -326,6 +326,7 @@ export interface Project {
   configJson: string;
   repositories: ProjectRepository[];
   maxConcurrent: number;
+  githubSyncIntervalMinutes?: number;
   createdAt: string;
 }
 

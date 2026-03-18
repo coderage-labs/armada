@@ -4,9 +4,17 @@ import { githubIssueCache, triagedIssues } from '../db/drizzle-schema.js';
 import { eq, sql, and } from 'drizzle-orm';
 import { logActivity } from './activity-service.js';
 import { eventBus } from '../infrastructure/event-bus.js';
+import { projectIntegrationsRepo } from './integrations/project-integrations-repo.js';
+import { integrationsRepo } from './integrations/integrations-repo.js';
 import type { GitHubIssue } from '@coderage-labs/armada-shared';
 
 const GITHUB_API = 'https://api.github.com';
+const DEFAULT_SYNC_INTERVAL_MINUTES = 5;
+const SCHEDULER_TICK_MS = 60_000; // Check every 60s which projects are due
+
+// ── Per-project last sync tracking ──────────────────────────────────
+
+const lastSyncAt = new Map<string, number>();
 
 // ── DB-backed cache of GitHub issues per project ────────────────────
 
@@ -30,13 +38,34 @@ export function getCachedIssues(projectId: string): GitHubIssue[] {
   }));
 }
 
+/**
+ * Resolve the GitHub token for a project:
+ * 1. Check for a GitHub integration attached to the project
+ * 2. Fall back to GITHUB_TOKEN env var
+ */
+function resolveGitHubToken(projectId: string): string {
+  try {
+    const projectIntegrations = projectIntegrationsRepo.getByProject(projectId);
+    for (const pi of projectIntegrations) {
+      if (!pi.enabled) continue;
+      const integration = integrationsRepo.getById(pi.integrationId);
+      if (integration && integration.provider === 'github' && integration.authConfig?.token) {
+        return integration.authConfig.token as string;
+      }
+    }
+  } catch (err: any) {
+    console.warn(`[github-sync] Failed to resolve integration token for project ${projectId}:`, err.message);
+  }
+  return process.env.GITHUB_TOKEN || '';
+}
+
 export async function syncProjectIssues(projectId: string): Promise<{ fetched: number }> {
   const project = projectsRepo.get(projectId);
   if (!project) throw new Error('Project not found');
 
   const config = JSON.parse(project.configJson || '{}');
   const repos: Array<{ url: string }> = config.repositories || [];
-  const token = process.env.GITHUB_TOKEN || '';
+  const token = resolveGitHubToken(projectId);
 
   const allIssues: GitHubIssue[] = [];
 
@@ -120,52 +149,28 @@ export async function syncProjectIssues(projectId: string): Promise<{ fetched: n
     }).run();
   }
 
-  // Note: Routine sync no longer logs to activity feed to avoid noise (#261)
-
   return { fetched: allIssues.length };
 }
 
-// ── New-issue detection ─────────────────────────────────────────────
+// ── Sync interval resolution ────────────────────────────────────────
 
 /**
- * Returns issue numbers that are present in `freshIssues` but have NOT yet
- * been triaged (i.e. absent from the `triaged_issues` table).
+ * Resolve sync interval for a specific project:
+ * 1. Project config `githubSyncIntervalMinutes`
+ * 2. Global setting `github_sync_interval_minutes`
+ * 3. Default (5 minutes)
+ *
+ * Returns milliseconds. Returns 0 if explicitly disabled.
  */
-function findUntriagedNew(projectId: string, freshIssues: GitHubIssue[]): number[] {
-  const db = getDrizzle();
-  const freshNumbers = freshIssues.map(i => i.number);
-  if (freshNumbers.length === 0) return [];
+function resolveProjectIntervalMs(projectConfig: Record<string, any>): number {
+  // Check project-level setting
+  if (projectConfig.githubSyncIntervalMinutes !== undefined) {
+    const minutes = Number(projectConfig.githubSyncIntervalMinutes);
+    if (minutes === 0) return 0; // Explicitly disabled
+    if (Number.isFinite(minutes) && minutes > 0) return minutes * 60 * 1000;
+  }
 
-  // Load all previously cached issue numbers for this project so we can spot
-  // brand-new ones (present in fresh response but absent from cache).
-  const cached = db
-    .select({ issueNumber: githubIssueCache.issueNumber })
-    .from(githubIssueCache)
-    .where(eq(githubIssueCache.projectId, projectId))
-    .all();
-  const cachedNumbers = new Set(cached.map(r => r.issueNumber));
-
-  // Brand-new = in fresh response but not yet in our cache
-  const brandNewNumbers = freshNumbers.filter(n => !cachedNumbers.has(n));
-  if (brandNewNumbers.length === 0) return [];
-
-  // Of those, keep only ones that haven't been triaged yet
-  const triaged = db
-    .select({ issueNumber: triagedIssues.issueNumber })
-    .from(triagedIssues)
-    .where(eq(triagedIssues.projectId, projectId))
-    .all();
-  const triagedNumbers = new Set(triaged.map(r => r.issueNumber));
-
-  return brandNewNumbers.filter(n => !triagedNumbers.has(n));
-}
-
-// ── Periodic sync scheduler ─────────────────────────────────────────
-
-let syncInterval: ReturnType<typeof setInterval> | null = null;
-
-/** Resolve interval from DB setting, falling back to the provided default. */
-function resolveIntervalMs(defaultMs: number): number {
+  // Fall back to global setting
   try {
     const raw = settingsRepo.get('github_sync_interval_minutes');
     if (raw) {
@@ -173,24 +178,44 @@ function resolveIntervalMs(defaultMs: number): number {
       if (Number.isFinite(minutes) && minutes > 0) return minutes * 60 * 1000;
     }
   } catch (err: any) {
-    console.warn('[github-sync] Failed to read sync interval setting:', err.message);
+    console.warn('[github-sync] Failed to read global sync interval setting:', err.message);
   }
-  return defaultMs;
+
+  return DEFAULT_SYNC_INTERVAL_MINUTES * 60 * 1000;
 }
 
-export function startGithubSyncScheduler(intervalMs: number = 15 * 60 * 1000) {
+// ── Periodic sync scheduler ─────────────────────────────────────────
+
+let syncInterval: ReturnType<typeof setInterval> | null = null;
+
+export function startGithubSyncScheduler() {
   if (syncInterval) clearInterval(syncInterval);
 
-  const effectiveInterval = resolveIntervalMs(intervalMs);
-
+  // Tick every 60s and check which projects are due for sync
   syncInterval = setInterval(async () => {
     const projects = projectsRepo.getAll();
+    const now = Date.now();
+
     for (const project of projects) {
       const config = JSON.parse(project.configJson || '{}');
       if ((config.repositories || []).length === 0) continue;
 
+      // Resolve per-project interval
+      const intervalMs = resolveProjectIntervalMs(config);
+      if (intervalMs === 0) continue; // Explicitly disabled
+
+      // Check if project has a GitHub token available
+      const token = resolveGitHubToken(project.id);
+      if (!token) continue; // No token, skip
+
+      // Check if due
+      const last = lastSyncAt.get(project.id) || 0;
+      if (now - last < intervalMs) continue;
+
+      // Mark as synced now (before async work to prevent double-sync)
+      lastSyncAt.set(project.id, now);
+
       try {
-        // Snapshot cached issue numbers BEFORE the sync so we can detect new ones
         const beforeSync = getCachedIssues(project.id);
         const beforeNumbers = new Set(beforeSync.map(i => i.number));
 
@@ -201,7 +226,6 @@ export function startGithubSyncScheduler(intervalMs: number = 15 * 60 * 1000) {
         const newIssues = afterSync.filter(i => !beforeNumbers.has(i.number));
 
         if (newIssues.length > 0) {
-          // Filter to only those not yet triaged
           const db = getDrizzle();
           const triagedRows = db
             .select({ issueNumber: triagedIssues.issueNumber })
@@ -223,10 +247,12 @@ export function startGithubSyncScheduler(intervalMs: number = 15 * 60 * 1000) {
           }
         }
       } catch (err: any) {
-        console.error(`GitHub sync failed for ${project.name}:`, err.message);
+        console.error(`[github-sync] Sync failed for ${project.name}:`, err.message);
+        // Reset last sync so it retries next tick
+        lastSyncAt.delete(project.id);
       }
     }
-  }, effectiveInterval);
+  }, SCHEDULER_TICK_MS);
 }
 
 export function stopGithubSyncScheduler() {
