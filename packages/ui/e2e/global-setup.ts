@@ -13,7 +13,7 @@ export default async function globalSetup() {
   await page.evaluate((token: string) => {
     document.cookie = 'armada_authed=true; path=/; max-age=3600';
     localStorage.setItem('armada_token', token);
-  }, process.env.ARMADA_TOKEN || process.env.ARMADA_TOKEN ?? 'test-token');
+  }, process.env.ARMADA_TOKEN ?? 'test-token');
 
   await context.storageState({ path: 'e2e/.auth/state.json' });
   await browser.close();
