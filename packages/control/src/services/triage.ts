@@ -131,8 +131,7 @@ export async function triageIssue(
   if (!pm && triagerUser) {
     const user = usersRepo.getById(triagerUser.id!);
     // Look up user's hooks URL from their linked accounts
-    const linked = user ? JSON.parse((user as any).linkedAccountsJson || '{}') : {};
-    const userHooksUrl = linked.hooksUrl as string | undefined;
+    const userHooksUrl = (user?.linkedAccounts as any)?.hooksUrl as string | undefined;
     if (user && userHooksUrl) {
       console.log(`[triage] Dispatching issue #${issue.number} to user triager ${user.name} via callback`);
       const taskId = `triage-${projectId.slice(0, 8)}-${issue.number}`;
