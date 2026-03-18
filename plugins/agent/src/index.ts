@@ -1076,6 +1076,7 @@ export default function register(api: any) {
           modelProvider: s.modelProvider,
           updatedAt: s.updatedAt,
           chatType: s.chatType,
+          agentName: _sessionAgentMap.get(s.key) || null,
           inputTokens: s.inputTokens || 0,
           outputTokens: s.outputTokens || 0,
           totalTokens: s.totalTokens || 0,

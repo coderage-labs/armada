@@ -492,13 +492,13 @@ export function createAgentRoutes(nodeManager: NodeManager): Router {
         const resp = await node.relayRequest(containerName, 'GET', '/armada/session') as any;
         const body = resp?.body ?? resp;
         // Filter sessions to only those belonging to this agent
-        // Session keys contain the agent name: armada:<agentName>:...
         const agentName = req.params.name;
         if (body?.sessions && Array.isArray(body.sessions)) {
-          body.sessions = body.sessions.filter((s: any) => {
-            const key = s.sessionKey || s.label || '';
-            return key.includes(agentName) || key.includes(`armada:${agentName}`);
-          });
+          body.sessions = body.sessions.filter((s: any) =>
+            s.agentName === agentName ||
+            (s.sessionKey || '').includes(agentName) ||
+            (s.label || '').includes(agentName)
+          );
         }
         res.json(body);
       } catch (err: any) {
