@@ -678,19 +678,119 @@ export default function register(api: any) {
   });
 
   // ── Dynamic tool loading from armada control ────────────────────
-  // Fetch tool definitions from /api/meta/tools, filtered by role.
-  // These are proxy tools (issue tracker, etc.) that agents use
-  // without seeing credentials.
+  // Instead of loading all 200+ tools at startup (which bloats the LLM context),
+  // we register a single meta-tool: armada_find_tools.
+  // Agents call it with a query or category to load only the tools they need.
+  // Tools loaded this way appear on the NEXT LLM turn (OpenClaw resolves tools per-turn).
   //
-  // All calls are routed through the node agent relay (proxyUrl).
+  // For workflow tasks with toolCategories, tools are still loaded directly via ensureAgentTools.
+
+  // Cache of tool defs fetched from control plane (for search)
+  let _allToolDefs: ArmadaToolDef[] | null = null;
+
+  async function fetchAllToolDefs(agentName?: string): Promise<ArmadaToolDef[]> {
+    if (_allToolDefs) return _allToolDefs;
+    if (!getApiBaseUrl()) return [];
+    try {
+      const params = new URLSearchParams();
+      if (agentName) params.set('agent', agentName);
+      const resp = await fetch(`${getApiBaseUrl()}/api/meta/tools?${params}`, {
+        headers: { ...getToolAuthHeaders() },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!resp.ok) return [];
+      _allToolDefs = (await resp.json()) as ArmadaToolDef[];
+      return _allToolDefs;
+    } catch { return []; }
+  }
+
+  // Track which tools have been dynamically registered (avoid duplicates)
+  const _dynamicallyRegistered = new Set<string>();
+
+  function registerToolsFromDefs(defs: ArmadaToolDef[]): string[] {
+    const registered: string[] = [];
+    for (const def of defs) {
+      if (NATIVE_TOOLS.has(def.name) || _dynamicallyRegistered.has(def.name)) continue;
+      const properties: Record<string, any> = {};
+      const required: string[] = [];
+      for (const p of def.parameters) {
+        properties[p.name] = { type: p.type, description: p.description };
+        if (p.required) required.push(p.name);
+      }
+      api.registerTool({
+        name: def.name,
+        description: def.description,
+        parameters: { type: 'object', properties, ...(required.length > 0 ? { required } : {}) },
+        execute: async (_id: string, args: Record<string, any>) => executearmadaTool(def, args),
+      });
+      _dynamicallyRegistered.add(def.name);
+      registered.push(def.name);
+    }
+    return registered;
+  }
 
   if (getApiBaseUrl()) {
-    // At startup we don't know which agents this instance hosts, so load the full
-    // (unfiltered) tool set as a baseline. Per-agent filtered sets are loaded lazily
-    // the first time a task arrives for each agent (see ensureAgentTools in /armada/task).
-    loadarmadaTools(api).catch(err => {
-      _logger.warn(`[armada-agent] Failed to load armada tools: ${err.message}`);
+    api.registerTool({
+      name: 'armada_find_tools',
+      description: 'Search and load Armada tools on demand. Call with a search query (e.g. "create issue", "manage workflows") or a category name (instances, projects, issues, workflows, git, changesets, integrations, notifications, system, hierarchy, plugins, admin, tasks, tools). Matching tools are registered and available on your NEXT turn. Call armada_find_tools("all") to load everything.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Search query, category name, or "all" to load everything' },
+        },
+        required: ['query'],
+      },
+      execute: async (_id: string, args: { query: string }) => {
+        const query = (args.query || '').trim().toLowerCase();
+        if (!query) return { error: 'Provide a search query, category name, or "all"' };
+
+        const allDefs = await fetchAllToolDefs();
+        if (!allDefs.length) return { error: 'Failed to fetch tool definitions from control plane' };
+
+        let matches: ArmadaToolDef[];
+
+        if (query === 'all') {
+          matches = allDefs;
+        } else {
+          // First try exact category match
+          const categoryMatch = allDefs.filter(t => (t as any).category === query);
+          if (categoryMatch.length > 0) {
+            matches = categoryMatch;
+          } else {
+            // Fuzzy search: match query words against tool name + description
+            const queryWords = query.split(/\s+/);
+            matches = allDefs.filter(t => {
+              const haystack = `${t.name} ${t.description} ${(t as any).category || ''}`.toLowerCase();
+              return queryWords.every(w => haystack.includes(w));
+            });
+          }
+        }
+
+        if (!matches.length) {
+          // Show available categories as hints
+          const categories = [...new Set(allDefs.map(t => (t as any).category).filter(Boolean))].sort();
+          return {
+            found: 0,
+            message: `No tools matching "${args.query}". Available categories: ${categories.join(', ')}`,
+          };
+        }
+
+        const registered = registerToolsFromDefs(matches);
+        const alreadyLoaded = matches.length - registered.length;
+
+        return {
+          found: matches.length,
+          newlyRegistered: registered.length,
+          alreadyLoaded,
+          tools: matches.map(t => t.name),
+          message: registered.length > 0
+            ? `Loaded ${registered.length} new tool(s). They'll be available on your next turn.${alreadyLoaded > 0 ? ` (${alreadyLoaded} already loaded)` : ''}`
+            : `All ${matches.length} matching tools already loaded.`,
+        };
+      },
     });
+
+    _logger.info('[armada-agent] Registered armada_find_tools (dynamic tool loading)');
   }
 
   // ── HTTP Routes ─────────────────────────────────────────────────
