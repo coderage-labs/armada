@@ -126,22 +126,28 @@ export function buildWorkflowContextBlock(
     lines.push(`Trigger: ${run.triggerRef}`);
   }
 
-  // List completed steps with truncated outputs
+  // List completed steps as a conversation thread — full output, no truncation
   const completedEntries: string[] = [];
   for (const s of workflow.steps) {
     if (s.id === step.id) continue;
     const ctx = context[s.id];
     if (ctx && typeof ctx === 'object' && ctx.output) {
-      const truncated = ctx.output.slice(0, 500);
-      const ellipsis = ctx.output.length > 500 ? '...' : '';
-      const agentStr = stepRun.agentName ? `, ${stepRun.agentName}` : '';
-      completedEntries.push(`- ${s.id} (${s.role}${agentStr}): ${truncated}${ellipsis}`);
+      // Resolve the agent name from the step run records
+      const agentName = (() => {
+        try {
+          const sr = getDrizzle().select().from(workflowStepRuns)
+            .where(and(eq(workflowStepRuns.runId, run.id), eq(workflowStepRuns.stepId, s.id)))
+            .get();
+          return sr?.agentName || s.role;
+        } catch { return s.role; }
+      })();
+      completedEntries.push(`### Agent: ${agentName} (${s.role})\nStep: ${s.name || s.id}\n\n${ctx.output}`);
     }
   }
 
   if (completedEntries.length > 0) {
-    lines.push('', 'Completed steps:');
-    lines.push(...completedEntries);
+    lines.push('', '## Previous Steps', '');
+    lines.push(completedEntries.join('\n\n'));
   }
 
   // Rework feedback section
