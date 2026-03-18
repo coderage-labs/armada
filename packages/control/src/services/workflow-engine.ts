@@ -356,7 +356,13 @@ async function advanceRun(
       UPDATE workflow_runs SET status = ${finalStatus}, completed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ${run.id}
     `);
 
-    
+    // ── Auto-close GitHub issue on workflow completion ──────────────────
+    if (finalStatus === 'completed' && run.triggerRef) {
+      // Fire-and-forget — failure must not affect run status
+      closeGithubIssueForRun(run, workflow, updatedStepRuns).catch((err: Error) => {
+        console.error('[workflow-engine] GitHub auto-close failed (non-fatal):', err.message);
+      });
+    }
 
     if (_notifyFn) {
       _notifyFn({
@@ -1039,6 +1045,44 @@ function findDownstream(stepId: string, steps: WorkflowStep[]): Set<string> {
   }
 
   return downstream;
+}
+
+// ── Auto-close GitHub issue when a workflow run completes ───────────
+
+/**
+ * If the workflow run was triggered by a GitHub issue URL, post a resolution
+ * comment, close the issue, and add the "resolved-by-armada" label.
+ *
+ * Failures are non-fatal — the caller should wrap in try/catch.
+ */
+async function closeGithubIssueForRun(
+  run: WorkflowRun,
+  workflow: Workflow,
+  stepRuns: WorkflowStepRun[],
+): Promise<void> {
+  if (!run.triggerRef) return;
+
+  const { parseGithubIssueUrl, closeIssue, addLabel, addComment } = await import('./github-actions.js');
+
+  const parsed = parseGithubIssueUrl(run.triggerRef);
+  if (!parsed) return; // Not a GitHub issue URL
+
+  const { owner, repo, number: issueNumber } = parsed;
+
+  // Get the last completed step's output as summary
+  const completedSteps = stepRuns.filter(sr => sr.status === 'completed' && sr.output);
+  const finalOutput = completedSteps.length > 0
+    ? completedSteps[completedSteps.length - 1].output ?? ''
+    : '';
+
+  const comment =
+    `✅ Resolved by Armada workflow "${workflow.name}"\n\n## Summary\n${finalOutput}`.trimEnd();
+
+  await addComment(run.projectId, owner, repo, issueNumber, comment);
+  await closeIssue(run.projectId, owner, repo, issueNumber);
+  await addLabel(run.projectId, owner, repo, issueNumber, 'resolved-by-armada');
+
+  console.log(`[workflow-engine] Auto-closed GitHub issue ${owner}/${repo}#${issueNumber} after workflow "${workflow.name}" completed`);
 }
 
 // ── Cancel a run ────────────────────────────────────────────────────
