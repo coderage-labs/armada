@@ -188,10 +188,12 @@ export async function triageIssue(
   }
 
   // Build the triage prompt
+  const AUTO_VARS = new Set(['vars.issueNumber', 'vars.issueTitle', 'vars.issueBody', 'vars.issueLabels', 'vars.issueUrl']);
   const workflowList = workflows.map(w => {
     const stepIds = w.steps.map(s => s.id).join(' → ');
-    const varNames = extractTemplateVars(w.steps);
-    return `- **${w.name}** (id: ${w.id}): ${w.description || 'No description'}\n  Steps: ${stepIds}\n  Variables needed: ${varNames.join(', ') || 'none'}`;
+    const allVars = extractTemplateVars(w.steps);
+    const manualVars = allVars.filter(v => !AUTO_VARS.has(v));
+    return `- **${w.name}** (id: ${w.id}): ${w.description || 'No description'}\n  Steps: ${stepIds}\n  Additional variables you must provide: ${manualVars.join(', ') || 'none (all auto-populated)'}`;
   }).join('\n');
 
   const triagePrompt = `You are triaging a GitHub issue for project assignment.
@@ -205,15 +207,18 @@ ${issue.milestone ? `Milestone: ${issue.milestone}` : ''}
 ## Available Workflows
 ${workflowList}
 
+## Auto-populated variables (DO NOT include these in your vars — they are injected automatically)
+- issueNumber, issueTitle, issueBody, issueLabels
+
 ## Your Task
 1. Decide which workflow best fits this issue
-2. Fill in the template variables the workflow needs
+2. Fill in ONLY the template variables that are NOT auto-populated
 3. Explain your reasoning briefly
 
 Respond with ONLY a JSON object (no markdown, no code fences):
 {
   "workflowId": "the-workflow-id",
-  "vars": { "varName": "value", ... },
+  "vars": { "additionalVarName": "value" },
   "reasoning": "brief explanation"
 }
 
