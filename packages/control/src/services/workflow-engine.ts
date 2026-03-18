@@ -103,6 +103,15 @@ export function buildWorkflowContextBlock(
     `[WORKFLOW CONTEXT]`,
     `Workflow: "${workflow.name}" (run ${run.id.slice(0, 8)})`,
     `Your step: "${step.name || step.id}" (role: ${step.role})`,
+    '',
+    '## Guidelines',
+    '- You are one step in a multi-agent workflow. Other agents will read your output.',
+    '- Be concise and structured. Use headings and bullet points.',
+    '- State what you did, what you found, or what you decided — not your thought process.',
+    '- If you produce files, upload them as artifacts using armada_artifact_upload.',
+    '- If previous steps uploaded artifacts, download and review them using armada_artifact_download.',
+    '- Do not repeat the full prompt or task description in your output.',
+    `- Your run ID is ${run.id} and your step ID is ${step.id} (needed for artifact tools).`,
   ];
 
   // Project + repository context
