@@ -299,13 +299,20 @@ export async function getArtifactContextBlock(
 
     // Exclude artifacts from the current step (show only "previous" steps)
     const others = rows.filter(r => r.stepId !== currentStepId);
-    if (others.length === 0) return null;
 
-    const lines = ['## Artifacts from previous steps'];
-    for (const a of others) {
-      lines.push(`- ${a.stepId}/${a.filename} (${formatBytes(a.size)}, ${a.mimeType})`);
+    const lines = [
+      '## File Artifacts',
+      'When you produce files (code, configs, reports, etc.), upload them using armada_artifact_upload so subsequent workflow steps can access them.',
+    ];
+
+    if (others.length > 0) {
+      lines.push('', 'Available artifacts from completed steps:');
+      for (const a of others) {
+        lines.push(`- ${a.stepId}/${a.filename} (${formatBytes(a.size)}, ${a.mimeType})`);
+      }
+      lines.push('Use armada_artifact_download to retrieve any artifact you need.');
     }
-    lines.push('Use armada_artifact_download to retrieve any artifact you need.');
+
     return lines.join('\n');
   } catch {
     return null;
