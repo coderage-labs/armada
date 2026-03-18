@@ -33,6 +33,7 @@ interface WorkflowStep {
   loopUntilApproved?: boolean;
   loopBackToStep?: string;
   maxLoopIterations?: number;
+  isolateGit?: boolean;
 }
 interface RetryState {
   retryCount: number;
@@ -155,6 +156,8 @@ interface DispatchFn {
     runId: string;
     stepId: string;
     taskId: string;
+    /** If true, an isolated Git worktree should be created before the step runs */
+    isolateGit?: boolean;
   }): Promise<{ agentName: string; armadaTaskId: string } | { error: string }>;
 }
 
@@ -405,6 +408,7 @@ async function dispatchStep(
       runId: run.id,
       stepId: step.id,
       taskId,
+      isolateGit: step.isolateGit,
     });
 
     if ('error' in result) {

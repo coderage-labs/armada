@@ -16,3 +16,5 @@ export { taskManager } from './task-manager.js';
 export type { TaskManager } from './task-manager.js';
 export { mutationService } from './mutation-service.js';
 export type { MutationService, EntityType } from './mutation-service.js';
+export { createWorktree, mergeWorktree, cleanupWorktree, getActiveWorktrees } from './worktree-service.js';
+export type { ActiveWorktree, CreateWorktreeResult, MergeWorktreeResult } from './worktree-service.js';

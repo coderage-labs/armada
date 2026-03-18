@@ -4,14 +4,26 @@
  * Resolves role → agent, sends tasks, handles completion callbacks.
  */
 
-import { agentsRepo, instancesRepo } from '../repositories/index.js';
+import { agentsRepo, instancesRepo, projectsRepo } from '../repositories/index.js';
 import { tasksRepo } from '../repositories/index.js';
 import { setWorkflowDispatcher, setWorkflowNotifier, onStepCompleted } from './workflow-engine.js';
 import { getAgentsByRoleWithCapacity } from './health-monitor.js';
 import { notifyGate, notifyCompletion } from './user-notifier.js';
 import { getNodeClient } from '../infrastructure/node-client.js';
+import { createWorktree, mergeWorktree, cleanupWorktree } from './worktree-service.js';
 
 const CONTROL_PLANE_URL = process.env.ARMADA_API_URL || 'http://armada-control:3001';
+
+// ── Worktree task registry ──────────────────────────────────────────
+
+interface WorktreeTaskEntry {
+  nodeId: string;
+  worktreePath: string;
+  stepId: string;
+}
+
+/** Map of taskId → worktree info for tasks that have an active worktree */
+const _worktreeTasks = new Map<string, WorktreeTaskEntry>();
 
 /**
  * Find the least busy running agent with the given role.
@@ -80,13 +92,49 @@ export function initWorkflowDispatcher() {
 
       const containerName = `armada-instance-${instance.name}`;
       const node = getNodeClient(instance.nodeId);
+
+      // ── Git worktree isolation ─────────────────────────────────────
+      let worktreeContext = '';
+      if (opts.isolateGit) {
+        // Derive repo path from the project's first repository (cloneDir or a default)
+        const project = opts.projectId ? projectsRepo.get(opts.projectId) : null;
+        const repoPath = project?.repositories?.[0]?.cloneDir
+          || (project?.repositories?.[0]?.url ? `/workspace/${project.name}` : null);
+
+        if (repoPath) {
+          try {
+            const baseBranch = project?.repositories?.[0]?.defaultBranch || 'main';
+            const wt = await createWorktree(
+              instance.nodeId,
+              repoPath,
+              opts.stepId,
+              opts.runId,
+              baseBranch,
+            );
+            // Record worktree for post-completion merge+cleanup
+            _worktreeTasks.set(opts.taskId, {
+              nodeId: instance.nodeId,
+              worktreePath: wt.worktreePath,
+              stepId: opts.stepId,
+            });
+            worktreeContext = `\n\n[WORKTREE ISOLATION]\nYour isolated Git worktree is at: ${wt.worktreePath}\nWorking branch: ${wt.branch}\nAll code changes must be made in this directory.\n[END WORKTREE ISOLATION]`;
+            console.log(`[workflow-dispatcher] Created worktree for step "${opts.stepId}" at ${wt.worktreePath}`);
+          } catch (wtErr: any) {
+            console.warn(`[workflow-dispatcher] Failed to create worktree for step "${opts.stepId}": ${wtErr.message}`);
+            // Non-fatal — proceed without worktree isolation
+          }
+        } else {
+          console.warn(`[workflow-dispatcher] isolateGit=true but no repoPath for project "${opts.projectId}" — skipping worktree`);
+        }
+      }
+
       // Use instance proxyUrl for callback so agents can reach the control plane through the node proxy
       const callbackBaseUrl = process.env.ARMADA_AGENT_GATEWAY_URL || 'http://armada-node:3002';
       const body = JSON.stringify({
         taskId: opts.taskId,
         from: 'workflow-engine',
         fromRole: 'operator',
-        message: opts.message,
+        message: opts.message + worktreeContext,
         callbackUrl: `${callbackBaseUrl}/api/tasks/${opts.taskId}/result`,
         projectId: opts.projectId,
         ...(agent.targetAgent && { targetAgent: agent.targetAgent }),
@@ -99,6 +147,8 @@ export function initWorkflowDispatcher() {
         const errBody = typeof resp?.body === 'string' ? resp.body : JSON.stringify(resp);
         const errMsg = `Agent ${agent.name} rejected task (${status})`;
         tasksRepo.update(opts.taskId, { status: 'failed', result: `Dispatch failed (${status}): ${errBody}` });
+        // Cleanup worktree on dispatch failure
+        await _cleanupWorktreeForTask(opts.taskId);
         checkWorkflowStep(opts.taskId, 'failed', errMsg);
         return { error: errMsg };
       }
@@ -110,6 +160,7 @@ export function initWorkflowDispatcher() {
     } catch (err: any) {
       const errMsg = `Failed to reach ${agent.name}: ${err.message}`;
       tasksRepo.update(opts.taskId, { status: 'failed', result: `Dispatch error: ${err.message}` });
+      await _cleanupWorktreeForTask(opts.taskId);
       checkWorkflowStep(opts.taskId, 'failed', errMsg);
       return { error: errMsg };
     }
@@ -144,6 +195,49 @@ export function initWorkflowDispatcher() {
   console.log('🔄 Workflow dispatcher initialized');
 }
 
+// ── Worktree helpers ────────────────────────────────────────────────
+
+/**
+ * Merge (if completed) and cleanup the worktree associated with a task.
+ * Always runs cleanup even if merge fails — worktrees are ephemeral.
+ */
+async function _mergeAndCleanupWorktree(taskId: string, succeeded: boolean): Promise<void> {
+  const entry = _worktreeTasks.get(taskId);
+  if (!entry) return;
+
+  if (succeeded) {
+    try {
+      const mergeResult = await mergeWorktree(entry.nodeId, entry.worktreePath);
+      if (!mergeResult.merged) {
+        console.warn(
+          `[workflow-dispatcher] Merge conflicts for step "${entry.stepId}": ` +
+          (mergeResult.conflicts?.join(', ') || 'unknown'),
+        );
+      } else {
+        console.log(`[workflow-dispatcher] Merged worktree for step "${entry.stepId}"`);
+      }
+    } catch (err: any) {
+      console.warn(`[workflow-dispatcher] Merge failed for step "${entry.stepId}": ${err.message}`);
+    }
+  }
+
+  await _cleanupWorktreeForTask(taskId);
+}
+
+async function _cleanupWorktreeForTask(taskId: string): Promise<void> {
+  const entry = _worktreeTasks.get(taskId);
+  if (!entry) return;
+
+  try {
+    await cleanupWorktree(entry.nodeId, entry.worktreePath, entry.stepId);
+    console.log(`[workflow-dispatcher] Cleaned up worktree for step "${entry.stepId}"`);
+  } catch (err: any) {
+    console.warn(`[workflow-dispatcher] Cleanup failed for step "${entry.stepId}": ${err.message}`);
+  }
+  // cleanupWorktree already removes from _activeWorktrees; remove from local map too
+  _worktreeTasks.delete(taskId);
+}
+
 /**
  * Check if a completed task is a workflow step and advance the workflow.
  * Call this from the task result endpoint.
@@ -165,9 +259,18 @@ export function checkWorkflowStep(taskId: string, status: string, result: string
   }
 
   const stepStatus = status === 'completed' ? 'completed' : 'failed';
-  onStepCompleted(taskId, stepStatus as any, finalResult, sharedRefs).catch(err => {
-    console.error(`[workflow-dispatcher] Failed to advance workflow for task ${taskId}:`, err);
-  });
+  const succeeded = stepStatus === 'completed';
+
+  // Handle worktree merge + cleanup before advancing the workflow
+  _mergeAndCleanupWorktree(taskId, succeeded)
+    .catch(err => {
+      console.error(`[workflow-dispatcher] Worktree merge/cleanup failed for task ${taskId}:`, err);
+    })
+    .finally(() => {
+      onStepCompleted(taskId, stepStatus as any, finalResult, sharedRefs).catch(err => {
+        console.error(`[workflow-dispatcher] Failed to advance workflow for task ${taskId}:`, err);
+      });
+    });
 
   return true;
 }
