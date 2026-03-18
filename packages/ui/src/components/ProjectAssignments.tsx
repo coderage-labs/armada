@@ -121,7 +121,16 @@ export default function ProjectAssignments({ projectId }: { projectId: string })
     setLoading(true);
     try {
       const [assignmentsData, usersData, agentsData] = await Promise.all([
-        apiFetch<AssignmentsResponse>(`/api/projects/${projectId}/assignments`).catch(() => ({})),
+        apiFetch<any>(`/api/projects/${projectId}/assignments`).then((data) => {
+          // API returns { assignments: [...] } — reshape to { owner, triager, approver }
+          const arr = Array.isArray(data) ? data : (data?.assignments ?? []);
+          const mapped: AssignmentsResponse = {};
+          for (const a of arr) {
+            const type = a.assignmentType as 'owner' | 'triager' | 'approver';
+            mapped[type] = { type, assigneeType: a.assigneeType, assigneeId: a.assigneeId };
+          }
+          return mapped;
+        }).catch(() => ({})),
         apiFetch<AssigneeUser[]>('/api/users').catch(() => []),
         apiFetch<AssigneeAgent[]>('/api/agents').catch(() => []),
       ]);
@@ -141,14 +150,14 @@ export default function ProjectAssignments({ projectId }: { projectId: string })
     const [assigneeType, assigneeId] = value.split(':') as ['user' | 'agent', string];
     setUpdating(type);
     try {
-      const updated = await apiFetch<AssignmentsResponse>(
+      const result = await apiFetch<any>(
         `/api/projects/${projectId}/assignments/${type}`,
         {
           method: 'PUT',
           body: JSON.stringify({ assigneeType, assigneeId }),
         },
       );
-      setAssignments((prev) => ({ ...prev, [type]: updated[type] ?? { type, assigneeType, assigneeId } }));
+      setAssignments((prev) => ({ ...prev, [type]: { type, assigneeType, assigneeId } }));
       // Reload to get fresh display names
       loadAll();
       toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} updated`);
