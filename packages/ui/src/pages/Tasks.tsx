@@ -17,6 +17,7 @@ import { RowSkeleton } from '../components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../components/ui/table';
 import { EmptyState } from '../components/EmptyState';
+import WorkflowStepOutput from '../components/WorkflowStepOutput';
 
 /* ── Types ─────────────────────────────────────────── */
 
@@ -754,6 +755,11 @@ function TaskDetailPanel({ task, onClose, onUnblock, onCommentEvent }: { task: A
             </div>
           )}
         </div>
+
+        {/* Workflow Step Outputs — shown when task is part of a workflow run */}
+        {task.workflowRunId && (
+          <WorkflowStepOutput workflowRunId={task.workflowRunId} />
+        )}
 
         {/* Comments Section */}
         <div className="border-t border-zinc-700 pt-4">
