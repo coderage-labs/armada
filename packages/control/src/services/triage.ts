@@ -125,24 +125,27 @@ export async function triageIssue(
 
   const workflows = getWorkflowsForProject(projectId).filter(w => w.enabled);
 
-  // ── User triager notification ───────────────────────────────────
-  // If a user is assigned as triager but no agent PM exists, send them
-  // a triage notification with per-workflow buttons (same UX as operator
-  // fallback but as the primary path, not a fallback).
+  // ── User triager dispatch (via callback URL) ────────────────────
+  // If a user is assigned as triager but no agent PM exists, deliver the
+  // triage notification directly to that user only (via their callbackUrl).
+  // This enables operator users (like Robin) to autonomously triage issues.
   if (!pm && triagerUser) {
     const user = usersRepo.getById(triagerUser.id!);
     if (user) {
-      console.log(`[triage] Sending triage notification to user triager ${user.name} for issue #${issue.number}`);
+      console.log(`[triage] Delivering triage to user triager ${user.name} for issue #${issue.number}`);
       const issueUrl = issue.htmlUrl || (issue as any).url || '';
-      notifyTriageOperatorFallback({
-        issueNumber: issue.number,
-        issueTitle: issue.title,
-        issueUrl,
-        projectId,
-        projectName,
-        reason: `Triager ${user.displayName || user.name} to select workflow`,
-        excludeUserIds: [], // Don't exclude the triager themselves
-      }).catch((err: Error) => console.error('[triage] Failed to notify user triager:', err.message));
+      const message = `🔔 <b>Triage Required</b>\n\nIssue #${issue.number}: <b>${issue.title}</b>\nProject: ${projectName}\n${issue.body ? `\n${issue.body.slice(0, 500)}${issue.body.length > 500 ? '...' : ''}` : ''}\n\nURL: ${issueUrl}\n\nSelect a workflow to assign this issue.`;
+      import('./user-notifier.js').then(({ deliverToUser }) => {
+        deliverToUser(user, message, {
+          event: 'triage.user_triager',
+          issueNumber: issue.number,
+          issueTitle: issue.title,
+          issueUrl,
+          projectId,
+          projectName,
+          reason: `User triager ${user.name} to triage`,
+        });
+      }).catch((err: Error) => console.error('[triage] Failed to deliver to user triager:', err.message));
       return { triaged: true, by: user.name };
     }
   }
