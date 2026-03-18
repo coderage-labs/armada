@@ -174,6 +174,11 @@ let _activeTasks = 0;
 let _api: any = null;
 let _logger: ArmadaLogger = console;
 
+// ALS reference (set in register()) — allows module-level functions to read the current session key
+let _turnSessionStore: AsyncLocalStorage<string> | null = null;
+// Map from session key → agent name (e.g. "forge") for per-request X-Agent-Name headers
+const _sessionAgentMap = new Map<string, string>();
+
 // ── Task persistence ────────────────────────────────────────────────
 
 const _dataDir = join(process.env.HOME || '/home/node', '.openclaw');
@@ -334,15 +339,48 @@ function getToolAuthHeaders(): Record<string, string> {
   return token ? { 'Authorization': `Bearer ${token}` } : {};
 }
 
-async function loadarmadaTools(api: any) {
+/**
+ * Get the X-Agent-Name value for the current request context.
+ * During a task turn, this returns the specific agent name (e.g. "forge").
+ * At startup / outside a task turn, falls back to the instance name.
+ */
+function getCurrentAgentName(): string {
+  if (_turnSessionStore) {
+    const sessionKey = _turnSessionStore.getStore();
+    if (sessionKey) {
+      const agentName = _sessionAgentMap.get(sessionKey);
+      if (agentName) return agentName;
+    }
+  }
+  return _config?.instanceName ?? 'unknown';
+}
+
+// Cache of agent names whose tools have already been loaded
+const _agentToolsLoaded = new Set<string>();
+
+/**
+ * Ensure tools are loaded for a specific agent name (per-agent lazy loading).
+ * No-ops if already loaded for that agent.
+ */
+async function ensureAgentTools(api: any, agentName: string): Promise<void> {
+  if (_agentToolsLoaded.has(agentName)) return;
+  await loadarmadaTools(api, agentName);
+  _agentToolsLoaded.add(agentName);
+}
+
+async function loadarmadaTools(api: any, agentName?: string) {
   // Require proxyUrl — all control plane communication must go through the node agent relay
   if (!_config || !getApiBaseUrl()) return;
 
   try {
-    const resp = await fetch(`${getApiBaseUrl()}/api/meta/tools`, {
+    const toolsUrl = agentName
+      ? `${getApiBaseUrl()}/api/meta/tools?agent=${encodeURIComponent(agentName)}`
+      : `${getApiBaseUrl()}/api/meta/tools`;
+    const resp = await fetch(toolsUrl, {
       headers: {
         ...getToolAuthHeaders(),
-        'X-Agent-Name': _config.instanceName,
+        // Use agentName param when filtering, otherwise fall back to instance name
+        'X-Agent-Name': agentName ?? _config.instanceName,
       },
       signal: AbortSignal.timeout(10_000),
     });
@@ -376,7 +414,7 @@ async function loadarmadaTools(api: any) {
       registered++;
     }
 
-    _logger.info(`[armada-agent] Loaded ${registered} armada tools from control plane`);
+    _logger.info(`[armada-agent] Loaded ${registered} armada tools from control plane${agentName ? ` (agent: ${agentName})` : ''}`);
   } catch (err: any) {
     _logger.warn(`[armada-agent] Error loading armada tools: ${err.message}`);
   }
@@ -405,7 +443,8 @@ async function executearmadaTool(def: ArmadaToolDef, args: Record<string, any>):
   const url = `${getApiBaseUrl()}${resolvedPath}`;
   const headers: Record<string, string> = {
     ...getToolAuthHeaders(),
-    'X-Agent-Name': _config.instanceName,
+    // Identify the specific agent invoking this tool (resolved via ALS session key)
+    'X-Agent-Name': getCurrentAgentName(),
   };
 
   try {
@@ -474,6 +513,7 @@ export default function register(api: any) {
   // invoked them. ALS propagates the session key through the async chain
   // from beforeAgentTurn → tool execution without global state races.
   const turnSessionStore = new AsyncLocalStorage<string>();
+  _turnSessionStore = turnSessionStore; // expose to module-level helpers (getCurrentAgentName)
 
   if (typeof api.registerHook === 'function') {
     api.registerHook('beforeAgentTurn', (context: any) => {
@@ -614,6 +654,9 @@ export default function register(api: any) {
   // All calls are routed through the node agent relay (proxyUrl).
 
   if (getApiBaseUrl()) {
+    // At startup we don't know which agents this instance hosts, so load the full
+    // (unfiltered) tool set as a baseline. Per-agent filtered sets are loaded lazily
+    // the first time a task arrives for each agent (see ensureAgentTools in /armada/task).
     loadarmadaTools(api).catch(err => {
       _logger.warn(`[armada-agent] Failed to load armada tools: ${err.message}`);
     });
@@ -640,6 +683,13 @@ export default function register(api: any) {
       }
 
       if (_draining) return sendJson(res, 503, { error: 'Instance is draining' });
+
+      // Ensure tools are loaded for the target agent (lazy, cached per-agent name)
+      if (targetAgent && getApiBaseUrl()) {
+        await ensureAgentTools(api, targetAgent).catch(err => {
+          _logger.warn(`[armada-agent] Failed to load tools for agent ${targetAgent}: ${err.message}`);
+        });
+      }
 
       _activeTasks++;
       _logger.info(`[armada-agent] Received task ${taskId} from ${from}${targetAgent ? ` (targetAgent: ${targetAgent})` : ''}: ${message.slice(0, 100)}`);
@@ -675,12 +725,18 @@ export default function register(api: any) {
           hardTimeoutMs: _config!.hardTimeoutMs,
         }, _logger);
 
-        // Report status changes back to control plane
+        // Report status changes back to control plane; clean up session→agent mapping
         inbound.onFinalize = (taskId, status, result) => {
           reportTask('update', { id: taskId, status, result });
+          _sessionAgentMap.delete(inbound.sessionKey);
         };
 
         inboundContexts.set(inbound.sessionKey, inbound);
+        // Track which agent owns this session so X-Agent-Name resolves correctly
+        // during tool execution (via getCurrentAgentName → ALS → _sessionAgentMap)
+        if (targetAgent) {
+          _sessionAgentMap.set(inbound.sessionKey, targetAgent);
+        }
         saveAgentTasks();
 
         // Fetch project context if a project is specified
