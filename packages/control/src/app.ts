@@ -49,6 +49,7 @@ import { draftRoutes } from './routes/draft.js';
 import sessionEventsRouter from './routes/session-events.js';
 import { usageRoutes, internalUsageRouter } from './routes/usage.js';
 import { installScriptRoutes } from './routes/install-script.js';
+import { notificationChannelsRoutes } from './routes/notification-channels.js';
 
 export interface AppOptions {
   nodeManager: NodeManager;
@@ -123,6 +124,7 @@ export function createApp(opts: AppOptions): express.Express {
   app.use('/api/events', eventsRoutes);
   app.use('/api/operations', operationsRoutes);
   app.use('/api/badges', badgesRoutes);
+  app.use('/api/notification-channels', notificationChannelsRoutes);
   app.use('/api/auth', authRoutes);
   app.use('/api/audit', auditRoutes);
   app.use('/api/settings', settingsRoutes);
