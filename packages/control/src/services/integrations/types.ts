@@ -116,6 +116,7 @@ export interface IntegrationProvider {
   getIssue?(auth: AuthConfig, issueKey: string): Promise<ExternalIssue>;
   updateIssueStatus?(auth: AuthConfig, issueKey: string, status: string): Promise<void>;
   addComment?(auth: AuthConfig, issueKey: string, comment: string): Promise<void>;
+  addIssueLabel?(auth: AuthConfig, issueKey: string, label: string): Promise<void>;
   
   // VCS
   listRepos?(auth: AuthConfig): Promise<ExternalRepo[]>;

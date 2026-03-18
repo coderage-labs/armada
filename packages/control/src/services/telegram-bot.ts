@@ -275,6 +275,39 @@ export async function initTelegramBot(): Promise<void> {
             );
             await ctx.answerCallbackQuery({ text: '✅ Marked as triaged' });
 
+          } else if ((isShort ? action === 'x' : action === 'dismiss') && parts.length >= 4) {
+            // Short: t:x:<pid8>:<issueNumber>
+            const pidFragment = parts[2];
+            const issueNumber = parseInt(parts[3], 10);
+
+            // Resolve short ID to full project ID
+            const { projectsRepo: pr } = await import('../repositories/index.js');
+            const proj = pr.getAll().find(p => p.id.startsWith(pidFragment)) ?? pr.getAll().find(p => p.id === pidFragment);
+            const projectId = proj?.id ?? pidFragment;
+
+            await ctx.answerCallbackQuery({ text: '❌ Dismissing...' });
+
+            const { triageDismiss } = await import('./triage.js');
+            const result = await triageDismiss({
+              projectId,
+              issueNumber,
+              reason: `Dismissed via Telegram by ${user.displayName}`,
+              closeOnGithub: true,
+            });
+
+            const originalText = ctx.callbackQuery.message?.text ?? '';
+            if (result.error) {
+              await ctx.editMessageText(
+                `${originalText}\n\n❌ Dismissed by ${escapeHtml(user.displayName)} (GitHub close failed: ${escapeHtml(result.error)})`,
+                { parse_mode: 'HTML', reply_markup: undefined },
+              );
+            } else {
+              await ctx.editMessageText(
+                `${originalText}\n\n❌ Dismissed by ${escapeHtml(user.displayName)}`,
+                { parse_mode: 'HTML', reply_markup: undefined },
+              );
+            }
+
           } else {
             await ctx.answerCallbackQuery({ text: 'Unknown triage action' });
           }
@@ -535,7 +568,8 @@ export async function sendTriageNotification(
   for (const wf of workflows) {
     keyboard.text(`🔄 ${wf.name}`, `t:d:${pid}:${issueNumber}:${wf.id.slice(0, 8)}`).row();
   }
-  keyboard.text('✅ Mark Triaged', `t:m:${pid}:${issueNumber}`);
+  keyboard.text('✅ Mark Triaged', `t:m:${pid}:${issueNumber}`).row();
+  keyboard.text('❌ Dismiss', `t:x:${pid}:${issueNumber}`);
 
   if (issueUrl) {
     keyboard.row().url('🔗 View Issue', issueUrl);

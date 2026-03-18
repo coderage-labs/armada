@@ -252,6 +252,53 @@ export class GitHubAdapter implements IntegrationProvider {
     });
   }
 
+  async updateIssueStatus(auth: AuthConfig, issueKey: string, status: string): Promise<void> {
+    const match = issueKey.match(/^([^/]+)\/([^#]+)#(\d+)$/);
+    if (!match) {
+      throw new Error(`Invalid GitHub issue key format: ${issueKey}`);
+    }
+
+    const [, owner, repo, number] = match;
+
+    // GitHub only supports 'open' and 'closed'
+    const state = status === 'closed' ? 'closed' : 'open';
+
+    await this.fetchGitHub(auth, `/repos/${owner}/${repo}/issues/${number}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ state }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  async addIssueLabel(auth: AuthConfig, issueKey: string, label: string): Promise<void> {
+    const match = issueKey.match(/^([^/]+)\/([^#]+)#(\d+)$/);
+    if (!match) {
+      throw new Error(`Invalid GitHub issue key format: ${issueKey}`);
+    }
+
+    const [, owner, repo, number] = match;
+
+    // Ensure label exists — create it if not (422 = already exists, safe to ignore)
+    try {
+      await this.fetchGitHub(auth, `/repos/${owner}/${repo}/labels`, {
+        method: 'POST',
+        body: JSON.stringify({ name: label, color: '0075ca' }),
+        headers: { 'Content-Type': 'application/json' },
+      });
+    } catch (err: any) {
+      // "already_exists" from GitHub returns 422 — our fetchGitHub throws on !resp.ok
+      if (!err.message?.includes('422')) {
+        console.warn(`[github-adapter] Could not ensure label "${label}" exists: ${err.message}`);
+      }
+    }
+
+    await this.fetchGitHub(auth, `/repos/${owner}/${repo}/issues/${number}/labels`, {
+      method: 'POST',
+      body: JSON.stringify({ labels: [label] }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   async listRepos(auth: AuthConfig): Promise<ExternalRepo[]> {
     try {
       const data = await this.fetchGitHub<Array<Record<string, any>>>(

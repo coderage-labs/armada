@@ -535,6 +535,55 @@ export function markIssueTriaged(projectId: string, issueNumber: number) {
   markIssueTriage(projectId, issueNumber);
 }
 
+// ── Dismiss an issue ────────────────────────────────────────────────────────
+
+/**
+ * Dismiss an issue — mark it as triaged and optionally close it on GitHub with
+ * a "wontfix" label and a reason comment.
+ */
+export async function triageDismiss(input: {
+  projectId: string;
+  issueNumber: number;
+  reason: string;
+  closeOnGithub?: boolean;
+}): Promise<{ dismissed: boolean; error?: string }> {
+  const { projectId, issueNumber, reason, closeOnGithub = false } = input;
+
+  // Mark locally so it won't be re-triaged
+  markIssueTriaged(projectId, issueNumber);
+
+  logActivity({
+    eventType: 'triage.dismissed',
+    agentName: 'triage-service',
+    detail: `Dismissed issue #${issueNumber}: ${reason}`,
+  });
+
+  if (closeOnGithub) {
+    try {
+      const { closeIssue, addLabel, parseGithubIssueUrl } = await import('./github-actions.js');
+
+      // Resolve owner/repo from the cached issue's HTML URL
+      const issues = getCachedIssues(projectId);
+      const issue = issues.find(i => i.number === issueNumber);
+      const issueUrl = issue?.htmlUrl || (issue as any)?.url || '';
+      const parsed = issueUrl ? parseGithubIssueUrl(issueUrl) : null;
+
+      if (!parsed) {
+        console.warn(`[triage] Cannot close issue #${issueNumber} on GitHub — no issue URL found in cache`);
+        return { dismissed: true };
+      }
+
+      await closeIssue(projectId, parsed.owner, parsed.repo, issueNumber, reason);
+      await addLabel(projectId, parsed.owner, parsed.repo, issueNumber, 'wontfix');
+    } catch (err: any) {
+      console.error(`[triage] Failed to close issue #${issueNumber} on GitHub:`, err.message);
+      return { dismissed: true, error: err.message };
+    }
+  }
+
+  return { dismissed: true };
+}
+
 // ── Auto-triage wiring ────────────────────────────────────────────────────────
 // Subscribe to github.new_issues events emitted by github-sync.ts so that
 // newly discovered issues are automatically triaged without manual intervention.

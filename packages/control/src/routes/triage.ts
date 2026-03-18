@@ -3,6 +3,20 @@ import { requireScope } from '../middleware/scopes.js';
 import { registerToolDef } from '../utils/tool-registry.js';
 
 registerToolDef({
+  name: 'armada_triage_dismiss',
+  description: 'Dismiss a GitHub issue — mark it as triaged and optionally close it on GitHub with a wontfix label.',
+  method: 'POST',
+  path: '/api/triage/dismiss',
+  parameters: [
+    { name: 'projectId', type: 'string', description: 'Project ID', required: true },
+    { name: 'issueNumber', type: 'number', description: 'GitHub issue number', required: true },
+    { name: 'reason', type: 'string', description: 'Reason for dismissal', required: true },
+    { name: 'closeOnGithub', type: 'boolean', description: 'Also close the issue on GitHub and add wontfix label' },
+  ],
+  scope: 'tasks:write',
+});
+
+registerToolDef({
   name: 'armada_triage_scan',
   description: 'Scan all projects for untriaged GitHub issues and dispatch triage to PM agents.',
   method: 'POST', path: '/api/triage/scan',
@@ -46,7 +60,7 @@ registerToolDef({
   scope: 'workflows:write',
 });
 
-import { triageIssue, handleTriageResult, triageNewIssues, markIssueTriaged, triageDispatch } from '../services/triage.js';
+import { triageIssue, handleTriageResult, triageNewIssues, markIssueTriaged, triageDispatch, triageDismiss } from '../services/triage.js';
 import { getCachedIssues } from '../services/github-sync.js';
 
 const router = Router();
@@ -149,6 +163,30 @@ router.post('/dispatch', requireScope('workflows:write'), async (req, res) => {
   }
 
   res.json({ ok: true, runId: result.runId, workflowName: result.workflowName });
+});
+
+/** POST /api/triage/dismiss — Dismiss an issue (mark triaged, optionally close on GitHub) */
+router.post('/dismiss', requireScope('tasks:write'), async (req, res) => {
+  const { projectId, issueNumber, reason, closeOnGithub } = req.body;
+  if (!projectId || !issueNumber || !reason) {
+    res.status(400).json({ error: 'projectId, issueNumber, and reason are required' });
+    return;
+  }
+
+  const result = await triageDismiss({
+    projectId,
+    issueNumber: Number(issueNumber),
+    reason,
+    closeOnGithub: Boolean(closeOnGithub),
+  });
+
+  if (result.error) {
+    // Still dismissed locally — return 200 with warning
+    res.json({ dismissed: result.dismissed, warning: result.error });
+    return;
+  }
+
+  res.json({ dismissed: result.dismissed });
 });
 
 export default router;
