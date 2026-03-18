@@ -611,6 +611,7 @@ registerToolDef({
     { name: 'agent', type: 'string', description: 'Filter tasks by agent name (from or to)' },
     { name: 'status', type: 'string', description: 'Filter by status', enum: ['pending', 'running', 'completed', 'failed', 'blocked'] },
   ],
+  scope: 'tasks:read',
 });
 
 registerToolDef({
@@ -621,6 +622,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Task ID', required: true },
   ],
+  scope: 'tasks:read',
 });
 
 registerToolDef({
@@ -671,6 +673,7 @@ registerToolDef({
   parameters: [
     { name: 'id', type: 'string', description: 'Task ID', required: true },
   ],
+  scope: 'tasks:read',
 });
 
 registerToolDef({

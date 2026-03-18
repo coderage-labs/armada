@@ -34,6 +34,7 @@ export function createAgentRoutes(nodeManager: NodeManager): Router {
     description: 'Check the status of all armada instances. Shows which agents are running and available for armada_task.',
     method: 'GET', path: '/api/agents',
     parameters: [],
+    scope: 'agents:read',
   });
 
   registerToolDef({
@@ -77,6 +78,7 @@ export function createAgentRoutes(nodeManager: NodeManager): Router {
       { name: 'tail', type: 'number', description: 'Number of lines (default 50)' },
     ],
     responseFormat: 'text',
+    scope: 'instances:read',
   });
 
   registerToolDef({
@@ -140,6 +142,7 @@ export function createAgentRoutes(nodeManager: NodeManager): Router {
     description: 'Get capacity info for all agents — task count, response latency, and health status. Useful for checking agent load.',
     method: 'GET', path: '/api/agents/capacity',
     parameters: [],
+    scope: 'agents:read',
   });
 
   registerToolDef({
@@ -149,6 +152,7 @@ export function createAgentRoutes(nodeManager: NodeManager): Router {
     parameters: [
       { name: 'target', type: 'string', description: 'Agent name', required: true },
     ],
+    scope: 'agents:read',
   });
 
   registerToolDef({
@@ -161,6 +165,7 @@ export function createAgentRoutes(nodeManager: NodeManager): Router {
       { name: 'after', type: 'string', description: 'ISO timestamp cursor — only return messages after this' },
       { name: 'limit', type: 'number', description: 'Max messages to return (default 50, max 200)' },
     ],
+    scope: 'agents:read',
   });
 
   // ── Capacity endpoint ─────────────────────────────────────────────

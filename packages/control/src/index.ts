@@ -70,11 +70,26 @@ async function start() {
   // ── Meta: tool definitions for auto-discovery ───────────────────
   const { getToolDefs } = await import('./utils/tool-registry.js');
   const { optionalAuthMiddleware } = await import('./middleware/auth.js');
+  const { getScopesForAgentRole } = await import('./utils/role-scopes.js');
   
   app.get('/api/meta/tools', optionalAuthMiddleware, (req, res) => {
     const allTools = getToolDefs();
-    
-    // Get caller's scopes from auth middleware (optional - may be undefined)
+
+    // ?agent=<name> — resolve agent → role → scopes → filtered tools
+    // Plugin can call this per-agent once per-agent tool filtering is supported
+    const agentName = req.query.agent as string | undefined;
+    if (agentName) {
+      const agent = agentsRepo.getAll().find(a => a.name === agentName);
+      if (agent?.role) {
+        const allowedScopes = getScopesForAgentRole(agent.role);
+        if (!allowedScopes.includes('*')) {
+          const filtered = allTools.filter(t => !t.scope || allowedScopes.includes(t.scope));
+          return res.json(filtered);
+        }
+      }
+    }
+
+    // Fallback: existing scope-based filtering from caller auth
     const callerScopes: string[] = req.caller?.scopes ?? [];
     
     // No scopes = return all (backward compat: unauthenticated or operator without scope restriction)
