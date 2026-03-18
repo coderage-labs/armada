@@ -62,7 +62,7 @@ export function ImpactBadge({ impactLevel, requiresRestart, compact = false }: I
         <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
         {style.label}
         {requiresRestart && (
-          <RefreshCw className="w-2.5 h-2.5 ml-0.5" title="Requires restart" />
+          <RefreshCw className="w-2.5 h-2.5 ml-0.5" aria-label="Requires restart" />
         )}
       </span>
     );
