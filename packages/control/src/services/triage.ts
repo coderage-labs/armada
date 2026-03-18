@@ -125,74 +125,25 @@ export async function triageIssue(
 
   const workflows = getWorkflowsForProject(projectId).filter(w => w.enabled);
 
-  // ── User triager dispatch (via notification callback) ──────────
-  // If a user is assigned as triager but no agent PM exists, route the
-  // triage task to the user's OpenClaw instance via their notification channel.
+  // ── User triager notification ───────────────────────────────────
+  // If a user is assigned as triager but no agent PM exists, send them
+  // a triage notification with per-workflow buttons (same UX as operator
+  // fallback but as the primary path, not a fallback).
   if (!pm && triagerUser) {
     const user = usersRepo.getById(triagerUser.id!);
-    // Look up user's hooks URL from their linked accounts
-    const userHooksUrl = (user?.linkedAccounts as any)?.hooksUrl as string | undefined;
-    if (user && userHooksUrl) {
-      console.log(`[triage] Dispatching issue #${issue.number} to user triager ${user.name} via callback`);
-      const taskId = `triage-${projectId.slice(0, 8)}-${issue.number}`;
-
-      // Build the triage prompt (same as for agents)
-      const AUTO_VARS_USER = new Set(['vars.issueNumber', 'vars.issueTitle', 'vars.issueBody', 'vars.issueLabels', 'vars.issueUrl']);
-      const workflowListUser = workflows.map(w => {
-        const stepIds = w.steps.map((s: any) => s.id).join(' → ');
-        const allVars = extractTemplateVars(w.steps);
-        const manualVars = allVars.filter((v: string) => !AUTO_VARS_USER.has(v));
-        return `- **${w.name}** (id: ${w.id}): ${w.description || 'No description'}\n  Steps: ${stepIds}\n  Additional variables: ${manualVars.join(', ') || 'none'}`;
-      }).join('\n');
-
-      const triagePromptUser = `You are triaging a GitHub issue for project assignment.
-
-## Issue #${issue.number}: ${issue.title}
-${issue.body?.slice(0, 2000) || 'No description'}
-
-Labels: ${issue.labels?.join(', ') || 'none'}
-
-## Available Workflows
-${workflowListUser}
-
-Respond with ONLY a JSON object (no markdown, no code fences):
-{ "workflowId": "the-workflow-id", "vars": {}, "reasoning": "brief explanation" }
-
-If none fit: { "workflowId": null, "vars": {}, "reasoning": "why" }`;
-
-      // Cache issue data for handleTriageResult
-      pendingTriageIssues.set(taskId, {
-        number: issue.number,
-        title: issue.title,
-        body: issue.body?.slice(0, 4000) || '',
-        labels: issue.labels || [],
-      });
-
-      try {
-        const resp = await fetch(userHooksUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            taskId,
-            from: 'triage-service',
-            fromRole: 'operator',
-            targetAgent: user.name,
-            message: triagePromptUser,
-            callbackUrl: `${CONTROL_PLANE_URL}/api/triage/callback`,
-          }),
-          signal: AbortSignal.timeout(30_000),
-        });
-        if (resp.ok) {
-          console.log(`[triage] Dispatched issue #${issue.number} to user triager ${user.name}`);
-          return { triaged: true, by: user.name };
-        }
-        console.error(`[triage] User triager ${user.name} callback returned ${resp.status}`);
-      } catch (err: any) {
-        console.error(`[triage] User triager ${user.name} callback failed: ${err.message}`);
-      }
-      // Fall through to operator fallback if callback fails
-    } else {
-      console.warn(`[triage] User triager ${triagerUser.name} has no hooksUrl in linkedAccounts`);
+    if (user) {
+      console.log(`[triage] Sending triage notification to user triager ${user.name} for issue #${issue.number}`);
+      const issueUrl = issue.htmlUrl || (issue as any).url || '';
+      notifyTriageOperatorFallback({
+        issueNumber: issue.number,
+        issueTitle: issue.title,
+        issueUrl,
+        projectId,
+        projectName,
+        reason: `Triager ${user.displayName || user.name} to select workflow`,
+        excludeUserIds: [], // Don't exclude the triager themselves
+      }).catch((err: Error) => console.error('[triage] Failed to notify user triager:', err.message));
+      return { triaged: true, by: user.name };
     }
   }
 
