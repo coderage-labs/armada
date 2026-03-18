@@ -104,7 +104,7 @@ export default function TriageModal({
     setBodyExpanded(false);
 
     setLoadingWorkflows(true);
-    apiFetch<WorkflowInfo[]>('/api/workflows')
+    apiFetch<WorkflowInfo[]>(`/api/workflows?projectId=${projectId}`)
       .then((wfs) => {
         // Filter to enabled workflows, optionally filtered by project
         const enabled = wfs.filter((wf) => {

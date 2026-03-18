@@ -218,11 +218,18 @@ router.get('/', (req, res) => {
     res.json(getWorkflowsForProject(projectId));
     return;
   }
-  // Return all workflows
+  // Return all workflows with their project links
   const rows = getDrizzle().select().from(workflows).orderBy(desc(workflows.createdAt)).all();
+  const wpRows = getDrizzle().select().from(workflowProjects).all();
+  const wpMap = new Map<string, string[]>();
+  for (const wp of wpRows) {
+    if (!wpMap.has(wp.workflowId)) wpMap.set(wp.workflowId, []);
+    wpMap.get(wp.workflowId)!.push(wp.projectId);
+  }
   res.json(rows.map(r => ({
     ...r,
     steps: JSON.parse(r.stepsJson || '[]'),
+    projectIds: wpMap.get(r.id) || [],
     projectId: undefined,
     enabled: !!r.enabled,
   })));
