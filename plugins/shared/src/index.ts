@@ -750,10 +750,13 @@ export function finalizeInbound(
   if (inbound.pingTimer) clearInterval(inbound.pingTimer);
 
   const status = statusOverride || 'completed';
+  // Use only the final turn's output — earlier turns contain narration, tool calls,
+  // and intermediate thinking that clutters downstream step context.
+  // The final turn (where TASK_COMPLETE was emitted) contains the actual deliverable.
   const rawText = resultOverride || (
-    inbound.accumulator.length <= 1
-      ? (inbound.accumulator[0] || '(no response)')
-      : inbound.accumulator.join('\n\n---\n\n')
+    inbound.accumulator.length === 0
+      ? '(no response)'
+      : inbound.accumulator[inbound.accumulator.length - 1]
   );
 
   // Extract {{file:...}} markers and encode as base64 attachments
