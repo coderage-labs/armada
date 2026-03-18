@@ -221,7 +221,8 @@ function resolveAssignment(projectId: string, assignmentType: AssignmentType): R
 
     // 2. Explicit agent assignment
     if (assignment.assigneeType === 'agent') {
-      const agent = db.select().from(agents).where(eq(agents.name, assignment.assigneeId)).get();
+      const agent = db.select().from(agents).where(eq(agents.id, assignment.assigneeId)).get()
+        ?? db.select().from(agents).where(eq(agents.name, assignment.assigneeId)).get();
       if (agent && isAgentHealthy(agent)) {
         return [{ type: 'agent', id: agent.id, name: agent.name }];
       }
