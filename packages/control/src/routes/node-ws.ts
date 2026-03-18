@@ -202,6 +202,9 @@ wss.on('connection', (ws: WebSocket, _request: IncomingMessage, auth: Extract<Au
     }
 
     if (isProgress(msg)) {
+      // Dispatch to any pending command's progress callback (e.g. logs.stream)
+      commandDispatcher.handleProgress(msg);
+
       // Forward progress events to the SSE event bus so UI clients receive live updates.
       // The commandId links this progress to the originating operation command.
       eventBus.emit('operation.progress', {

@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { WsErrorCode, type ResponseMessage, type StreamMessage } from '@coderage-labs/armada-shared';
+import { WsErrorCode, type ResponseMessage, type StreamMessage, type ProgressMessage } from '@coderage-labs/armada-shared';
 import { serializeMessage } from './protocol.js';
 import { nodeConnectionManager } from './node-connections.js';
 
@@ -11,6 +11,8 @@ interface PendingCommand {
   timer: ReturnType<typeof setTimeout>;
   /** Accumulated stream chunks keyed by seq, only populated for streaming responses */
   streamChunks?: Map<number, string>;
+  /** Progress callback — called for each ProgressMessage matching this command's id */
+  onProgress?: (msg: ProgressMessage) => void;
 }
 
 /**
@@ -25,13 +27,17 @@ export class CommandDispatcher {
   /**
    * Send a command to a node agent and return a Promise that resolves
    * when the node responds (or rejects on timeout/error).
+   * Optionally supply an `onProgress` callback to receive ProgressMessages
+   * before the final ResponseMessage (e.g. for logs.stream).
    */
   async send(
     nodeId: string,
     action: string,
     params: object,
-    timeoutMs: number = DEFAULT_TIMEOUT_MS,
+    timeoutMs?: number,
+    onProgress?: (msg: ProgressMessage) => void,
   ): Promise<unknown> {
+    timeoutMs = timeoutMs ?? DEFAULT_TIMEOUT_MS;
     const ws = nodeConnectionManager.getConnection(nodeId);
     if (!ws) {
       throw Object.assign(
@@ -53,7 +59,7 @@ export class CommandDispatcher {
         );
       }, timeoutMs);
 
-      this.pending.set(id, { resolve, reject, timer });
+      this.pending.set(id, { resolve, reject, timer, onProgress });
 
       const message = serializeMessage({
         type: 'command',
@@ -93,6 +99,16 @@ export class CommandDispatcher {
       );
       pending.reject(err);
     }
+  }
+
+  /**
+   * Handle an incoming ProgressMessage from a node agent.
+   * Calls the registered onProgress callback if one exists for this command id.
+   */
+  handleProgress(msg: ProgressMessage): void {
+    const pending = this.pending.get(msg.id);
+    if (!pending) return; // Orphaned progress — ignore
+    pending.onProgress?.(msg);
   }
 
   /**

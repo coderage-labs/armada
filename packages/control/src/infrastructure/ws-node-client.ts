@@ -7,14 +7,20 @@
  */
 
 import { commandDispatcher } from '../ws/command-dispatcher.js';
+import type { ProgressMessage } from '@coderage-labs/armada-shared';
 
 export class WsNodeClient {
   constructor(public readonly nodeId: string) {}
 
   // ── Internal helper ─────────────────────────────────────────────────────────
 
-  private send(action: string, params: object = {}, _timeoutMs?: number): Promise<unknown> {
-    return commandDispatcher.send(this.nodeId, action, params, _timeoutMs);
+  private send(action: string, params: object, timeoutMs: number, onProgress: (msg: ProgressMessage) => void): Promise<unknown>;
+  private send(action: string, params?: object, timeoutMs?: number): Promise<unknown>;
+  private send(action: string, params: object = {}, timeoutMs?: number, onProgress?: (msg: ProgressMessage) => void): Promise<unknown> {
+    if (onProgress) {
+      return commandDispatcher.send(this.nodeId, action, params, timeoutMs ?? 30_000, onProgress);
+    }
+    return commandDispatcher.send(this.nodeId, action, params, timeoutMs);
   }
 
   // === Instance Lifecycle ===
@@ -162,6 +168,65 @@ export class WsNodeClient {
 
   async getContainerStats(id: string): Promise<any> {
     return this.send('container.stats', { id });
+  }
+
+  /**
+   * Stream live container logs via `logs.stream` command.
+   * Each log line is delivered to the `onLine` callback via ProgressMessage.
+   * Returns a cleanup function that stops forwarding lines after the client disconnects.
+   *
+   * The returned Promise rejects (quickly, within ~200ms) if the node returns an error
+   * for the `logs.stream` action (e.g. unknown action on older nodes), allowing the
+   * caller to fall back to polling.
+   */
+  streamContainerLogs(
+    name: string,
+    onLine: (line: string) => void,
+    timeoutMs = 3_600_000, // 1 hour max stream
+  ): Promise<() => void> {
+    let active = true;
+
+    return new Promise<() => void>((resolve, reject) => {
+      let resolved = false;
+
+      const onProgress = (msg: ProgressMessage) => {
+        if (!active) return;
+        if (msg.data?.step === 'log_line' && typeof msg.data.message === 'string') {
+          onLine(msg.data.message);
+        }
+        // Confirm that the node supports logs.stream on first progress message
+        if (!resolved) {
+          resolved = true;
+          resolve(() => { active = false; });
+        }
+      };
+
+      // Wait briefly before resolving; if the node immediately errors, reject instead
+      const startTimer = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          resolve(() => { active = false; });
+        }
+      }, 500);
+
+      this.send('logs.stream', { id: name }, timeoutMs, onProgress)
+        .then(() => {
+          clearTimeout(startTimer);
+          if (!resolved) {
+            resolved = true;
+            resolve(() => { active = false; });
+          }
+        })
+        .catch((err) => {
+          clearTimeout(startTimer);
+          if (!resolved) {
+            resolved = true;
+            // Reject so the route can fall back to polling
+            reject(err);
+          }
+          // If already resolved (stream started), swallow the error
+        });
+    });
   }
 
   async signalContainer(name: string, signal = 'SIGUSR1'): Promise<void> {

@@ -90,6 +90,34 @@ registerToolDef({
     scope: 'instances:read',
 });
 
+registerToolDef({
+  name: 'armada_logs',
+  description: 'Tail logs from an agent instance. Returns recent log lines.',
+  method: 'GET',
+  path: '/api/instances/:id/logs',
+  parameters: [
+    { name: 'id', type: 'string', description: 'Instance ID', required: true },
+    { name: 'lines', type: 'number', description: 'Number of lines (default 100)' },
+    { name: 'level', type: 'string', description: 'Filter by log level (error, warn, info)' },
+    { name: 'agent', type: 'string', description: 'Filter by agent name' },
+  ],
+  scope: 'instances:read',
+});
+
+registerToolDef({
+  name: 'armada_logs_stream',
+  description: 'Stream live logs from an agent instance via SSE.',
+  method: 'GET',
+  path: '/api/instances/:id/logs/stream',
+  parameters: [
+    { name: 'id', type: 'string', description: 'Instance ID', required: true },
+    { name: 'lines', type: 'number', description: 'Number of initial lines (default 100)' },
+    { name: 'level', type: 'string', description: 'Filter by log level (error, warn, info)' },
+    { name: 'agent', type: 'string', description: 'Filter by agent name' },
+  ],
+  scope: 'instances:read',
+});
+
 // ── Routes ──────────────────────────────────────────────────────────
 
 const router = Router();
@@ -368,13 +396,34 @@ router.get('/:id/logs', async (req, res, next) => {
     const instance = resolveInstance(req.params.id);
     if (!instance) return res.status(404).json({ error: 'Instance not found' });
 
-    const tail = parseInt(req.query.tail as string, 10) || 100;
+    const lines = parseInt(req.query.lines as string, 10) || 100;
+    const level = req.query.level as string | undefined;
+    const agent = req.query.agent as string | undefined;
+
     const containerName = `armada-instance-${instance.name}`;
-    const node = getNodeClient();
-    const logs = await node.getContainerLogs(containerName, tail);
-    res.type('text/plain').send(logs);
+    const node = getNodeClient(instance.nodeId);
+    const raw = await node.getContainerLogs(containerName, lines);
+
+    // Split into lines and filter control characters from Docker multiplexed streams
+    let logLines = raw
+      .split('\n')
+      .map((l) => stripDockerPrefix(l).trim())
+      .filter((l) => l.length > 0);
+
+    // Filter by log level if requested
+    if (level) {
+      const lvl = level.toLowerCase();
+      logLines = logLines.filter((l) => l.toLowerCase().includes(lvl));
+    }
+
+    // Filter by agent name if requested
+    if (agent) {
+      logLines = logLines.filter((l) => l.toLowerCase().includes(agent.toLowerCase()));
+    }
+
+    res.json({ logs: logLines });
   } catch (err: any) {
-    if (err.message?.includes('failed:')) {
+    if (err.message?.includes('failed:') || err.message?.includes('not connected')) {
       return res.status(502).json({ error: err.message });
     }
     next(err);
@@ -387,43 +436,55 @@ router.get('/:id/logs/stream', async (req, res, next) => {
     const instance = resolveInstance(req.params.id);
     if (!instance) return res.status(404).json({ error: 'Instance not found' });
 
+    const lines = parseInt(req.query.lines as string, 10) || 100;
+    const level = req.query.level as string | undefined;
+    const agent = req.query.agent as string | undefined;
+
     const containerName = `armada-instance-${instance.name}`;
     const node = getNodeClient(instance.nodeId);
     const sse = setupSSE(res);
 
-    // Fetch initial batch of logs
-    let lastSince = Math.floor(Date.now() / 1000) - 60; // last 60 seconds
+    // Helper: filter and send a raw log line via SSE
+    const sendLine = (raw: string) => {
+      const line = stripDockerPrefix(raw).trim();
+      if (!line) return;
+      if (level && !line.toLowerCase().includes(level.toLowerCase())) return;
+      if (agent && !line.toLowerCase().includes(agent.toLowerCase())) return;
+      sse.send('log', { line });
+    };
+
+    // Fetch initial batch of logs synchronously before starting the stream
     try {
-      const initialLogs = await node.getContainerLogs(containerName, 50);
-      if (initialLogs) {
-        for (const line of initialLogs.split('\n')) {
-          const trimmed = line.trim();
-          if (trimmed) sse.send('log', { line: trimmed });
-        }
-      }
+      const initialLogs = await node.getContainerLogs(containerName, lines);
+      for (const l of initialLogs.split('\n')) sendLine(l);
     } catch (err: any) {
       console.warn('[instances] Failed to fetch initial logs:', err.message);
     }
 
-    // Poll for new log lines every 2 seconds using `since` timestamp
-    const pollInterval = setInterval(async () => {
-      try {
-        const now = Math.floor(Date.now() / 1000);
-        const pollClient = getNodeClient(instance.nodeId);
-        const newLogs = await pollClient.getContainerLogs(containerName, 50, lastSince);
-        lastSince = now;
-        if (newLogs) {
-          for (const line of newLogs.split('\n')) {
-            const trimmed = line.trim();
-            if (trimmed) sse.send('log', { line: trimmed });
-          }
-        }
-      } catch (err: any) {
-        console.warn('[instances] Log poll failed:', err.message);
-      }
-    }, 2000);
+    // Stream live logs via progress events from node (logs.stream action)
+    // The node sends each log line as a ProgressMessage with step='log_line'.
+    // Fall back to polling if the node doesn't support the streaming action.
+    let cleanup: (() => void) | null = null;
 
-    res.on('close', () => clearInterval(pollInterval));
+    try {
+      cleanup = await node.streamContainerLogs(containerName, (line) => sendLine(line));
+    } catch (_streamErr) {
+      // Node doesn't support logs.stream — fall back to 2s polling
+      let lastSince = Math.floor(Date.now() / 1000);
+      const pollInterval = setInterval(async () => {
+        try {
+          const now = Math.floor(Date.now() / 1000);
+          const newLogs = await node.getContainerLogs(containerName, 50, lastSince);
+          lastSince = now;
+          for (const l of newLogs.split('\n')) sendLine(l);
+        } catch (pollErr: any) {
+          console.warn('[instances] Log poll failed:', pollErr.message);
+        }
+      }, 2000);
+      cleanup = () => clearInterval(pollInterval);
+    }
+
+    res.on('close', () => cleanup?.());
   } catch (err) { next(err); }
 });
 
@@ -457,3 +518,18 @@ router.post('/heartbeat', requireScope('instances:write'), (req, res) => {
 });
 
 export default router;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Docker multiplexed log streams prepend an 8-byte header to each frame:
+ *   [stream_type (1)] [padding (3)] [size (4 big-endian)]
+ * Strip these non-printable control bytes so callers receive clean text lines.
+ */
+function stripDockerPrefix(line: string): string {
+  // If the line starts with a non-printable byte in the Docker header range, strip first 8 chars
+  if (line.length > 8 && line.charCodeAt(0) <= 2 && line.charCodeAt(0) >= 0) {
+    return line.slice(8);
+  }
+  return line;
+}
