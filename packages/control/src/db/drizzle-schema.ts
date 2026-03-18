@@ -646,6 +646,18 @@ export const projectAssignments = sqliteTable('project_assignments', {
   uniqueIndex('project_assignment_unique').on(table.projectId, table.assignmentType),
 ]);
 
+// ── workflow_artifacts (#113) ────────────────────────────────────────
+export const workflowArtifacts = sqliteTable('workflow_artifacts', {
+  id: text('id').primaryKey(),
+  runId: text('run_id').notNull(),
+  stepId: text('step_id').notNull(),
+  filename: text('filename').notNull(),
+  mimeType: text('mime_type').notNull().default('application/octet-stream'),
+  size: integer('size').notNull().default(0),
+  storagePath: text('storage_path').notNull(),
+  createdAt: text('created_at').notNull(),
+});
+
 // ── notification_channels (#512) ────────────────────────────────────
 export const notificationChannels = sqliteTable('notification_channels', {
   id: text('id').primaryKey(),

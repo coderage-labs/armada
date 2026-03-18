@@ -429,6 +429,26 @@ const migrations: Migration[] = [
       'ALTER TABLE github_issue_cache ADD COLUMN html_url TEXT',
     ],
   },
+
+  // ── workflow_artifacts (#113) ─────────────────────────────────────
+  {
+    version: 37,
+    description: 'Create workflow_artifacts table for file storage between steps (#113)',
+    sql: [
+      `CREATE TABLE IF NOT EXISTS workflow_artifacts (
+        id           TEXT PRIMARY KEY,
+        run_id       TEXT NOT NULL,
+        step_id      TEXT NOT NULL,
+        filename     TEXT NOT NULL,
+        mime_type    TEXT NOT NULL DEFAULT 'application/octet-stream',
+        size         INTEGER NOT NULL DEFAULT 0,
+        storage_path TEXT NOT NULL,
+        created_at   TEXT NOT NULL
+      )`,
+      'CREATE INDEX IF NOT EXISTS idx_workflow_artifacts_run_id ON workflow_artifacts(run_id)',
+      'CREATE INDEX IF NOT EXISTS idx_workflow_artifacts_step_id ON workflow_artifacts(run_id, step_id)',
+    ],
+  },
 ];
 
 /**

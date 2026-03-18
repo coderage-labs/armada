@@ -51,6 +51,7 @@ import sessionEventsRouter from './routes/session-events.js';
 import { usageRoutes, internalUsageRouter } from './routes/usage.js';
 import { installScriptRoutes } from './routes/install-script.js';
 import { notificationChannelsRoutes } from './routes/notification-channels.js';
+import workflowArtifactRoutes from './routes/workflow-artifacts.js';
 
 export interface AppOptions {
   nodeManager: NodeManager;
@@ -119,6 +120,7 @@ export function createApp(opts: AppOptions): express.Express {
   app.use('/api/tools', createToolRoutes(nodeManager));
   app.use('/api/files', fileRoutes);
   app.use('/api/workflows', workflowRoutes);
+  app.use('/api/workflows/runs', workflowArtifactRoutes);
   app.use('/api/worktrees', worktreeRoutes);
   app.use('/api/triage', triageRoutes);
   app.use('/api/users', userRoutes);
