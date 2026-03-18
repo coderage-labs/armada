@@ -2,25 +2,35 @@ import { eq, and, asc } from 'drizzle-orm';
 import { getDrizzle } from '../db/drizzle.js';
 import { providerApiKeys } from '../db/drizzle-schema.js';
 import type { ProviderApiKey } from '@coderage-labs/armada-shared';
+import { encrypt, decryptIfNeeded, isEncrypted } from '../utils/crypto.js';
 
 type KeyRow = typeof providerApiKeys.$inferSelect;
 
+/**
+ * Convert a DB row to a ProviderApiKey domain object.
+ * Decrypts the apiKey value transparently (handles both legacy plain text
+ * and encrypted enc:v1:… values).
+ */
 function rowToKey(r: KeyRow): ProviderApiKey {
   return {
     id: r.id,
     providerId: r.providerId,
     name: r.name,
-    apiKey: r.apiKey,
+    apiKey: r.apiKey ? decryptIfNeeded(r.apiKey) : r.apiKey,
     isDefault: r.isDefault,
     priority: r.priority,
     createdAt: r.createdAt,
   };
 }
 
-function maskApiKey(key: string | null): string | null {
+/**
+ * Mask an API key for display: show first 3 + last 3 characters.
+ * Accepts the already-decrypted plain text value.
+ */
+export function maskApiKey(key: string | null): string | null {
   if (!key) return null;
-  if (key.length <= 4) return '••••••';
-  return '••••••' + key.slice(-4);
+  if (key.length <= 6) return '••••••';
+  return key.slice(0, 3) + '...' + key.slice(-3);
 }
 
 export const providerApiKeyRepo = {
@@ -82,7 +92,7 @@ export const providerApiKeyRepo = {
       id,
       providerId: data.providerId,
       name: data.name,
-      apiKey: data.apiKey,
+      apiKey: encrypt(data.apiKey),
       isDefault: effectiveDefault,
       priority: data.priority ?? 0,
     }).run();
@@ -96,7 +106,7 @@ export const providerApiKeyRepo = {
 
     const updateData: Record<string, any> = {};
     if (data.name !== undefined) updateData.name = data.name;
-    if (data.apiKey !== undefined) updateData.apiKey = data.apiKey;
+    if (data.apiKey !== undefined) updateData.apiKey = encrypt(data.apiKey);
     if (data.priority !== undefined) updateData.priority = data.priority;
 
     // If setting as default, unset others first
@@ -151,5 +161,26 @@ export const providerApiKeyRepo = {
       .run();
 
     return rowToKey(getDrizzle().select().from(providerApiKeys).where(eq(providerApiKeys.id, id)).get()!);
+  },
+
+  /**
+   * Migrate all legacy plain-text API keys to encrypted form.
+   * Safe to run multiple times (idempotent — already-encrypted keys are skipped).
+   * Returns the number of keys that were migrated.
+   */
+  migrateEncryption(): number {
+    const db = getDrizzle();
+    const allRows = db.select().from(providerApiKeys).all();
+    let migrated = 0;
+    for (const row of allRows) {
+      if (row.apiKey && !isEncrypted(row.apiKey)) {
+        db.update(providerApiKeys)
+          .set({ apiKey: encrypt(row.apiKey) })
+          .where(eq(providerApiKeys.id, row.id))
+          .run();
+        migrated++;
+      }
+    }
+    return migrated;
   },
 };

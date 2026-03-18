@@ -11,6 +11,7 @@ import { modelProviders, providerApiKeys, modelRegistry, templates, agents, auth
 import { instancesRepo, templatesRepo } from '../repositories/index.js';
 import { eq } from 'drizzle-orm';
 import { resolveTemplateModel } from './model-resolver.js';
+import { decryptIfNeeded } from '../utils/crypto.js';
 
 // Armada provider type → OpenClaw API type
 const PROVIDER_API_MAP: Record<string, string> = {
@@ -161,7 +162,7 @@ function generateModelsConfig(): GeneratedConfig {
 
     const entry: any = { api };
     if (baseUrl) entry.baseUrl = baseUrl;
-    if (defaultKey) entry.apiKey = defaultKey.apiKey;
+    if (defaultKey?.apiKey) entry.apiKey = decryptIfNeeded(defaultKey.apiKey);
 
     // Add model list (normalize model IDs to strip date suffixes)
     entry.models = providerModels.map(m => ({
@@ -186,7 +187,7 @@ function generateModelsConfig(): GeneratedConfig {
       for (const fbKey of fallbackKeys) {
         fallbacks.push({
           provider: configKey,
-          apiKey: fbKey.apiKey,
+          apiKey: decryptIfNeeded(fbKey.apiKey),
           fallbackFor: configKey,
           behavior: (provider.fallbackBehavior as 'immediate' | 'backoff') ?? 'immediate',
         });
@@ -370,7 +371,7 @@ export function generateAuthProfiles(): { version: number; profiles: Record<stri
       profiles[profileKey] = {
         provider: provider.type,
         type: 'api_key',
-        key: key.apiKey,
+        key: key.apiKey ? decryptIfNeeded(key.apiKey) : key.apiKey,
       };
     }
   }
