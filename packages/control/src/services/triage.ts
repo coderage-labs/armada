@@ -170,7 +170,9 @@ export async function triageIssue(
           deliverToUser(owner, message, { event: 'triage.owner_fallback', issueNumber: issue.number, issueTitle: issue.title, projectId, projectName, reason });
         }).catch((err: Error) => console.error('[triage] Failed to notify owner:', err.message));
       }
-      // Also notify operators
+      // Also notify operators (excluding already-notified owner)
+      const alreadyNotified2: string[] = [];
+      if (owner) alreadyNotified2.push(owner.id);
       notifyTriageOperatorFallback({
         issueNumber: issue.number,
         issueTitle: issue.title,
@@ -178,6 +180,7 @@ export async function triageIssue(
         projectId,
         projectName,
         reason,
+        excludeUserIds: alreadyNotified2,
       }).catch((err: Error) => console.error('[triage] Failed to send operator fallback notification:', err.message));
     }
     return { triaged: false, by: 'operator' };
