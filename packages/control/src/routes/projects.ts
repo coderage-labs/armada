@@ -10,6 +10,7 @@ import { logActivity } from '../services/activity-service.js';
 import { emitTaskEvent } from './tasks.js';
 import { dispatchWebhook } from '../services/webhook-dispatcher.js';
 import { syncProjectIssues, getCachedIssues } from '../services/github-sync.js';
+import { isIssueTriaged } from '../services/triage.js';
 import type { BoardColumn, MeshTask } from '@coderage-labs/armada-shared';
 
 // ── SSE event bus for project events ────────────────────────────────
@@ -366,9 +367,9 @@ router.get('/:id/issues', (req, res) => {
     res.json(cached);
     return;
   }
-  // Filter out issues that already have a corresponding task in the DB
-  const existingNumbers = tasksRepo.getGithubIssueNumbers(project.name);
-  const filtered = cached.filter(i => !existingNumbers.includes(i.number));
+  // Filter out issues that already have a corresponding task OR are triaged
+  const existingNumbers = new Set(tasksRepo.getGithubIssueNumbers(project.name));
+  const filtered = cached.filter(i => !existingNumbers.has(i.number) && !isIssueTriaged(project.id, i.number));
   res.json(filtered);
 });
 

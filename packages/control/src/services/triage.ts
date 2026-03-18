@@ -42,7 +42,7 @@ const CONTROL_PLANE_URL = process.env.ARMADA_API_URL || 'http://armada-control:3
 
 // ── Persistent triage state (DB-backed) ─────────────────────────────
 
-function isIssueTriaged(projectId: string, issueNumber: number): boolean {
+export function isIssueTriaged(projectId: string, issueNumber: number): boolean {
   const row = getDrizzle()
     .select({ id: triagedIssues.id })
     .from(triagedIssues)

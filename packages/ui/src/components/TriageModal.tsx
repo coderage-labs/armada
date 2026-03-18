@@ -106,19 +106,8 @@ export default function TriageModal({
     setLoadingWorkflows(true);
     apiFetch<WorkflowInfo[]>(`/api/workflows?projectId=${projectId}`)
       .then((wfs) => {
-        // Filter to enabled workflows, optionally filtered by project
-        const enabled = wfs.filter((wf) => {
-          if (!wf.enabled) return false;
-          // If the workflow has projectIds / projectId, filter; otherwise show all
-          if (wf.projectIds && wf.projectIds.length > 0) {
-            return wf.projectIds.includes(projectId);
-          }
-          if (wf.projectId) {
-            return wf.projectId === projectId;
-          }
-          return false; // only show workflows explicitly linked to this project
-        });
-        setWorkflows(enabled);
+        // API already filters by project — just filter to enabled
+        setWorkflows(wfs.filter((wf) => wf.enabled !== false));
       })
       .catch((err) => {
         console.error('Failed to load workflows:', err);
