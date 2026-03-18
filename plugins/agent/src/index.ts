@@ -1036,6 +1036,45 @@ export default function register(api: any) {
     },
   });
 
+  // ── HTTP: Abort — cancel a running inbound task ─────────────────────
+
+  api.registerHttpRoute({
+    auth: 'plugin',
+    path: '/armada/abort',
+    handler: async (req: IncomingMessage, res: ServerResponse) => {
+      const body = await readBody(req);
+      const { taskId } = body;
+
+      if (!taskId) {
+        return sendJson(res, 400, { error: 'taskId required' });
+      }
+
+      // Find the inbound context for this task
+      let inbound: InboundContext | undefined;
+      for (const [, ctx] of inboundContexts) {
+        if (ctx.taskId === taskId) { inbound = ctx; break; }
+      }
+
+      if (!inbound) {
+        _logger.warn(`[armada-agent] Abort requested for unknown task ${taskId}`);
+        return sendJson(res, 404, { error: `No active task found: ${taskId}` });
+      }
+
+      if (inbound.finalized) {
+        return sendJson(res, 200, { aborted: false, taskId, reason: 'already finalized' });
+      }
+
+      _logger.info(`[armada-agent] Aborting task ${taskId} via /armada/abort`);
+      sendJson(res, 200, { aborted: true, taskId });
+
+      // Finalize with cancelled status (fire-and-forget)
+      finalizeInbound(inbound, 'Task cancelled by workflow engine', 'cancelled', _logger);
+      _activeTasks--;
+      reportTask('update', { id: taskId, status: 'cancelled' });
+      saveAgentTasks();
+    },
+  });
+
   // ── HTTP: Notify — receive notifications from armada control ────────
 
   api.registerHttpRoute({

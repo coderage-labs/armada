@@ -18,7 +18,8 @@ import { eq, and, desc, sql, inArray } from 'drizzle-orm';
 import { dispatchWebhook } from './webhook-dispatcher.js';
 import { broadcast } from '../utils/event-bus.js';
 import { getArtifactContextBlock } from '../routes/workflow-artifacts.js';
-import { projectsRepo } from '../repositories/index.js';
+import { projectsRepo, agentsRepo, instancesRepo } from '../repositories/index.js';
+import { getNodeClient } from '../infrastructure/node-client.js';
 
 // Types — mirror shared package types locally to avoid build ordering issues
 interface WorkflowStep {
@@ -1087,12 +1088,41 @@ async function closeGithubIssueForRun(
 
 // ── Cancel a run ────────────────────────────────────────────────────
 
-export function cancelRun(runId: string): void {
+export async function cancelRun(runId: string): Promise<void> {
   const db = getDrizzle();
   const now = sql`strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`;
+
+  // Query running step runs BEFORE updating status (we need agentName + taskId)
+  const runningSteps = db.select().from(workflowStepRuns)
+    .where(and(eq(workflowStepRuns.runId, runId), eq(workflowStepRuns.status, 'running')))
+    .all();
+
   db.run(sql`UPDATE workflow_runs SET status = 'cancelled', completed_at = ${now} WHERE id = ${runId}`);
   db.run(sql`UPDATE workflow_step_runs SET status = 'cancelled', completed_at = ${now} WHERE run_id = ${runId} AND status = 'running'`);
   db.run(sql`UPDATE workflow_step_runs SET status = 'skipped' WHERE run_id = ${runId} AND status IN ('pending', 'waiting_gate', 'waiting_for_rework')`);
+
+  // Fire-and-forget abort requests to running agents
+  for (const stepRun of runningSteps) {
+    if (!stepRun.agentName || !stepRun.taskId) continue;
+
+    try {
+      const agentRecord = agentsRepo.getAll().find(a => a.name === stepRun.agentName);
+      if (!agentRecord?.instanceId) continue;
+
+      const instance = instancesRepo.getById(agentRecord.instanceId);
+      if (!instance?.nodeId) continue;
+
+      const containerName = `armada-instance-${instance.name}`;
+      const node = getNodeClient(instance.nodeId);
+
+      node.relayRequest(containerName, 'POST', '/armada/abort', { taskId: stepRun.taskId })
+        .catch((err: any) => {
+          console.warn(`[workflow-engine] Failed to abort task ${stepRun.taskId} on ${stepRun.agentName}: ${err.message}`);
+        });
+    } catch (err: any) {
+      console.warn(`[workflow-engine] Error sending abort for step ${stepRun.stepId}: ${err.message}`);
+    }
+  }
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────
