@@ -422,6 +422,13 @@ const migrations: Migration[] = [
       'ALTER TABLE github_issue_cache ADD COLUMN body TEXT',
     ],
   },
+  {
+    version: 36,
+    description: 'Add html_url column to github_issue_cache for issue links',
+    sql: [
+      'ALTER TABLE github_issue_cache ADD COLUMN html_url TEXT',
+    ],
+  },
 ];
 
 /**

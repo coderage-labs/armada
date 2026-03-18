@@ -557,15 +557,7 @@ function IssuesTab({
           {syncing ? 'Syncing…' : 'Sync'}
         </Button>
 
-        {/* Triage All */}
-        <Button
-          variant="ghost" onClick={handleTriageAll}
-          disabled={triagingAll}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-violet-600/80 hover:bg-violet-500 text-sm text-white font-medium transition-colors disabled:opacity-40"
-        >
-          <Zap className="w-3.5 h-3.5" />
-          {triagingAll ? 'Triaging…' : 'Triage All'}
-        </Button>
+
       </div>
 
       {/* Sync status */}
