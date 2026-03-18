@@ -176,10 +176,10 @@ async function start() {
   initEventWiring();
 
   // ── GitHub sync scheduler ─────────────────────────────────────────
-  if (process.env.GITHUB_TOKEN) {
-    startGithubSyncScheduler();
-    console.log('🔄 GitHub sync scheduler started (every 30m)');
-  }
+  // Always start — individual projects use their integration token,
+  // falling back to GITHUB_TOKEN env var. Projects without any token skip.
+  startGithubSyncScheduler();
+  console.log('🔄 GitHub sync scheduler started (per-project intervals, checking every 60s)');
 
   // ── Stuck task detector ─────────────────────────────────────────────
   startStuckDetector();

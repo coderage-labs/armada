@@ -31,6 +31,7 @@ function rowToProject(r: typeof projects.$inferSelect): Project {
     configJson: r.configJson,
     repositories,
     maxConcurrent: r.maxConcurrent ?? 3,
+    githubSyncIntervalMinutes: typeof config.githubSyncIntervalMinutes === 'number' ? config.githubSyncIntervalMinutes : undefined,
     createdAt: r.createdAt,
   };
 }
@@ -93,7 +94,7 @@ export const projectsRepo = {
     return rowToProject(getDrizzle().select().from(projects).where(eq(projects.id, id)).get()!);
   },
 
-  update(id: string, data: Partial<{ name: string; description: string; context_md: string; color: string; icon: string | null; archived: boolean; config_json: string; repositories: ProjectRepository[]; maxConcurrent: number }>): Project {
+  update(id: string, data: Partial<{ name: string; description: string; context_md: string; color: string; icon: string | null; archived: boolean; config_json: string; repositories: ProjectRepository[]; maxConcurrent: number; githubSyncIntervalMinutes: number }>): Project {
     const existing = projectsRepo.get(id);
     if (!existing) throw new Error(`Project not found: ${id}`);
 
@@ -112,7 +113,14 @@ export const projectsRepo = {
       const config = JSON.parse(existing.configJson || '{}');
       config.repositories = data.repositories;
       updates.configJson = JSON.stringify(config);
-    } else if (data.config_json !== undefined) {
+    }
+    // Handle githubSyncIntervalMinutes — merge into config_json
+    if (data.githubSyncIntervalMinutes !== undefined) {
+      const config = JSON.parse(updates.configJson || existing.configJson || '{}');
+      config.githubSyncIntervalMinutes = data.githubSyncIntervalMinutes;
+      updates.configJson = JSON.stringify(config);
+    }
+    if (data.config_json !== undefined && !data.repositories && data.githubSyncIntervalMinutes === undefined) {
       updates.configJson = data.config_json;
     }
 
