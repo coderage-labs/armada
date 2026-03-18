@@ -289,6 +289,7 @@ If none of the workflows fit, respond with:
       taskText: `Triage issue #${issue.number}: ${issue.title}`,
       result: null,
       status: 'running',
+      projectId: projectName,
     });
 
     markIssueTriage(projectId, issue.number);

@@ -61,21 +61,42 @@ export function getProjectMetrics(projectId: string): ProjectMetrics | null {
   const db = getDrizzle();
   const pid = project.name;
 
-  // Tasks by status
+  // Tasks by status — union of:
+  //   1. Tasks directly linked to this project (project_id = project name)
+  //   2. Tasks linked via workflow step runs → workflow runs → project
+  // This handles both legacy tasks (no project_id) and new tasks (project_id set).
   const taskRows = db.all<{ status: string; count: number }>(
-    sql`SELECT status, COUNT(*) as count FROM tasks WHERE project_id = ${pid} GROUP BY status`,
+    sql`SELECT status, COUNT(*) as count FROM (
+      SELECT t.status FROM tasks t
+      WHERE t.project_id = ${pid}
+      UNION ALL
+      SELECT t.status FROM tasks t
+      INNER JOIN workflow_step_runs wsr ON wsr.task_id = t.id
+      INNER JOIN workflow_runs wr ON wr.id = wsr.run_id
+      WHERE wr.project_id = ${project.id}
+        AND (t.project_id IS NULL OR t.project_id != ${pid})
+    ) GROUP BY status`,
   );
   const taskCounts: Record<string, number> = {};
   let taskTotal = 0;
   for (const r of taskRows) { taskCounts[r.status] = r.count; taskTotal += r.count; }
 
-  // Task timing
+  // Task timing — same union approach
   const timingRow = db.get<{ avg_ms: number | null; min_ms: number | null; max_ms: number | null }>(
     sql`SELECT
       AVG(CASE WHEN completed_at IS NOT NULL THEN (julianday(completed_at) - julianday(created_at)) * 86400000 END) as avg_ms,
       MIN(CASE WHEN completed_at IS NOT NULL THEN (julianday(completed_at) - julianday(created_at)) * 86400000 END) as min_ms,
       MAX(CASE WHEN completed_at IS NOT NULL THEN (julianday(completed_at) - julianday(created_at)) * 86400000 END) as max_ms
-    FROM tasks WHERE project_id = ${pid}`,
+    FROM (
+      SELECT t.created_at, t.completed_at FROM tasks t
+      WHERE t.project_id = ${pid}
+      UNION ALL
+      SELECT t.created_at, t.completed_at FROM tasks t
+      INNER JOIN workflow_step_runs wsr ON wsr.task_id = t.id
+      INNER JOIN workflow_runs wr ON wr.id = wsr.run_id
+      WHERE wr.project_id = ${project.id}
+        AND (t.project_id IS NULL OR t.project_id != ${pid})
+    )`,
   ) ?? { avg_ms: null, min_ms: null, max_ms: null };
 
   // Workflow runs by status
@@ -109,7 +130,8 @@ export function getProjectMetrics(projectId: string): ProjectMetrics | null {
     }
   }
 
-  // Activity counts
+  // Activity counts — count workflow step runs completed/started for this project
+  // (more accurate than tasks since every workflow step = one unit of work)
   const now = new Date();
   const ago24h = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
   const ago7d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -117,7 +139,17 @@ export function getProjectMetrics(projectId: string): ProjectMetrics | null {
 
   const activityCount = (since: string) => {
     const row = db.get<{ count: number }>(
-      sql`SELECT COUNT(*) as count FROM tasks WHERE project_id = ${pid} AND created_at >= ${since}`,
+      sql`SELECT COUNT(*) as count FROM (
+        SELECT t.id FROM tasks t
+        WHERE t.project_id = ${pid} AND t.created_at >= ${since}
+        UNION ALL
+        SELECT t.id FROM tasks t
+        INNER JOIN workflow_step_runs wsr ON wsr.task_id = t.id
+        INNER JOIN workflow_runs wr ON wr.id = wsr.run_id
+        WHERE wr.project_id = ${project.id}
+          AND (t.project_id IS NULL OR t.project_id != ${pid})
+          AND t.created_at >= ${since}
+      )`,
     );
     return row?.count ?? 0;
   };
@@ -129,7 +161,18 @@ export function getProjectMetrics(projectId: string): ProjectMetrics | null {
     const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
     const dayLabel = dayStart.toISOString().slice(0, 10);
     const row = db.get<{ count: number }>(
-      sql`SELECT COUNT(*) as count FROM tasks WHERE project_id = ${pid} AND created_at >= ${dayStart.toISOString()} AND created_at < ${dayEnd.toISOString()}`,
+      sql`SELECT COUNT(*) as count FROM (
+        SELECT t.id FROM tasks t
+        WHERE t.project_id = ${pid}
+          AND t.created_at >= ${dayStart.toISOString()} AND t.created_at < ${dayEnd.toISOString()}
+        UNION ALL
+        SELECT t.id FROM tasks t
+        INNER JOIN workflow_step_runs wsr ON wsr.task_id = t.id
+        INNER JOIN workflow_runs wr ON wr.id = wsr.run_id
+        WHERE wr.project_id = ${project.id}
+          AND (t.project_id IS NULL OR t.project_id != ${pid})
+          AND t.created_at >= ${dayStart.toISOString()} AND t.created_at < ${dayEnd.toISOString()}
+      )`,
     );
     dailyActivity.push({ date: dayLabel, count: row?.count ?? 0 });
   }

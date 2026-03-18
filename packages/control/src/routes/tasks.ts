@@ -47,9 +47,12 @@ router.get('/', (req, res) => {
   const limit = Math.min(parseInt(req.query.limit as string, 10) || 50, 200);
   const agent = req.query.agent as string | undefined;
   const status = req.query.status as string | undefined;
+  const projectId = req.query.projectId as string | undefined;
 
   let tasks: MeshTask[];
-  if (agent) {
+  if (projectId) {
+    tasks = tasksRepo.getByProject(projectId, limit);
+  } else if (agent) {
     tasks = tasksRepo.getByAgent(agent, limit);
   } else if (status) {
     tasks = tasksRepo.getByStatus(status, limit);

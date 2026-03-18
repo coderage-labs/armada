@@ -1931,7 +1931,7 @@ export default function ProjectDetail() {
       const [issueData, memberData, taskData, metricsData] = await Promise.all([
         apiFetch<GitHubIssue[]>(`/api/projects/${id}/issues`).catch(() => []),
         apiFetch<{ members: AgentInfo[] }>(`/api/projects/${id}/members`).catch(() => ({ members: [] })),
-        apiFetch<ArmadaTask[]>('/api/tasks?limit=50').catch(() => []),
+        apiFetch<ArmadaTask[]>(`/api/tasks?projectId=${encodeURIComponent(project.name)}&limit=50`).catch(() => []),
         apiFetch<ProjectMetrics>(`/api/projects/${id}/metrics`).catch(() => null),
       ]);
       setMetrics(metricsData);
@@ -1964,11 +1964,7 @@ export default function ProjectDetail() {
         setAgents(membersList as AgentInfo[]);
       }
 
-      // Filter tasks for this project
-      const projectTasks = taskData.filter(
-        (t) => t.projectId === project.name || t.projectId === project.id,
-      );
-      setTasks(projectTasks);
+      setTasks(taskData);
 
       // Load workflows
       try {
