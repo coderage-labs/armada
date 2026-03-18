@@ -181,7 +181,7 @@ export async function initTelegramBot(): Promise<void> {
 
       // Parse callback data
       const parts = data.split(':');
-      const namespace = parts[0];
+      const namespace: string = parts[0];
 
       if (parts.length < 3 || (namespace !== 'gate' && namespace !== 'triage')) {
         await ctx.answerCallbackQuery({ text: 'Invalid callback data' });
