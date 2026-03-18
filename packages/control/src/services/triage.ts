@@ -154,6 +154,7 @@ export async function triageIssue(
       notifyTriageOperatorFallback({
         issueNumber: issue.number,
         issueTitle: issue.title,
+        issueUrl: issue.htmlUrl || (issue as any).url || '',
         projectId,
         projectName,
         reason,
@@ -179,6 +180,7 @@ export async function triageIssue(
       notifyTriageOperatorFallback({
         issueNumber: issue.number,
         issueTitle: issue.title,
+        issueUrl: issue.htmlUrl || (issue as any).url || '',
         projectId,
         projectName,
         reason,
@@ -234,7 +236,7 @@ If none of the workflows fit, respond with:
     console.error(`[triage] PM ${pm.name} has no instanceId`);
     const reason = `PM agent "${pm.name}" has no associated instance`;
     if (shouldNotifyFallback(projectId, issue.number)) {
-      notifyTriageOperatorFallback({ issueNumber: issue.number, issueTitle: issue.title, projectId, projectName, reason })
+      notifyTriageOperatorFallback({ issueNumber: issue.number, issueTitle: issue.title, issueUrl: issue.htmlUrl || (issue as any).url || '', projectId, projectName, reason })
         .catch((err: Error) => console.error('[triage] Failed to send operator fallback notification:', err.message));
     }
     return { triaged: false, by: 'operator' };
@@ -244,7 +246,7 @@ If none of the workflows fit, respond with:
     console.error(`[triage] Instance for PM ${pm.name} has no nodeId`);
     const reason = `PM agent "${pm.name}" instance has no associated node`;
     if (shouldNotifyFallback(projectId, issue.number)) {
-      notifyTriageOperatorFallback({ issueNumber: issue.number, issueTitle: issue.title, projectId, projectName, reason })
+      notifyTriageOperatorFallback({ issueNumber: issue.number, issueTitle: issue.title, issueUrl: issue.htmlUrl || (issue as any).url || '', projectId, projectName, reason })
         .catch((err: Error) => console.error('[triage] Failed to send operator fallback notification:', err.message));
     }
     return { triaged: false, by: 'operator' };
@@ -276,7 +278,7 @@ If none of the workflows fit, respond with:
       console.error(`[triage] PM ${pm.name} rejected triage task: ${JSON.stringify(resp)}`);
       const reason = `PM agent "${pm.name}" rejected the triage task (HTTP ${status})`;
       if (shouldNotifyFallback(projectId, issue.number)) {
-        notifyTriageOperatorFallback({ issueNumber: issue.number, issueTitle: issue.title, projectId, projectName, reason })
+        notifyTriageOperatorFallback({ issueNumber: issue.number, issueTitle: issue.title, issueUrl: issue.htmlUrl || (issue as any).url || '', projectId, projectName, reason })
           .catch((err: Error) => console.error('[triage] Failed to send operator fallback notification:', err.message));
       }
       return { triaged: false, by: 'operator' };
@@ -306,7 +308,7 @@ If none of the workflows fit, respond with:
     console.error(`[triage] Failed to reach PM ${pm.name}:`, err.message);
     const reason = `Could not reach PM agent "${pm.name}": ${err.message}`;
     if (shouldNotifyFallback(projectId, issue.number)) {
-      notifyTriageOperatorFallback({ issueNumber: issue.number, issueTitle: issue.title, projectId, projectName, reason })
+      notifyTriageOperatorFallback({ issueNumber: issue.number, issueTitle: issue.title, issueUrl: issue.htmlUrl || (issue as any).url || '', projectId, projectName, reason })
         .catch((notifyErr: Error) => console.error('[triage] Failed to send operator fallback notification:', notifyErr.message));
     }
     return { triaged: false, by: 'operator' };
