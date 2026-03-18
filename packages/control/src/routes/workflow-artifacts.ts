@@ -8,7 +8,7 @@
 
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, createReadStream, writeFileSync, existsSync, unlinkSync, statSync } from 'node:fs';
+import { mkdirSync, createReadStream, readFileSync, writeFileSync, existsSync, unlinkSync, statSync } from 'node:fs';
 import { dirname, basename, join } from 'node:path';
 import { getDrizzle } from '../db/drizzle.js';
 import { workflowArtifacts } from '../db/drizzle-schema.js';
@@ -219,15 +219,56 @@ router.get('/:runId/artifacts/:artifactId', requireScope('workflows:read'), asyn
       return;
     }
 
-    res.setHeader('Content-Type', artifact.mimeType);
-    res.setHeader('Content-Length', artifact.size);
-
+    // If requested as raw download (browser/curl), stream the file
     if (download === 'true') {
+      res.setHeader('Content-Type', artifact.mimeType);
+      res.setHeader('Content-Length', artifact.size);
       res.setHeader('Content-Disposition', `attachment; filename="${artifact.filename}"`);
+      const stream = createReadStream(artifact.storagePath);
+      stream.pipe(res);
+      return;
     }
 
-    const stream = createReadStream(artifact.storagePath);
-    stream.pipe(res);
+    // For tool/API access: return content as JSON so agents can read it inline
+    const isText = artifact.mimeType.startsWith('text/') ||
+      artifact.mimeType === 'application/json' ||
+      artifact.mimeType === 'application/javascript' ||
+      artifact.mimeType === 'application/xml' ||
+      artifact.mimeType === 'application/yaml' ||
+      artifact.filename.endsWith('.md') ||
+      artifact.filename.endsWith('.txt') ||
+      artifact.filename.endsWith('.json') ||
+      artifact.filename.endsWith('.yml') ||
+      artifact.filename.endsWith('.yaml') ||
+      artifact.filename.endsWith('.ts') ||
+      artifact.filename.endsWith('.js') ||
+      artifact.filename.endsWith('.py') ||
+      artifact.filename.endsWith('.sh');
+
+    if (isText && artifact.size < 1_000_000) {
+      // Return text content inline as JSON — agents can read it directly
+      const content = readFileSync(artifact.storagePath, 'utf-8');
+      res.json({
+        id: artifact.id,
+        filename: artifact.filename,
+        stepId: artifact.stepId,
+        mimeType: artifact.mimeType,
+        size: artifact.size,
+        content,
+      });
+    } else {
+      // Binary or large files: return base64-encoded
+      const buffer = readFileSync(artifact.storagePath);
+      res.json({
+        id: artifact.id,
+        filename: artifact.filename,
+        stepId: artifact.stepId,
+        mimeType: artifact.mimeType,
+        size: artifact.size,
+        encoding: 'base64',
+        content: buffer.toString('base64'),
+      });
+    }
   } catch (err) {
     console.error('[workflow-artifacts] GET download error:', err);
     res.status(500).json({ error: 'Internal server error' });
