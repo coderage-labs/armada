@@ -15,7 +15,7 @@
 
 import type { ArmadaUser } from '@coderage-labs/armada-shared';
 import { usersRepo, assignmentRepo, notificationChannelRepo } from '../repositories/index.js';
-import { sendGateNotification, sendPlainNotification } from './telegram-bot.js';
+import { sendGateNotification, sendPlainNotification, sendTriageNotification } from './telegram-bot.js';
 import { sendSlackGateNotification, sendSlackNotification } from './slack-bot.js';
 import { sendDiscordGateNotification, sendDiscordNotification } from './discord-bot.js';
 import { getDrizzle } from '../db/drizzle.js';
@@ -52,6 +52,7 @@ export interface NotifyCompletionOptions {
 export interface NotifyTriageOperatorFallbackOptions {
   issueNumber: number;
   issueTitle: string;
+  issueUrl?: string;
   projectId: string;
   projectName: string;
   reason: string;
@@ -204,7 +205,7 @@ export async function notifyCompletion(opts: NotifyCompletionOptions): Promise<v
  * - Rate-limited: at most one notification per issue (caller responsibility via cooldown map)
  */
 export async function notifyTriageOperatorFallback(opts: NotifyTriageOperatorFallbackOptions): Promise<void> {
-  const { issueNumber, issueTitle, projectId, projectName, reason, excludeUserIds } = opts;
+  const { issueNumber, issueTitle, issueUrl, projectId, projectName, reason, excludeUserIds } = opts;
 
   // Get users assigned to project via assignments — only notify project members
   let users = assignmentRepo.getAllAssignedUsers(projectId);
@@ -231,6 +232,7 @@ export async function notifyTriageOperatorFallback(opts: NotifyTriageOperatorFal
         event: 'triage.operator_fallback',
         issueNumber,
         issueTitle,
+        issueUrl,
         projectId,
         projectName,
         reason,
@@ -261,8 +263,9 @@ export async function deliverToUser(
   const telegramId = userChannels.telegram?.platformId;
   if (enabledTypes.has('telegram') && telegramId) {
     const isGate = payload.event === 'workflow.gate';
+    const isTriage = payload.event === 'triage.operator_fallback' || payload.event === 'triage.owner_fallback';
     deliveries.push(
-      sendTelegram(telegramId, message, isGate, payload.runId, payload.stepId).then(msgId => {
+      sendTelegram(telegramId, message, isGate, payload.runId, payload.stepId, isTriage, payload.projectId, payload.issueNumber, payload.issueUrl).then(msgId => {
         if (msgId !== null) telegramResult = { chatId: telegramId, messageId: msgId };
       })
     );
@@ -385,11 +388,19 @@ async function sendTelegram(
   isGate: boolean,
   runId?: string,
   stepId?: string,
+  isTriage?: boolean,
+  projectId?: string,
+  issueNumber?: number,
+  issueUrl?: string,
 ): Promise<number | null> {
   try {
     if (isGate && runId && stepId) {
       // Send gate notification with approve/reject buttons — returns message ID
       return await sendGateNotification(chatId, message, runId, stepId);
+    } else if (isTriage && projectId && issueNumber != null) {
+      // Send triage notification with inline action buttons
+      await sendTriageNotification(chatId, message, projectId, issueNumber, issueUrl ?? '');
+      return null;
     } else {
       // Send plain notification (completion/failure)
       await sendPlainNotification(chatId, message);
