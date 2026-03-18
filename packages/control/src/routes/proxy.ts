@@ -60,6 +60,7 @@ function auditLog(agent: string, project: string, action: string, detail?: strin
 
 // List issues for a project
 registerToolDef({
+  category: 'issues',
   name: 'armada_issue_list',
   description: 'List issues from a project\'s connected issue tracker',
   method: 'POST',
@@ -108,6 +109,7 @@ router.post('/list', async (req, res, next) => {
 
 // Get a single issue
 registerToolDef({
+  category: 'issues',
   name: 'armada_issue_get',
   description: 'Get full details of a specific issue',
   method: 'POST',
@@ -143,6 +145,7 @@ router.post('/get', async (req, res, next) => {
 
 // Add a comment to an issue
 registerToolDef({
+  category: 'issues',
   name: 'armada_issue_comment',
   description: 'Add a comment to an issue',
   method: 'POST',
@@ -179,6 +182,7 @@ router.post('/comment', requireScope('integrations:write'), async (req, res, nex
 
 // Transition/change issue status
 registerToolDef({
+  category: 'issues',
   name: 'armada_issue_transition',
   description: 'Change the status of an issue',
   method: 'POST',
@@ -215,6 +219,7 @@ router.post('/transition', requireScope('integrations:write'), async (req, res, 
 
 // Search issues (provider-specific query)
 registerToolDef({
+  category: 'issues',
   name: 'armada_issue_search',
   description: 'Search issues using provider-specific query (JQL for Jira, query for GitHub)',
   method: 'POST',

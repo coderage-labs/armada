@@ -79,6 +79,7 @@ function validateRepo(repos: string[], repo: string): boolean {
 
 // List available repos
 registerToolDef({
+  category: 'issues',
   name: 'armada_pr_repos',
   description: 'List available repositories for a project\'s VCS integration',
   method: 'POST',
@@ -133,6 +134,7 @@ router.post('/repos', async (req, res, next) => {
 
 // List PRs
 registerToolDef({
+  category: 'issues',
   name: 'armada_pr_list',
   description: 'List pull requests for a project repository',
   method: 'POST',
@@ -197,6 +199,7 @@ router.post('/list', async (req, res, next) => {
 
 // Get a single PR
 registerToolDef({
+  category: 'issues',
   name: 'armada_pr_get',
   description: 'Get full details of a pull request including reviews and diff stats',
   method: 'POST',
@@ -234,6 +237,7 @@ router.post('/get', async (req, res, next) => {
 
 // Get PR reviews
 registerToolDef({
+  category: 'issues',
   name: 'armada_pr_reviews',
   description: 'Get reviews and inline comments for a pull request',
   method: 'POST',
@@ -271,6 +275,7 @@ router.post('/reviews', async (req, res, next) => {
 
 // Add a comment to a PR
 registerToolDef({
+  category: 'issues',
   name: 'armada_pr_comment',
   description: 'Add a comment to a pull request (general or inline)',
   method: 'POST',
@@ -312,6 +317,7 @@ router.post('/comment', requireScope('integrations:write'), async (req, res, nex
 
 // Create a PR
 registerToolDef({
+  category: 'issues',
   name: 'armada_pr_create',
   description: 'Create a pull request',
   method: 'POST',
@@ -369,6 +375,7 @@ router.post('/create', requireScope('integrations:write'), async (req, res, next
 
 // Merge a PR
 registerToolDef({
+  category: 'issues',
   name: 'armada_pr_merge',
   description: 'Merge a pull request',
   method: 'POST',
@@ -409,6 +416,7 @@ router.post('/merge', requireScope('integrations:write'), async (req, res, next)
 
 // Update a PR
 registerToolDef({
+  category: 'issues',
   name: 'armada_pr_update',
   description: 'Update a pull request (title, body, state, labels, assignees)',
   method: 'POST',

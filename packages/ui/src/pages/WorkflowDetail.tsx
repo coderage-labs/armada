@@ -128,6 +128,13 @@ function StepEditorDialog({
   const [loopUntilApproved, setLoopUntilApproved] = useState(step?.loopUntilApproved ?? false);
   const [loopBackToStep, setLoopBackToStep] = useState(step?.loopBackToStep ?? '');
   const [maxLoopIterations, setMaxLoopIterations] = useState(step?.maxLoopIterations ?? 5);
+  const [toolCategories, setToolCategories] = useState<string[]>(step?.toolCategories || []);
+
+  const TOOL_CATEGORIES = [
+    'instances', 'projects', 'issues', 'workflows', 'git', 'changesets',
+    'integrations', 'notifications', 'system', 'hierarchy', 'plugins',
+    'admin', 'tasks', 'tools',
+  ];
 
   useEffect(() => {
     apiFetch<{ rules: Record<string, string[]> }>('/api/hierarchy')
@@ -177,6 +184,7 @@ function StepEditorDialog({
       loopUntilApproved: loopUntilApproved || undefined,
       loopBackToStep: loopUntilApproved && loopBackToStep.trim() ? loopBackToStep.trim() : undefined,
       maxLoopIterations: loopUntilApproved ? maxLoopIterations : undefined,
+      toolCategories: toolCategories.length > 0 ? toolCategories : undefined,
     });
   }
 
@@ -384,6 +392,46 @@ function StepEditorDialog({
               </div>
             </div>
           )}
+
+          {/* Tool Categories */}
+          <div className="border-t border-zinc-700/50 pt-3">
+            <div className="mb-2">
+              <div className="text-sm text-zinc-300">Tool Categories</div>
+              <div className="text-xs text-zinc-500">Restrict which tools the agent can use (empty = all tools)</div>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {TOOL_CATEGORIES.map(cat => {
+                const selected = toolCategories.includes(cat);
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => {
+                      setToolCategories(prev =>
+                        selected ? prev.filter(c => c !== cat) : [...prev, cat]
+                      );
+                    }}
+                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
+                      selected
+                        ? 'bg-violet-500/30 text-violet-300 border border-violet-500/50'
+                        : 'bg-zinc-800/50 text-zinc-500 border border-zinc-700 hover:border-zinc-600 hover:text-zinc-400'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                );
+              })}
+            </div>
+            {toolCategories.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setToolCategories([])}
+                className="mt-1.5 text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors"
+              >
+                Clear all
+              </button>
+            )}
+          </div>
         </div>
 
         <DialogFooter>

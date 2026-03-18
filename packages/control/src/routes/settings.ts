@@ -6,6 +6,7 @@ import { logActivity } from '../services/activity-service.js';
 import { registerToolDef } from '../utils/tool-registry.js';
 
 registerToolDef({
+  category: 'system',
   name: 'armada_settings_get',
   description: 'Get all armada settings (version, retention, avatar generation, sync interval).',
   method: 'GET', path: '/api/settings', parameters: [],
@@ -13,6 +14,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'system',
   name: 'armada_settings_update',
   description: 'Update a armada setting by key.',
   method: 'PUT', path: '/api/settings',

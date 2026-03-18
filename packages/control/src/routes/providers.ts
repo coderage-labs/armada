@@ -10,12 +10,14 @@ import { workingCopy } from '../services/working-copy.js';
 import type { ModelProvider, ProviderApiKey } from '@coderage-labs/armada-shared';
 
 registerToolDef({
+  category: 'system',
   name: 'armada_providers_list',
   description: 'List all model providers (Anthropic, OpenAI, OpenRouter, Google).',
   method: 'GET', path: '/api/providers', parameters: [],
 });
 
 registerToolDef({
+  category: 'system',
   name: 'armada_provider_get',
   description: 'Get a model provider by ID.',
   method: 'GET', path: '/api/providers/:id',
@@ -23,6 +25,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'system',
   name: 'armada_provider_update',
   description: 'Update a model provider (base URL, enabled state).',
   method: 'PUT', path: '/api/providers/:id',
@@ -35,6 +38,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'system',
   name: 'armada_provider_discover_models',
   description: 'Discover available models from a provider (requires API key configured).',
   method: 'GET', path: '/api/providers/:id/models',
@@ -42,6 +46,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'system',
   name: 'armada_provider_sync_models',
   description: 'Sync discovered models into the model registry from a provider.',
   method: 'POST', path: '/api/providers/:id/sync',
@@ -50,6 +55,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'system',
   name: 'armada_provider_keys_list',
   description: 'List API keys for a provider (masked).',
   method: 'GET', path: '/api/providers/:id/keys',
@@ -57,6 +63,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'system',
   name: 'armada_provider_key_add',
   description: 'Add a named API key to a provider.',
   method: 'POST', path: '/api/providers/:id/keys',

@@ -32,6 +32,7 @@ const router = Router();
 // ── Tool definitions ─────────────────────────────────────────────────
 
 registerToolDef({
+  category: 'projects',
   name: 'armada_projects_list',
   description: 'List all armada projects. Projects provide shared context for agent workstreams.',
   method: 'GET',
@@ -43,6 +44,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'projects',
   name: 'armada_project_get',
   description: 'Get a single armada project by ID.',
   method: 'GET',
@@ -54,6 +56,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'projects',
   name: 'armada_project_create',
   description: 'Create a new armada project.',
   method: 'POST',
@@ -70,6 +73,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'projects',
   name: 'armada_project_update',
   description: 'Update an existing armada project.',
   method: 'PUT',
@@ -87,6 +91,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'projects',
   name: 'armada_project_delete',
   description: 'Delete a armada project.',
   method: 'DELETE',
@@ -98,6 +103,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'projects',
   name: 'armada_project_archive',
   description: 'Archive a armada project.',
   method: 'POST',
@@ -109,6 +115,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'projects',
   name: 'armada_project_unarchive',
   description: 'Unarchive a armada project.',
   method: 'POST',
@@ -120,6 +127,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'projects',
   name: 'armada_project_members',
   description: 'List agent members of a armada project.',
   method: 'GET',
@@ -131,6 +139,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'projects',
   name: 'armada_project_repos',
   description: 'List repositories linked to a armada project.',
   method: 'GET',
@@ -142,6 +151,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'projects',
   name: 'armada_project_sync',
   description: 'Trigger a manual GitHub issue sync for a project. Imports open issues from linked repositories.',
   method: 'POST',
@@ -153,6 +163,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'projects',
   name: 'armada_project_issues',
   description: 'Get cached GitHub issues for a project backlog. Returns issues not yet promoted to tasks.',
   method: 'GET',
@@ -164,6 +175,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'projects',
   name: 'armada_project_board',
   description: 'Get the task board for a project, grouped by column (queued, in-progress, review, done).',
   method: 'GET',
@@ -175,6 +187,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'projects',
   name: 'armada_task_board_column',
   description: 'Move a task to a different board column.',
   method: 'PUT',
@@ -187,6 +200,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'projects',
   name: 'armada_project_metrics',
   description: 'Get project-level metrics and stats: task/workflow counts by status, timing, GitHub issues, and recent activity.',
   method: 'GET',

@@ -355,27 +355,30 @@ function getCurrentAgentName(): string {
   return _config?.instanceName ?? 'unknown';
 }
 
-// Cache of agent names whose tools have already been loaded
+// Cache of agent+categories combos whose tools have already been loaded
 const _agentToolsLoaded = new Set<string>();
 
 /**
  * Ensure tools are loaded for a specific agent name (per-agent lazy loading).
- * No-ops if already loaded for that agent.
+ * Optionally filter by tool categories for workflow step scoping.
+ * No-ops if already loaded for that agent+categories combo.
  */
-async function ensureAgentTools(api: any, agentName: string): Promise<void> {
-  if (_agentToolsLoaded.has(agentName)) return;
-  await loadarmadaTools(api, agentName);
-  _agentToolsLoaded.add(agentName);
+async function ensureAgentTools(api: any, agentName: string, categories?: string[]): Promise<void> {
+  const cacheKey = categories?.length ? `${agentName}:${[...categories].sort().join(',')}` : agentName;
+  if (_agentToolsLoaded.has(cacheKey)) return;
+  await loadarmadaTools(api, agentName, categories);
+  _agentToolsLoaded.add(cacheKey);
 }
 
-async function loadarmadaTools(api: any, agentName?: string) {
+async function loadarmadaTools(api: any, agentName?: string, categories?: string[]) {
   // Require proxyUrl — all control plane communication must go through the node agent relay
   if (!_config || !getApiBaseUrl()) return;
 
   try {
-    const toolsUrl = agentName
-      ? `${getApiBaseUrl()}/api/meta/tools?agent=${encodeURIComponent(agentName)}`
-      : `${getApiBaseUrl()}/api/meta/tools`;
+    const params = new URLSearchParams();
+    if (agentName) params.set('agent', agentName);
+    if (categories?.length) params.set('categories', categories.join(','));
+    const toolsUrl = `${getApiBaseUrl()}/api/meta/tools?${params}`;
     const resp = await fetch(toolsUrl, {
       headers: {
         ...getToolAuthHeaders(),
@@ -704,7 +707,7 @@ export default function register(api: any) {
     path: '/armada/task',
     handler: async (req: IncomingMessage, res: ServerResponse) => {
       const body = await readBody(req);
-      const { taskId, from, fromRole, message, callbackUrl, attachments, project, targetAgent } = body;
+      const { taskId, from, fromRole, message, callbackUrl, attachments, project, targetAgent, toolCategories } = body;
 
       if (!taskId || !from || !message || !callbackUrl) {
         return sendJson(res, 400, { error: 'Missing required fields: taskId, from, message, callbackUrl' });
@@ -712,9 +715,11 @@ export default function register(api: any) {
 
       if (_draining) return sendJson(res, 503, { error: 'Instance is draining' });
 
-      // Ensure tools are loaded for the target agent (lazy, cached per-agent name)
+      // Ensure tools are loaded for the target agent (lazy, cached per-agent+categories combo)
+      // When toolCategories is set, only load tools from those categories (reduces context window usage)
+      const categories = Array.isArray(toolCategories) ? toolCategories : undefined;
       if (targetAgent && getApiBaseUrl()) {
-        await ensureAgentTools(api, targetAgent).catch(err => {
+        await ensureAgentTools(api, targetAgent, categories).catch(err => {
           _logger.warn(`[armada-agent] Failed to load tools for agent ${targetAgent}: ${err.message}`);
         });
       }

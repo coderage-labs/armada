@@ -30,6 +30,7 @@ export function createAgentRoutes(nodeManager: NodeManager): Router {
   // ── Tool definitions (auto-discovered by armada-control plugin) ────
 
   registerToolDef({
+  category: 'instances',
     name: 'armada_status',
     description: 'Check the status of all armada instances. Shows which agents are running and available for armada_task.',
     method: 'GET', path: '/api/agents',
@@ -38,6 +39,7 @@ export function createAgentRoutes(nodeManager: NodeManager): Router {
   });
 
   registerToolDef({
+  category: 'instances',
     name: 'armada_spawn',
     description: 'Spawn a new agent from a template. Contact sync runs automatically after spawn.',
     method: 'POST', path: '/api/agents',
@@ -49,6 +51,7 @@ export function createAgentRoutes(nodeManager: NodeManager): Router {
   });
 
   registerToolDef({
+  category: 'instances',
     name: 'armada_redeploy',
     description: 'Regenerate an agent\'s config, SOUL.md, and AGENTS.md from its template, then restart. Use after template changes. Pass "all" to redeploy every agent.',
     method: 'POST', path: '/api/agents/:name/redeploy',
@@ -60,6 +63,7 @@ export function createAgentRoutes(nodeManager: NodeManager): Router {
   });
 
   registerToolDef({
+  category: 'instances',
     name: 'armada_destroy',
     description: 'Destroy a agent — stops and removes its container, deletes the agent record. Contact sync runs automatically after deletion.',
     method: 'DELETE', path: '/api/agents/:name',
@@ -70,6 +74,7 @@ export function createAgentRoutes(nodeManager: NodeManager): Router {
   });
 
   registerToolDef({
+  category: 'instances',
     name: 'armada_logs',
     description: 'Get recent logs from a agent\'s instance container.',
     method: 'GET', path: '/api/agents/:name/logs',
@@ -82,6 +87,7 @@ export function createAgentRoutes(nodeManager: NodeManager): Router {
   });
 
   registerToolDef({
+  category: 'instances',
     name: 'armada_heartbeat',
     description: 'Send a heartbeat for an agent to indicate it is alive. Optionally include metadata (taskCount, memoryMb, uptimeMs).',
     method: 'POST', path: '/api/agents/:name/heartbeat',
@@ -95,6 +101,7 @@ export function createAgentRoutes(nodeManager: NodeManager): Router {
   });
 
   registerToolDef({
+  category: 'instances',
     name: 'armada_nudge',
     description: 'Send a quick health-check nudge to an agent and wait for a response (up to 30s). Returns the agent\'s status reply.',
     method: 'POST', path: '/api/agents/:name/nudge',
@@ -106,6 +113,7 @@ export function createAgentRoutes(nodeManager: NodeManager): Router {
   });
 
   registerToolDef({
+  category: 'instances',
     name: 'armada_avatar_generate',
     description: 'Generate an AI avatar image for a agent based on its name and role.',
     method: 'POST', path: '/api/agents/:name/avatar/generate',
@@ -116,6 +124,7 @@ export function createAgentRoutes(nodeManager: NodeManager): Router {
   });
 
   registerToolDef({
+  category: 'instances',
     name: 'armada_avatar_delete',
     description: 'Delete the avatar image for a agent.',
     method: 'DELETE', path: '/api/agents/:name/avatar',
@@ -126,6 +135,7 @@ export function createAgentRoutes(nodeManager: NodeManager): Router {
   });
 
   registerToolDef({
+  category: 'instances',
     name: 'armada_maintain',
     description: 'Perform graceful maintenance on a agent — drains active tasks, signals graceful restart (SIGUSR1), and waits for the agent to come back healthy. Long-running operation (up to ~2.5 minutes).',
     method: 'POST', path: '/api/agents/:name/maintain',
@@ -138,6 +148,7 @@ export function createAgentRoutes(nodeManager: NodeManager): Router {
   });
 
   registerToolDef({
+  category: 'instances',
     name: 'armada_agent_capacity',
     description: 'Get capacity info for all agents — task count, response latency, and health status. Useful for checking agent load.',
     method: 'GET', path: '/api/agents/capacity',
@@ -146,6 +157,7 @@ export function createAgentRoutes(nodeManager: NodeManager): Router {
   });
 
   registerToolDef({
+  category: 'instances',
     name: 'armada_agent_sessions',
     description: 'Get agent session list',
     method: 'GET', path: '/api/agents/:name/session',
@@ -156,6 +168,7 @@ export function createAgentRoutes(nodeManager: NodeManager): Router {
   });
 
   registerToolDef({
+  category: 'instances',
     name: 'armada_agent_session_messages',
     description: 'Get session messages',
     method: 'GET', path: '/api/agents/:name/session/messages',

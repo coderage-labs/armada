@@ -30,6 +30,7 @@ function triggerCredentialSyncForAllAgents(nodeManager: NodeManager): void {
 // ── Tool Definitions ────────────────────────────────────────────────
 
 registerToolDef({
+  category: 'integrations',
   name: 'armada_integrations_list',
   description: 'List all integrations (masked auth)',
   method: 'GET',
@@ -39,6 +40,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'integrations',
   name: 'armada_integration_create',
   description: 'Create a new integration (validate provider exists)',
   method: 'POST',
@@ -54,6 +56,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'integrations',
   name: 'armada_integration_get',
   description: 'Get a single integration (masked auth)',
   method: 'GET',
@@ -65,6 +68,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'integrations',
   name: 'armada_integration_update',
   description: 'Update an integration',
   method: 'PUT',
@@ -81,6 +85,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'integrations',
   name: 'armada_integration_delete',
   description: 'Delete an integration (cascade removes project integrations)',
   method: 'DELETE',
@@ -92,6 +97,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'integrations',
   name: 'armada_integration_test',
   description: 'Test connection via provider adapter',
   method: 'POST',
@@ -103,6 +109,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'integrations',
   name: 'armada_integration_projects',
   description: 'List available external projects',
   method: 'GET',
@@ -114,6 +121,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'integrations',
   name: 'armada_integration_repos',
   description: 'List available repos',
   method: 'GET',
@@ -125,6 +133,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'integrations',
   name: 'armada_project_integrations_list',
   description: 'List project\'s integration configs',
   method: 'GET',
@@ -136,6 +145,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'integrations',
   name: 'armada_project_integration_attach',
   description: 'Attach integration to project',
   method: 'POST',
@@ -150,6 +160,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'integrations',
   name: 'armada_project_integration_update',
   description: 'Update project integration config',
   method: 'PUT',
@@ -164,6 +175,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'integrations',
   name: 'armada_project_integration_detach',
   description: 'Detach integration from project',
   method: 'DELETE',
@@ -176,6 +188,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'integrations',
   name: 'armada_project_integration_sync',
   description: 'Trigger manual sync',
   method: 'POST',

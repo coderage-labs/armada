@@ -15,6 +15,7 @@ import { workingCopy } from '../services/working-copy.js';
 const router = Router();
 
 registerToolDef({
+  category: 'workflows',
   name: 'armada_templates',
   description: 'List all armada templates. Shows template ID, name, role, and model.',
   method: 'GET', path: '/api/templates',
@@ -23,6 +24,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'workflows',
   name: 'armada_template_get',
   description: 'Get a single armada template by ID. Returns full template details including soul, agents, plugins, etc.',
   method: 'GET', path: '/api/templates/:id',
@@ -33,6 +35,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'workflows',
   name: 'armada_template_create',
   description: 'Create a new armada template. Defines the blueprint for spawning agents.',
   method: 'POST', path: '/api/templates',
@@ -49,6 +52,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'workflows',
   name: 'armada_template_update',
   description: 'Update an existing armada template. Only provided fields are changed.',
   method: 'PUT', path: '/api/templates/:id',
@@ -66,6 +70,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'workflows',
   name: 'armada_template_delete',
   description: 'Delete a armada template by ID.',
   method: 'DELETE', path: '/api/templates/:id',
@@ -264,6 +269,7 @@ router.post('/:id/sync', requireScope('templates:write'), (req, res, next) => {
 });
 
 registerToolDef({
+  category: 'workflows',
   name: 'armada_template_drift',
   description: 'Check which agents have drifted from their template. Shows field-level differences.',
   method: 'GET', path: '/api/templates/:id/drift',
@@ -274,6 +280,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'workflows',
   name: 'armada_template_sync',
   description: 'Sync a template to all agents using it. Stages pending mutations and creates/updates a draft changeset.',
   method: 'POST', path: '/api/templates/:id/sync',

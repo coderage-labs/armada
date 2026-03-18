@@ -168,6 +168,7 @@ router.get('/:token', (req, res) => {
 // ── Tool definitions ──────────────────────────────────────────────────
 
 registerToolDef({
+  category: 'admin',
   name: 'armada_install_control',
   description: 'Get the control plane install script — a shell script that pulls and runs the Armada control plane via Docker',
   method: 'GET',
@@ -176,6 +177,7 @@ registerToolDef({
 });
 
 registerToolDef({
+  category: 'admin',
   name: 'armada_install_compose',
   description: 'Get a docker-compose.yml template for the Armada control plane (includes optional Cloudflare Tunnel)',
   method: 'GET',

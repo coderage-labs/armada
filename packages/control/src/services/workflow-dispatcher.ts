@@ -145,6 +145,7 @@ export function initWorkflowDispatcher() {
         callbackUrl: `${callbackBaseUrl}/api/tasks/${opts.taskId}/result`,
         projectId: opts.projectId,
         ...(agent.targetAgent && { targetAgent: agent.targetAgent }),
+        ...(opts.toolCategories?.length && { toolCategories: opts.toolCategories }),
       });
 
       const resp = await node.relayRequest(containerName, 'POST', '/armada/task', body) as any;

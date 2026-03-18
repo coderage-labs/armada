@@ -30,6 +30,8 @@ export interface ToolDefinition {
   supportsAll?: boolean;
   /** Required scope to access this tool. Used for filtering in /api/meta/tools */
   scope?: string;
+  /** Logical category for on-demand subset loading (e.g. 'instances', 'issues', 'git') */
+  category?: string;
 }
 
 const _tools: ToolDefinition[] = [];
@@ -51,4 +53,13 @@ export function registerToolDef(def: ToolDefinition): void {
  */
 export function getToolDefs(): ToolDefinition[] {
   return [..._tools];
+}
+
+/**
+ * Get tool definitions filtered by one or more categories.
+ * Returns only tools whose category is in the given list.
+ */
+export function getToolDefsByCategories(categories: string[]): ToolDefinition[] {
+  if (!categories.length) return [..._tools];
+  return _tools.filter(t => t.category !== undefined && categories.includes(t.category));
 }
