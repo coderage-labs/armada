@@ -14,6 +14,7 @@ import {
   Crown, User,
 } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
+import TriageModal, { type TriageIssue } from '../components/TriageModal';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
@@ -295,17 +296,18 @@ function IssuesTab({
   syncing,
   lastSynced,
   onSync,
+  onTriageOne,
 }: {
   projectId: string;
   issues: GitHubIssue[];
   syncing: boolean;
   lastSynced: string | null;
   onSync: () => void;
+  onTriageOne: (issue: GitHubIssue) => void;
 }) {
   const [search, setSearch] = useState('');
   const [labelFilter, setLabelFilter] = useState<string | null>(null);
   const [expandedIssue, setExpandedIssue] = useState<number | null>(null);
-  const [triagingIssue, setTriagingIssue] = useState<number | null>(null);
   const [triagingAll, setTriagingAll] = useState(false);
 
   // All unique labels
@@ -332,21 +334,6 @@ function IssuesTab({
     }
     return result;
   }, [issues, search, labelFilter]);
-
-  async function handleTriageOne(issueNumber: number) {
-    setTriagingIssue(issueNumber);
-    try {
-      await apiFetch('/api/triage/issue', {
-        method: 'POST',
-        body: JSON.stringify({ projectId, issueNumber }),
-      });
-      toast(`Triaging issue #${issueNumber}…`);
-    } catch (err: any) {
-      toast.error(`Triage failed: ${err.message}`);
-    } finally {
-      setTriagingIssue(null);
-    }
-  }
 
   async function handleTriageAll() {
     setTriagingAll(true);
@@ -451,8 +438,8 @@ function IssuesTab({
               onToggle={() =>
                 setExpandedIssue((prev) => (prev === issue.number ? null : issue.number))
               }
-              onTriage={() => handleTriageOne(issue.number)}
-              triaging={triagingIssue === issue.number}
+              onTriage={() => onTriageOne(issue)}
+              triaging={false}
             />
           ))
         )}
@@ -1767,6 +1754,7 @@ export default function ProjectDetail() {
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [lastSynced, setLastSynced] = useState<string | null>(null);
+  const [triageModalIssue, setTriageModalIssue] = useState<TriageIssue | null>(null);
 
   const loadData = useCallback(async () => {
     if (!id || !project) return;
@@ -1999,6 +1987,7 @@ export default function ProjectDetail() {
             syncing={syncing}
             lastSynced={lastSynced}
             onSync={handleSync}
+            onTriageOne={(issue) => setTriageModalIssue(issue)}
           />
         </TabsContent>
         <TabsContent value="workflows">
@@ -2020,6 +2009,18 @@ export default function ProjectDetail() {
           <SettingsTab project={project} onUpdated={() => { refetchProject(); loadData(); }} />
         </TabsContent>
       </Tabs>
+
+      {/* Manual triage modal */}
+      <TriageModal
+        open={!!triageModalIssue}
+        issue={triageModalIssue}
+        projectId={project.id}
+        onSuccess={() => {
+          setTriageModalIssue(null);
+          loadData();
+        }}
+        onCancel={() => setTriageModalIssue(null)}
+      />
     </div>
   );
 }
