@@ -120,7 +120,7 @@ export default function Account() {
       setTokens(tks);
       if (sysChannels) {
         const chList = Array.isArray(sysChannels)
-          ? sysChannels
+          ? sysChannels.map((c: any) => typeof c === 'string' ? c : c.type).filter(Boolean)
           : (sysChannels.channels ?? Object.keys(sysChannels));
         setSystemChannels(chList.filter((c: any) => typeof c === 'string'));
       }
