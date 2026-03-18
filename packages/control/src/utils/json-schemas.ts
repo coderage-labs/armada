@@ -87,7 +87,6 @@ export const linkedAccountsSchema = z.object({
 
 export const notificationsSchema = z.object({
   channels: z.array(z.string()),
-  telegram: z.object({ chatId: z.string() }).optional(),
   email: z.object({ address: z.string() }).optional(),
   webhook: z.object({ url: z.string() }).optional(),
   preferences: z.object({

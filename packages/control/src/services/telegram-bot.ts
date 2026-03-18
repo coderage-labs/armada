@@ -88,8 +88,7 @@ export async function initTelegramBot(): Promise<void> {
 
       const users = usersRepo.getAll();
       const linked = users.find(u =>
-        u.channels?.telegram?.platformId === telegramUserId ||
-        u.linkedAccounts?.telegram === telegramUserId,
+        u.channels?.telegram?.platformId === telegramUserId,
       );
 
       if (linked) {
@@ -118,8 +117,7 @@ export async function initTelegramBot(): Promise<void> {
 
       const users = usersRepo.getAll();
       const linked = users.find(u =>
-        u.channels?.telegram?.platformId === telegramUserId ||
-        u.linkedAccounts?.telegram === telegramUserId,
+        u.channels?.telegram?.platformId === telegramUserId,
       );
 
       if (linked) {
@@ -147,8 +145,7 @@ export async function initTelegramBot(): Promise<void> {
 
       const users = usersRepo.getAll();
       const user = users.find(u =>
-        u.channels?.telegram?.platformId === telegramUserId ||
-        u.linkedAccounts?.telegram === telegramUserId,
+        u.channels?.telegram?.platformId === telegramUserId,
       );
 
       if (user) {
@@ -192,11 +189,9 @@ export async function initTelegramBot(): Promise<void> {
       const action = parts[1];
 
       // Auth: verify the Telegram user ID matches a linked Armada user
-      // Check both new user.channels field and legacy linkedAccounts.telegram for backwards compat
       const users = usersRepo.getAll();
       const user = users.find(u =>
-        u.channels?.telegram?.platformId === telegramUserId ||
-        u.linkedAccounts?.telegram === telegramUserId,
+        u.channels?.telegram?.platformId === telegramUserId,
       );
 
       if (!user) {
