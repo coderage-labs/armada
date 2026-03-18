@@ -300,7 +300,7 @@ async function advanceRun(
     if (!allDepsMet) continue;
 
     // Check gate
-    if (step.gate === 'manual') {
+    if (step.gate === 'manual' || (step as any).manualGate === true) {
       markStepStatus(stepRun.id, 'waiting_gate');
       if (_notifyFn) {
         // Get previous step output from context

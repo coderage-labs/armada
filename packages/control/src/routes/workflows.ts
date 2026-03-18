@@ -206,6 +206,7 @@ import {
   requestRework,
   getRunContext,
 } from '../services/workflow-engine.js';
+import { normaliseSteps } from '../utils/normalise-steps.js';
 
 const router = Router();
 
@@ -272,6 +273,9 @@ router.post('/', requireScope('workflows:write'), (req, res) => {
     return;
   }
 
+  // Normalise manualGate → gate: 'manual'
+  normaliseSteps(parsedSteps as any[]);
+
   const id = randomUUID();
   const pIds: string[] = parsedProjectIds || (projectId ? [projectId] : []);
   const wf = createWorkflow(id, { name, description, steps: parsedSteps as any[], projectIds: pIds });
@@ -292,6 +296,8 @@ router.put('/:id', requireScope('workflows:write'), (req, res) => {
       res.status(400).json({ error: `Circular dependency detected: ${cycle.join(' → ')}` });
       return;
     }
+    // Normalise manualGate → gate: 'manual'
+    normaliseSteps(parsedSteps);
   }
 
   const parsedProjectIds = projectIds !== undefined ? (parseJsonField<string[]>(projectIds) || []) : undefined;
