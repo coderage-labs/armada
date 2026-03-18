@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import { unlinkSync, existsSync } from 'node:fs';
 import type { EventMessage, CommandMessage, ResponseMessage } from '@coderage-labs/armada-shared';
 import { handleCommand } from './command-handler.js';
+import { unsubscribeAll } from '../handlers/events.js';
 import { loadCredentials, saveCredentials, CREDENTIALS_PATH } from '../credentials.js';
 import { getMachineFingerprint } from '../fingerprint.js';
 import { NODE_VERSION, PROTOCOL_VERSION, MIN_CONTROL_VERSION } from '../version.js';
@@ -275,6 +276,11 @@ function onClose(code: number, reason: Buffer): void {
   
   stopHeartbeat();
   stopPing();
+
+  // Cancel all instance SSE subscriptions — they'll be re-established by the
+  // control plane via events.subscribe after reconnect.
+  unsubscribeAll();
+
   scheduleReconnect();
 }
 

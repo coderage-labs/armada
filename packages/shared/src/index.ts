@@ -419,6 +419,27 @@ export interface ArmadaNodeEnrichedWithResources extends ArmadaNodeEnriched {
   };
 }
 
+// ── Instance Events (WS relay) ──────────────────────────────────────
+
+/**
+ * Represents a single event forwarded from an OpenClaw instance through
+ * the node agent WS tunnel to the control plane.
+ */
+export interface InstanceEvent {
+  /** Control-plane instance ID (from DB) */
+  instanceId: string;
+  /** Human-readable instance name (e.g. 'robin') */
+  instanceName: string;
+  /** Agent name within the instance, if applicable */
+  agentName?: string;
+  /** Dot-separated event type, e.g. 'session.message', 'agent.status', 'heartbeat' */
+  eventType: string;
+  /** Raw event payload from the instance SSE stream */
+  data: Record<string, unknown>;
+  /** ISO 8601 timestamp */
+  timestamp: string;
+}
+
 // ── Activity ────────────────────────────────────────────────────────
 
 export interface ActivityEvent {

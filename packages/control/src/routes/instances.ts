@@ -118,6 +118,17 @@ registerToolDef({
   scope: 'instances:read',
 });
 
+registerToolDef({
+  name: 'armada_instance_events',
+  description: 'Stream real-time events from an agent instance via SSE. Events include session activity, tool calls, agent status changes, and heartbeats.',
+  method: 'GET',
+  path: '/api/instances/:id/events/stream',
+  parameters: [
+    { name: 'id', type: 'string', description: 'Instance ID or name', required: true },
+  ],
+  scope: 'instances:read',
+});
+
 // ── Routes ──────────────────────────────────────────────────────────
 
 const router = Router();
@@ -515,6 +526,59 @@ router.post('/heartbeat', requireScope('instances:write'), (req, res) => {
     return res.status(result.status).json({ error: result.error });
   }
   res.json(result);
+});
+
+// ── Instance event stream ─────────────────────────────────────────────
+
+/**
+ * GET /api/instances/:id/events/stream
+ *
+ * SSE stream of real-time events for a specific instance.
+ * Events arrive via the node→control WS relay and are emitted on the eventBus
+ * under the key `instance.<instanceName>.<eventType>`.
+ *
+ * The endpoint also sends a `events.subscribe` command to the node agent so
+ * it starts (or confirms) the SSE relay for this instance.
+ */
+router.get('/:id/events/stream', async (req, res, next) => {
+  try {
+    const instance = resolveInstance(req.params.id);
+    if (!instance) return res.status(404).json({ error: 'Instance not found' });
+
+    const sse = setupSSE(res);
+
+    // Request the node agent to start relaying events for this instance
+    const containerName = `armada-instance-${instance.name}`;
+    try {
+      const node = getNodeClient(instance.nodeId);
+      await node.subscribeInstanceEvents(instance.id, instance.name, containerName);
+    } catch (err: any) {
+      // Non-fatal — if the node doesn't support events yet, we just get no events
+      console.warn(`[instances] events.subscribe failed for ${instance.name}: ${err.message}`);
+    }
+
+    // Subscribe to all event types for this instance from the eventBus
+    const pattern = `instance.${instance.name}.*`;
+    const unsubscribe = eventBus.on(pattern, (armadaEvent) => {
+      sse.send(armadaEvent.event, armadaEvent.data, armadaEvent.id);
+    });
+
+    // Replay recent events from the ring buffer
+    const replayEvents = eventBus.replay(0, pattern);
+    for (const evt of replayEvents) {
+      sse.send(evt.event, evt.data, evt.id);
+    }
+
+    res.on('close', () => {
+      unsubscribe();
+      // Unsubscribe the node agent when no more SSE clients remain for this instance
+      // (simple heuristic: unsubscribe on last client close)
+      const node = getNodeClient(instance.nodeId);
+      node.unsubscribeInstanceEvents(instance.id).catch(() => {
+        // Best-effort — ignore if node is offline
+      });
+    });
+  } catch (err) { next(err); }
 });
 
 export default router;
