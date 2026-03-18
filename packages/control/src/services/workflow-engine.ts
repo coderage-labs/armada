@@ -18,6 +18,7 @@ import { eq, desc, sql, inArray } from 'drizzle-orm';
 import { dispatchWebhook } from './webhook-dispatcher.js';
 import { broadcast } from '../utils/event-bus.js';
 import { getArtifactContextBlock } from '../routes/workflow-artifacts.js';
+import { projectsRepo } from '../repositories/index.js';
 
 // Types — mirror shared package types locally to avoid build ordering issues
 interface WorkflowStep {
@@ -103,6 +104,24 @@ export function buildWorkflowContextBlock(
     `Workflow: "${workflow.name}" (run ${run.id.slice(0, 8)})`,
     `Your step: "${step.name || step.id}" (role: ${step.role})`,
   ];
+
+  // Project + repository context
+  if (run.projectId) {
+    try {
+      const project = projectsRepo.get(run.projectId);
+      if (project) {
+        lines.push(`Project: ${project.name}`);
+        const config = JSON.parse(project.configJson || '{}');
+        const repos: Array<{ url: string }> = config.repositories || [];
+        if (repos.length > 0) {
+          lines.push(`Repositories: ${repos.map(r => r.url).join(', ')}`);
+        }
+      }
+    } catch { /* non-fatal */ }
+  }
+  if (run.triggerRef) {
+    lines.push(`Trigger: ${run.triggerRef}`);
+  }
 
   // List completed steps with truncated outputs
   const completedEntries: string[] = [];
