@@ -101,7 +101,7 @@ function resolveProjectManager(projectId: string): { name: string; role: string 
 export async function triageIssue(
   projectId: string,
   issue: GitHubIssue,
-): Promise<{ triaged: boolean; by: 'pm' | 'operator'; result?: TriageResult; runId?: string }> {
+): Promise<{ triaged: boolean; by: 'pm' | 'operator' | string; result?: TriageResult; runId?: string }> {
   if (isIssueTriaged(projectId, issue.number)) {
     return { triaged: false, by: 'operator' };
   }

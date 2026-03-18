@@ -11,6 +11,13 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "outDir": "dist"
-  }
+    "outDir": "dist",
+    "jsx": "react-jsx"
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    "plugins/**",
+    "packages/ui/e2e/**"
+  ]
 }
