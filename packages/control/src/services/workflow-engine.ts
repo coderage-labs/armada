@@ -1089,9 +1089,10 @@ async function closeGithubIssueForRun(
 
 export function cancelRun(runId: string): void {
   const db = getDrizzle();
-  db.run(sql`UPDATE workflow_runs SET status = 'cancelled', completed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ${runId}`);
-  db.run(sql`UPDATE workflow_step_runs SET status = 'skipped' WHERE run_id = ${runId} AND status IN ('pending', 'waiting_gate')`);
-  
+  const now = sql`strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`;
+  db.run(sql`UPDATE workflow_runs SET status = 'cancelled', completed_at = ${now} WHERE id = ${runId}`);
+  db.run(sql`UPDATE workflow_step_runs SET status = 'cancelled', completed_at = ${now} WHERE run_id = ${runId} AND status = 'running'`);
+  db.run(sql`UPDATE workflow_step_runs SET status = 'skipped' WHERE run_id = ${runId} AND status IN ('pending', 'waiting_gate', 'waiting_for_rework')`);
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────
