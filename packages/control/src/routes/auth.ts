@@ -165,6 +165,30 @@ router.post('/me/unlink', (req, res) => {
   res.json({ ok: true });
 });
 
+// POST /api/auth/me/test-notification — send a test message to the caller's linked channel
+router.post('/me/test-notification', async (req, res) => {
+  if (!req.caller) { res.status(401).json({ error: 'Auth required' }); return; }
+  const { channel } = req.body;
+  if (!channel) { res.status(400).json({ error: 'channel is required' }); return; }
+
+  const user = usersRepo.getById(req.caller.id);
+  if (!user) { res.status(404).json({ error: 'User not found' }); return; }
+
+  const linked = user.channels?.[channel];
+  if (!linked?.platformId) { res.status(400).json({ error: `No ${channel} account linked` }); return; }
+
+  try {
+    if (channel === 'telegram') {
+      const { sendPlainNotification } = await import('../services/telegram-bot.js');
+      await sendPlainNotification(linked.platformId, `🔔 <b>Test notification</b>\n\nHi ${user.displayName}! This is a test from Armada.\nYour ${channel} notifications are working correctly.`);
+    }
+    // TODO: add slack/discord/email test delivery here
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to send test notification' });
+  }
+});
+
 // GET /api/auth/me/channels — list linked channels
 router.get('/me/channels', (req, res) => {
   if (!req.caller) { res.status(401).json({ error: 'Auth required' }); return; }

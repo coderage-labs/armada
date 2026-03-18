@@ -254,12 +254,15 @@ export default function Account() {
   }
 
   async function handleTestChannel(channelType: string) {
-    const channelId = channelIds[channelType];
-    if (!channelId) return;
     setTestingChannel(channelType);
+    setLinkError('');
+    setLinkSuccess('');
     try {
-      await apiFetch(`/api/notification-channels/${channelId}/test`, { method: 'POST' });
-      setLinkSuccess(`Test message sent via ${channelType}`);
+      await apiFetch('/api/auth/me/test-notification', {
+        method: 'POST',
+        body: JSON.stringify({ channel: channelType }),
+      });
+      setLinkSuccess(`Test message sent to your ${channelType}`);
     } catch (err: any) {
       setLinkError(err.message || `Failed to send test via ${channelType}`);
     } finally {
@@ -484,26 +487,26 @@ export default function Account() {
                         </Badge>
                       )}
                     </div>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       {linked ? (
                         <>
                         <Button
                           variant="ghost"
                           onClick={() => handleTestChannel(channelType)}
                           disabled={testingChannel === channelType}
-                          className="flex items-center gap-1.5 text-xs font-medium text-emerald-300 hover:text-emerald-200 bg-emerald-500/10 hover:bg-emerald-500/20 px-3 py-1.5 rounded-lg transition disabled:opacity-50"
+                          className="flex items-center gap-1 text-[11px] font-medium text-emerald-300 hover:text-emerald-200 bg-emerald-500/10 hover:bg-emerald-500/20 px-2 py-1 rounded-md transition disabled:opacity-50"
                         >
-                          <Send className="w-3.5 h-3.5" />
-                          {testingChannel === channelType ? 'Sending…' : 'Test'}
+                          <Send className="w-3 h-3" />
+                          {testingChannel === channelType ? '…' : 'Test'}
                         </Button>
                         <Button
                           variant="ghost"
                           onClick={() => handleUnlink(channelType)}
                           disabled={isUnlinking}
-                          className="flex items-center gap-1.5 text-xs font-medium text-red-400/70 hover:text-red-400 bg-red-500/10 hover:bg-red-500/20 px-3 py-1.5 rounded-lg transition disabled:opacity-50"
+                          className="flex items-center gap-1 text-[11px] font-medium text-red-400/70 hover:text-red-400 bg-red-500/10 hover:bg-red-500/20 px-2 py-1 rounded-md transition disabled:opacity-50"
                         >
-                          <Unlink className="w-3.5 h-3.5" />
-                          {isUnlinking ? 'Unlinking…' : 'Unlink'}
+                          <Unlink className="w-3 h-3" />
+                          {isUnlinking ? '…' : 'Unlink'}
                         </Button>
                         </>
                       ) : (
