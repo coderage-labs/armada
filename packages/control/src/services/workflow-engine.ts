@@ -355,9 +355,11 @@ async function dispatchStep(
 
   // Build template variables — merge trigger vars from context + extraVars
   const storedVars = (run.context as any)?._vars || {};
+  const mergedUserVars = { ...storedVars, ...extraVars };
   const vars: Record<string, any> = {
-    ...storedVars,
-    ...extraVars,
+    ...mergedUserVars,
+    // Also expose under 'vars' namespace so {{vars.X}} templates work
+    vars: mergedUserVars,
     steps: {} as Record<string, any>,
     run: { id: run.id, trigger: run.triggerRef },
   };
