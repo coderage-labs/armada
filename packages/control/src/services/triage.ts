@@ -9,7 +9,7 @@
  * which is then used to start a workflow run.
  */
 
-import { agentsRepo, projectsRepo, roleMetaRepo, tasksRepo, instancesRepo, userProjectsRepo, assignmentRepo } from '../repositories/index.js';
+import { agentsRepo, projectsRepo, roleMetaRepo, tasksRepo, instancesRepo, usersRepo, assignmentRepo } from '../repositories/index.js';
 import { getDrizzle } from '../db/drizzle.js';
 import { triagedIssues } from '../db/drizzle-schema.js';
 import { and, eq, sql } from 'drizzle-orm';
@@ -72,11 +72,13 @@ interface TriageResult {
 
 /**
  * Resolve the PM agent for a project (tier 1 in hierarchy).
+ * Uses template-based membership (agents whose template includes this project).
  */
 function resolveProjectManager(projectId: string): { name: string; role: string } | null {
   const project = projectsRepo.get(projectId);
   if (!project) return null;
 
+  // Use template-based membership: agents assigned to templates that include this project
   const members = projectsRepo.getMembers(project.id);
   const agents = agentsRepo.getAll();
   const roles = roleMetaRepo.getAll();
@@ -126,27 +128,16 @@ export async function triageIssue(
     // No triager or PM — notify owner/operators
     const reason = 'No triager or PM-tier agent is assigned and running for this project';
     if (shouldNotifyFallback(projectId, issue.number)) {
-      // Notify project owner if one exists
-      const owner = userProjectsRepo.getOwner(projectId);
+      // Notify project owner if one exists (via assignment table)
+      const ownerAssignment = assignmentRepo.getAssignment(projectId, 'owner');
+      const owner = ownerAssignment?.assigneeType === 'user'
+        ? usersRepo.getById(ownerAssignment.assigneeId)
+        : null;
       if (owner) {
         import('./user-notifier.js').then(({ deliverToUser }) => {
           const message = `🔔 **Triage Required**\n\nIssue #${issue.number}: ${issue.title}\nProject: ${projectName}\n\nNo triager agent available. As project owner, please triage this issue manually.\n\nReason: ${reason}`;
           deliverToUser(owner, message, { event: 'triage.owner_fallback', issueNumber: issue.number, issueTitle: issue.title, projectId, projectName, reason });
         }).catch((err: Error) => console.error('[triage] Failed to notify owner:', err.message));
-      } else {
-        // Try resolving owner from assignment table
-        const ownerCandidates = assignmentRepo.resolveTriager(projectId).filter(c => c.type === 'user');
-        for (const ownerCandidate of ownerCandidates) {
-          import('./user-notifier.js').then(({ deliverToUser }) => {
-            import('../repositories/index.js').then(({ usersRepo }) => {
-              const ownerUser = usersRepo.getById(ownerCandidate.id);
-              if (ownerUser) {
-                const message = `🔔 **Triage Required**\n\nIssue #${issue.number}: ${issue.title}\nProject: ${projectName}\n\nNo triager agent available. Please triage this issue manually.\n\nReason: ${reason}`;
-                deliverToUser(ownerUser, message, { event: 'triage.owner_fallback', issueNumber: issue.number, issueTitle: issue.title, projectId, projectName, reason });
-              }
-            }).catch(() => {});
-          }).catch((err: Error) => console.error('[triage] Failed to notify owner candidate:', err.message));
-        }
       }
       // Also notify operators (excluding already-notified owner)
       const alreadyNotified: string[] = [];
@@ -168,8 +159,11 @@ export async function triageIssue(
     // No workflows defined — can't auto-triage
     const reason = 'No enabled workflows are configured for this project';
     if (shouldNotifyFallback(projectId, issue.number)) {
-      // Notify project owner if one exists
-      const owner = userProjectsRepo.getOwner(projectId);
+      // Notify project owner if one exists (via assignment table)
+      const ownerAssignment = assignmentRepo.getAssignment(projectId, 'owner');
+      const owner = ownerAssignment?.assigneeType === 'user'
+        ? usersRepo.getById(ownerAssignment.assigneeId)
+        : null;
       if (owner) {
         import('./user-notifier.js').then(({ deliverToUser }) => {
           const message = `🔔 **Triage Required**\n\nIssue #${issue.number}: ${issue.title}\nProject: ${projectName}\n\nNo workflows configured. As project owner, please triage this issue manually.\n\nReason: ${reason}`;

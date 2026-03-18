@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireScope } from '../middleware/scopes.js';
-import { projectsRepo, tasksRepo, userProjectsRepo, usersRepo } from '../repositories/index.js';
+import { projectsRepo, tasksRepo, assignmentRepo, usersRepo } from '../repositories/index.js';
 import { parseJsonField } from '../utils/parse-json-field.js';
 import { isValidName } from '../utils/validate.js';
 import { getProjectMetrics } from '../services/project-service.js';
@@ -425,52 +425,14 @@ router.get('/:id/context', (req, res) => {
   res.type('text/markdown').send(context);
 });
 
-// GET /api/projects/:id/users — list users assigned to project
+// GET /api/projects/:id/users — list users assigned to project (from assignments, backwards compat)
 router.get('/:id/users', (req, res) => {
   const project = projectsRepo.get(req.params.id) || projectsRepo.getByName(req.params.id);
   if (!project) {
     res.status(404).json({ error: 'Project not found' });
     return;
   }
-  const users = userProjectsRepo.getUsersForProject(project.id);
-  res.json({ users });
-});
-
-// POST /api/projects/:id/users — assign user to project
-router.post('/:id/users', requireScope('projects:write'), (req, res) => {
-  const project = projectsRepo.get(req.params.id) || projectsRepo.getByName(req.params.id);
-  if (!project) {
-    res.status(404).json({ error: 'Project not found' });
-    return;
-  }
-  const { userId, role } = req.body;
-  if (!userId) {
-    res.status(400).json({ error: 'userId is required' });
-    return;
-  }
-  const user = usersRepo.getById(userId);
-  if (!user) {
-    res.status(404).json({ error: 'User not found' });
-    return;
-  }
-  if (role === 'owner') {
-    userProjectsRepo.setOwner(userId, project.id);
-  } else {
-    userProjectsRepo.assign(userId, project.id, role);
-  }
-  const users = userProjectsRepo.getUsersForProject(project.id);
-  res.json({ users });
-});
-
-// DELETE /api/projects/:id/users/:userId — remove user from project
-router.delete('/:id/users/:userId', requireScope('projects:write'), (req, res) => {
-  const project = projectsRepo.get(req.params.id) || projectsRepo.getByName(req.params.id);
-  if (!project) {
-    res.status(404).json({ error: 'Project not found' });
-    return;
-  }
-  userProjectsRepo.remove(req.params.userId, project.id);
-  const users = userProjectsRepo.getUsersForProject(project.id);
+  const users = assignmentRepo.getAllAssignedUsers(project.id);
   res.json({ users });
 });
 

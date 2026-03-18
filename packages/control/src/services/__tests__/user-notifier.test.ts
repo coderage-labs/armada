@@ -19,7 +19,7 @@ import type { ArmadaUser } from '@coderage-labs/armada-shared';
 vi.mock('../../repositories/index.js', () => ({
   notificationChannelRepo: { getEnabled: vi.fn() },
   usersRepo: { getAll: vi.fn() },
-  userProjectsRepo: { getUsersForProject: vi.fn() },
+  assignmentRepo: { getAllAssignedUsers: vi.fn() },
 }));
 
 vi.mock('../telegram-bot.js', () => ({
@@ -42,13 +42,13 @@ vi.mock('../../db/drizzle-schema.js', () => ({
 // ── Import after mocks ───────────────────────────────────────────────
 
 import { notifyGate, notifyCompletion, isInQuietHours } from '../user-notifier.js';
-import { notificationChannelRepo, usersRepo, userProjectsRepo } from '../../repositories/index.js';
+import { notificationChannelRepo, usersRepo, assignmentRepo } from '../../repositories/index.js';
 import { sendGateNotification, sendPlainNotification } from '../telegram-bot.js';
 
 // Typed mock helpers
 const mockGetEnabled = vi.mocked(notificationChannelRepo.getEnabled);
 const mockGetAll = vi.mocked(usersRepo.getAll);
-const mockGetUsersForProject = vi.mocked(userProjectsRepo.getUsersForProject);
+const mockGetAllAssignedUsers = vi.mocked(assignmentRepo.getAllAssignedUsers);
 const mockSendGateNotification = vi.mocked(sendGateNotification);
 const mockSendPlainNotification = vi.mocked(sendPlainNotification);
 
@@ -197,7 +197,7 @@ describe('isInQuietHours', () => {
 describe('deliverToUser — system channel checks', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetUsersForProject.mockReturnValue([]);
+    mockGetAllAssignedUsers.mockReturnValue([]);
   });
 
   it('skips Telegram delivery when system channel is not enabled', async () => {
@@ -290,7 +290,7 @@ describe('deliverToUser — system channel checks', () => {
 describe('notifyCompletion — quiet hours', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetUsersForProject.mockReturnValue([]);
+    mockGetAllAssignedUsers.mockReturnValue([]);
     mockGetEnabled.mockReturnValue([makeTelegramChannel()]);
     mockSendPlainNotification.mockResolvedValue(undefined);
   });
@@ -355,7 +355,7 @@ describe('notifyCompletion — quiet hours', () => {
 describe('notifyGate — quiet hours', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetUsersForProject.mockReturnValue([]);
+    mockGetAllAssignedUsers.mockReturnValue([]);
     mockGetEnabled.mockReturnValue([makeTelegramChannel()]);
     mockSendGateNotification.mockResolvedValue(42);
   });
@@ -400,7 +400,7 @@ describe('notifyGate — quiet hours', () => {
 describe('deliverToUser — callback URL', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetUsersForProject.mockReturnValue([]);
+    mockGetAllAssignedUsers.mockReturnValue([]);
     mockGetEnabled.mockReturnValue([]); // No system channels
   });
 

@@ -17,7 +17,7 @@ import { checkWorkflowStep } from '../services/workflow-dispatcher.js';
 import { taskManager } from '../services/task-manager.js';
 import { eventBus } from '../infrastructure/event-bus.js';
 import type { MeshTask, TaskComment, BoardColumn, TaskType, TaskPayload } from '@coderage-labs/armada-shared';
-import { usersRepo, userProjectsRepo } from '../repositories/index.js';
+import { usersRepo, assignmentRepo } from '../repositories/index.js';
 import { deliverToUser } from '../services/user-notifier.js';
 
 // ── SSE event bus ────────────────────────────────────────────────────
@@ -479,7 +479,7 @@ router.post('/:id/escalate', requireScope('tasks:write'), async (req, res) => {
   // Notify operator users
   const projectId = task.projectId;
   let operators = projectId
-    ? userProjectsRepo.getUsersForProject(projectId).filter(u => u.type === 'operator')
+    ? assignmentRepo.getAllAssignedUsers(projectId).filter(u => u.type === 'operator')
     : usersRepo.getAll().filter(u => u.type === 'operator');
 
   if (operators.length === 0) {
