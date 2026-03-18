@@ -14,7 +14,7 @@
  */
 
 import type { ArmadaUser } from '@coderage-labs/armada-shared';
-import { usersRepo, userProjectsRepo, notificationChannelRepo } from '../repositories/index.js';
+import { usersRepo, assignmentRepo, notificationChannelRepo } from '../repositories/index.js';
 import { sendGateNotification, sendPlainNotification } from './telegram-bot.js';
 import { sendSlackGateNotification, sendSlackNotification } from './slack-bot.js';
 import { sendDiscordGateNotification, sendDiscordNotification } from './discord-bot.js';
@@ -101,8 +101,8 @@ export function isInQuietHours(user: ArmadaUser): boolean {
 export async function notifyGate(opts: NotifyGateOptions): Promise<void> {
   const { workflowName, stepId, runId, previousOutput, projectId, gatePolicy } = opts;
 
-  // Get users assigned to project (or all users if none assigned)
-  let users = userProjectsRepo.getUsersForProject(projectId);
+  // Get users assigned to project via assignments (or all users if none assigned)
+  let users = assignmentRepo.getAllAssignedUsers(projectId);
   if (users.length === 0) {
     users = usersRepo.getAll();
   }
@@ -162,8 +162,8 @@ export async function notifyGate(opts: NotifyGateOptions): Promise<void> {
 export async function notifyCompletion(opts: NotifyCompletionOptions): Promise<void> {
   const { workflowName, runId, status, projectId } = opts;
 
-  // Get users assigned to project (or all users if none assigned)
-  let users = userProjectsRepo.getUsersForProject(projectId);
+  // Get users assigned to project via assignments (or all users if none assigned)
+  let users = assignmentRepo.getAllAssignedUsers(projectId);
   if (users.length === 0) {
     users = usersRepo.getAll();
   }
@@ -206,8 +206,8 @@ export async function notifyCompletion(opts: NotifyCompletionOptions): Promise<v
 export async function notifyTriageOperatorFallback(opts: NotifyTriageOperatorFallbackOptions): Promise<void> {
   const { issueNumber, issueTitle, projectId, projectName, reason, excludeUserIds } = opts;
 
-  // Get users assigned to project — only notify project members
-  let users = userProjectsRepo.getUsersForProject(projectId);
+  // Get users assigned to project via assignments — only notify project members
+  let users = assignmentRepo.getAllAssignedUsers(projectId);
   if (users.length === 0) {
     // No project members — fall back to system owners only
     users = usersRepo.getAll().filter(u => u.role === 'owner');

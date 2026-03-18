@@ -53,6 +53,11 @@ function isAgentHealthy(agent: typeof agents.$inferSelect): boolean {
   return agent.status === 'running' || agent.healthStatus === 'healthy';
 }
 
+function tryParseJson(json: string | null | undefined): any {
+  if (!json) return null;
+  try { return JSON.parse(json); } catch { return null; }
+}
+
 // ── Repository ───────────────────────────────────────────────────────
 
 export const assignmentRepo = {
@@ -127,6 +132,40 @@ export const assignmentRepo = {
       .where(eq(projectAssignments.projectId, projectId))
       .all()
       .map(rowToAssignment);
+  },
+
+  /**
+   * Get all unique users assigned to this project (across owner/triager/approver).
+   * Only returns user-type assignees (not agent or role).
+   */
+  getAllAssignedUsers(projectId: string): import('@coderage-labs/armada-shared').ArmadaUser[] {
+    const db = getDrizzle();
+    const assignments = assignmentRepo.getAssignmentsForProject(projectId);
+    const userAssignments = assignments.filter(a => a.assigneeType === 'user');
+    const seen = new Set<string>();
+    const result: import('@coderage-labs/armada-shared').ArmadaUser[] = [];
+    for (const a of userAssignments) {
+      if (seen.has(a.assigneeId)) continue;
+      seen.add(a.assigneeId);
+      const user = db.select().from(users).where(eq(users.id, a.assigneeId)).get();
+      if (user) {
+        result.push({
+          id: user.id,
+          name: user.name,
+          displayName: user.displayName,
+          type: user.type as any,
+          role: user.role as any,
+          avatarUrl: user.avatarUrl,
+          avatarGenerating: !!user.avatarGenerating,
+          avatarVersion: (user as any).avatarVersion ?? 0,
+          linkedAccounts: tryParseJson(user.linkedAccountsJson) ?? {},
+          channels: tryParseJson((user as any).channelsJson) ?? {},
+          notifications: tryParseJson(user.notificationsJson) ?? undefined,
+          createdAt: user.createdAt,
+        });
+      }
+    }
+    return result;
   },
 
   /**

@@ -43,7 +43,7 @@ describe('EscalationRequest type (shared package)', () => {
 vi.mock('../../repositories/index.js', () => ({
   notificationChannelRepo: { getEnabled: vi.fn() },
   usersRepo: { getAll: vi.fn() },
-  userProjectsRepo: { getUsersForProject: vi.fn() },
+  assignmentRepo: { getAllAssignedUsers: vi.fn() },
 }));
 
 vi.mock('../../services/telegram-bot.js', () => ({
@@ -74,12 +74,12 @@ vi.mock('../../services/discord-bot.js', () => ({
 // ── Import after mocks ───────────────────────────────────────────────
 
 import { deliverToUser } from '../../services/user-notifier.js';
-import { notificationChannelRepo, usersRepo, userProjectsRepo } from '../../repositories/index.js';
+import { notificationChannelRepo, usersRepo, assignmentRepo } from '../../repositories/index.js';
 import { sendPlainNotification } from '../../services/telegram-bot.js';
 
 const mockGetEnabled = vi.mocked(notificationChannelRepo.getEnabled);
 const mockGetAll = vi.mocked(usersRepo.getAll);
-const mockGetUsersForProject = vi.mocked(userProjectsRepo.getUsersForProject);
+const mockGetAllAssignedUsers = vi.mocked(assignmentRepo.getAllAssignedUsers);
 const mockSendPlainNotification = vi.mocked(sendPlainNotification);
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -228,11 +228,11 @@ describe('Vertical escalation — operator notification', () => {
   });
 
   it('falls back to all users when no project assignments returned', () => {
-    mockGetUsersForProject.mockReturnValue([]);
+    mockGetAllAssignedUsers.mockReturnValue([]);
     mockGetAll.mockReturnValue([makeOperator()]);
 
     const projectId = 'proj-1';
-    let operators = userProjectsRepo.getUsersForProject(projectId).filter(u => u.type === 'operator');
+    let operators = assignmentRepo.getAllAssignedUsers(projectId).filter(u => u.type === 'operator');
     if (operators.length === 0) {
       operators = usersRepo.getAll().filter(u => u.type === 'operator');
     }

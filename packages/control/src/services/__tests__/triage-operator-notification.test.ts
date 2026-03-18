@@ -17,7 +17,7 @@ import type { ArmadaUser } from '@coderage-labs/armada-shared';
 vi.mock('../../repositories/index.js', () => ({
   notificationChannelRepo: { getEnabled: vi.fn() },
   usersRepo: { getAll: vi.fn() },
-  userProjectsRepo: { getUsersForProject: vi.fn() },
+  assignmentRepo: { getAllAssignedUsers: vi.fn() },
 }));
 
 vi.mock('../telegram-bot.js', () => ({
@@ -38,12 +38,12 @@ vi.mock('../../db/drizzle-schema.js', () => ({
 // ── Import after mocks ───────────────────────────────────────────────
 
 import { notifyTriageOperatorFallback } from '../user-notifier.js';
-import { notificationChannelRepo, usersRepo, userProjectsRepo } from '../../repositories/index.js';
+import { notificationChannelRepo, usersRepo, assignmentRepo } from '../../repositories/index.js';
 import { sendPlainNotification } from '../telegram-bot.js';
 
 const mockGetEnabled = vi.mocked(notificationChannelRepo.getEnabled);
 const mockGetAll = vi.mocked(usersRepo.getAll);
-const mockGetUsersForProject = vi.mocked(userProjectsRepo.getUsersForProject);
+const mockGetAllAssignedUsers = vi.mocked(assignmentRepo.getAllAssignedUsers);
 const mockSendPlainNotification = vi.mocked(sendPlainNotification);
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -101,7 +101,7 @@ describe('notifyTriageOperatorFallback', () => {
       type: 'operator',
       channels: { telegram: { platformId: 'op-chat-123', verified: true, linkedAt: '' } },
     });
-    mockGetUsersForProject.mockReturnValue([operator]);
+    mockGetAllAssignedUsers.mockReturnValue([operator]);
 
     await notifyTriageOperatorFallback(defaultOpts);
 
@@ -114,7 +114,7 @@ describe('notifyTriageOperatorFallback', () => {
       type: 'operator',
       channels: { telegram: { platformId: 'op-chat-123', verified: true, linkedAt: '' } },
     });
-    mockGetUsersForProject.mockReturnValue([operator]);
+    mockGetAllAssignedUsers.mockReturnValue([operator]);
 
     await notifyTriageOperatorFallback(defaultOpts);
 
@@ -129,7 +129,7 @@ describe('notifyTriageOperatorFallback', () => {
       type: 'human',
       channels: { telegram: { platformId: 'human-chat-123', verified: true, linkedAt: '' } },
     });
-    mockGetUsersForProject.mockReturnValue([human]);
+    mockGetAllAssignedUsers.mockReturnValue([human]);
 
     await notifyTriageOperatorFallback(defaultOpts);
 
@@ -137,7 +137,7 @@ describe('notifyTriageOperatorFallback', () => {
   });
 
   it('falls back to all users when no project assignments', async () => {
-    mockGetUsersForProject.mockReturnValue([]); // no project assignments
+    mockGetAllAssignedUsers.mockReturnValue([]); // no project assignments
 
     const operator = makeUser({
       type: 'operator',
@@ -165,7 +165,7 @@ describe('notifyTriageOperatorFallback', () => {
         },
       },
     });
-    mockGetUsersForProject.mockReturnValue([operator]);
+    mockGetAllAssignedUsers.mockReturnValue([operator]);
 
     await notifyTriageOperatorFallback(defaultOpts);
 
@@ -188,7 +188,7 @@ describe('notifyTriageOperatorFallback', () => {
         },
       },
     });
-    mockGetUsersForProject.mockReturnValue([operator]);
+    mockGetAllAssignedUsers.mockReturnValue([operator]);
 
     await notifyTriageOperatorFallback(defaultOpts);
 

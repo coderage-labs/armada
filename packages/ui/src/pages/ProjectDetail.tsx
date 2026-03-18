@@ -1918,7 +1918,7 @@ export default function ProjectDetail() {
   const [workflows, setWorkflows] = useState<WorkflowInfo[]>([]);
   const [tasks, setTasks] = useState<ArmadaTask[]>([]);
   const [metrics, setMetrics] = useState<ProjectMetrics | null>(null);
-  const [members, setMembers] = useState<ArmadaUser[]>([]);
+
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [lastSynced, setLastSynced] = useState<string | null>(null);
@@ -1928,14 +1928,12 @@ export default function ProjectDetail() {
     if (!id || !project) return;
     setLoading(true);
     try {
-      const [issueData, memberData, taskData, metricsData, usersData] = await Promise.all([
+      const [issueData, memberData, taskData, metricsData] = await Promise.all([
         apiFetch<GitHubIssue[]>(`/api/projects/${id}/issues`).catch(() => []),
         apiFetch<{ members: AgentInfo[] }>(`/api/projects/${id}/members`).catch(() => ({ members: [] })),
         apiFetch<ArmadaTask[]>('/api/tasks?limit=50').catch(() => []),
         apiFetch<ProjectMetrics>(`/api/projects/${id}/metrics`).catch(() => null),
-        apiFetch<{ users: ArmadaUser[] }>(`/api/projects/${id}/users`).catch(() => ({ users: [] })),
       ]);
-      setMembers(usersData.users);
       setMetrics(metricsData);
       setIssues(issueData);
       if (issueData.length > 0) {
@@ -2129,14 +2127,6 @@ export default function ProjectDetail() {
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="members" className="flex items-center gap-2 group">
-            <Users className="w-4 h-4" /> Members
-            {members.length > 0 && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full font-mono bg-zinc-700/50 text-zinc-500 group-data-[state=active]:bg-violet-500/20 group-data-[state=active]:text-violet-300">
-                {members.length}
-              </span>
-            )}
-          </TabsTrigger>
           <TabsTrigger value="assignments" className="flex items-center gap-2">
             <Crown className="w-4 h-4" /> Assignments
           </TabsTrigger>
@@ -2169,9 +2159,6 @@ export default function ProjectDetail() {
         </TabsContent>
         <TabsContent value="activity">
           <ActivityTab tasks={tasks} />
-        </TabsContent>
-        <TabsContent value="members">
-          <MembersTab projectId={project.id} users={members} />
         </TabsContent>
         <TabsContent value="assignments">
           <ProjectAssignments projectId={project.id} />
