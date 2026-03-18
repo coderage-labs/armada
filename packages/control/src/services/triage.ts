@@ -14,7 +14,7 @@ import { getDrizzle } from '../db/drizzle.js';
 import { triagedIssues } from '../db/drizzle-schema.js';
 import { and, eq, sql } from 'drizzle-orm';
 import { getWorkflowsForProject, startRun, getWorkflowById } from './workflow-engine.js';
-import { getCachedIssues } from './github-sync.js';
+import { getCachedIssues } from './issue-sync.js';
 import { logActivity } from './activity-service.js';
 import { eventBus } from '../infrastructure/event-bus.js';
 import { getNodeClient } from '../infrastructure/node-client.js';

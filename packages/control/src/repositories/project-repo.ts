@@ -31,7 +31,7 @@ function rowToProject(r: typeof projects.$inferSelect): Project {
     configJson: r.configJson,
     repositories,
     maxConcurrent: r.maxConcurrent ?? 3,
-    githubSyncIntervalMinutes: typeof config.githubSyncIntervalMinutes === 'number' ? config.githubSyncIntervalMinutes : undefined,
+    issueSyncIntervalMinutes: typeof config.issueSyncIntervalMinutes === 'number' ? config.issueSyncIntervalMinutes : undefined,
     createdAt: r.createdAt,
   };
 }
@@ -94,7 +94,7 @@ export const projectsRepo = {
     return rowToProject(getDrizzle().select().from(projects).where(eq(projects.id, id)).get()!);
   },
 
-  update(id: string, data: Partial<{ name: string; description: string; context_md: string; color: string; icon: string | null; archived: boolean; config_json: string; repositories: ProjectRepository[]; maxConcurrent: number; githubSyncIntervalMinutes: number }>): Project {
+  update(id: string, data: Partial<{ name: string; description: string; context_md: string; color: string; icon: string | null; archived: boolean; config_json: string; repositories: ProjectRepository[]; maxConcurrent: number; issueSyncIntervalMinutes: number }>): Project {
     const existing = projectsRepo.get(id);
     if (!existing) throw new Error(`Project not found: ${id}`);
 
@@ -114,13 +114,13 @@ export const projectsRepo = {
       config.repositories = data.repositories;
       updates.configJson = JSON.stringify(config);
     }
-    // Handle githubSyncIntervalMinutes — merge into config_json
-    if (data.githubSyncIntervalMinutes !== undefined) {
+    // Handle issueSyncIntervalMinutes — merge into config_json
+    if (data.issueSyncIntervalMinutes !== undefined) {
       const config = JSON.parse(updates.configJson || existing.configJson || '{}');
-      config.githubSyncIntervalMinutes = data.githubSyncIntervalMinutes;
+      config.issueSyncIntervalMinutes = data.issueSyncIntervalMinutes;
       updates.configJson = JSON.stringify(config);
     }
-    if (data.config_json !== undefined && !data.repositories && data.githubSyncIntervalMinutes === undefined) {
+    if (data.config_json !== undefined && !data.repositories && data.issueSyncIntervalMinutes === undefined) {
       updates.configJson = data.config_json;
     }
 

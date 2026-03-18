@@ -357,7 +357,7 @@ All operation events share the wildcard `operation.*` subscribed to by `routes/o
 ## GitHub Sync Events
 
 ### github.new_issues
-- **Emitted by:** `services/github-sync.ts` → polling loop, when new untriagedissues are detected
+- **Emitted by:** `services/issue-sync.ts` → polling loop, when new untriagedissues are detected
 - **Listened by:** `services/triage.ts` → routes issues to PM-tier agents or leaves for operator
 - **Payload:** `{ projectId: string, projectName: string, issueNumbers: number[] }`
 

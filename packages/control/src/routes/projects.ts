@@ -9,7 +9,7 @@ import { registerToolDef } from '../utils/tool-registry.js';
 import { logActivity } from '../services/activity-service.js';
 import { emitTaskEvent } from './tasks.js';
 import { dispatchWebhook } from '../services/webhook-dispatcher.js';
-import { syncProjectIssues, getCachedIssues } from '../services/github-sync.js';
+import { syncProjectIssues, getCachedIssues } from '../services/issue-sync.js';
 import { isIssueTriaged } from '../services/triage.js';
 import type { BoardColumn, MeshTask } from '@coderage-labs/armada-shared';
 

@@ -19,7 +19,7 @@ registerToolDef({
   description: 'Update a armada setting by key.',
   method: 'PUT', path: '/api/settings',
   parameters: [
-    { name: 'key', type: 'string', description: 'Setting key (armada_openclaw_version, workspace_retention_days, ai_avatar_generation, github_sync_interval_minutes, avatar_provider_id, avatar_model_id)', required: true },
+    { name: 'key', type: 'string', description: 'Setting key (armada_openclaw_version, workspace_retention_days, ai_avatar_generation, issue_sync_interval_minutes, avatar_provider_id, avatar_model_id)', required: true },
     { name: 'value', type: 'string', description: 'Setting value', required: true },
   ],
     scope: 'system:write',
@@ -30,7 +30,7 @@ const router = Router();
 // Allowlist of settings that can be managed via this API
 const ALLOWED_SETTINGS = new Set([
   'armada_openclaw_version',
-  'github_sync_interval_minutes',
+  'issue_sync_interval_minutes',
   'workspace_retention_days',
   'ai_avatar_generation', // legacy — kept for backwards compat
   'armada_config_version',
@@ -42,7 +42,7 @@ const ALLOWED_SETTINGS = new Set([
 // GET /api/settings — return all managed settings + latest available version
 router.get('/', (_req, res) => {
   const armada_openclaw_version = settingsRepo.get('armada_openclaw_version') ?? null;
-  const github_sync_interval_minutes = settingsRepo.get('github_sync_interval_minutes') ?? null;
+  const issue_sync_interval_minutes = settingsRepo.get('issue_sync_interval_minutes') ?? null;
   const latestVersion = getLatestVersion();
   const workspace_retention_days_raw = settingsRepo.get('workspace_retention_days');
   const workspace_retention_days = workspace_retention_days_raw
@@ -53,7 +53,7 @@ router.get('/', (_req, res) => {
 
   res.json({
     armada_openclaw_version,
-    github_sync_interval_minutes,
+    issue_sync_interval_minutes,
     latestVersion,
     workspace_retention_days,
     avatar_model_id,

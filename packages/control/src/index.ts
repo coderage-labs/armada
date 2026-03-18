@@ -7,7 +7,7 @@ import { generateInstallScript } from './install-script.js';
 import { nodesRepo, agentsRepo, migrateOwnerAssignments } from './repositories/index.js';
 import { startHealthMonitor, stopHealthMonitor } from './services/health-monitor.js';
 import { startWorkspaceRetention, stopWorkspaceRetention } from './services/workspace-retention.js';
-import { startGithubSyncScheduler, stopGithubSyncScheduler } from './services/github-sync.js';
+import { startIssueSyncScheduler, stopIssueSyncScheduler } from './services/issue-sync.js';
 import { initTelegramBot, stopTelegramBot } from './services/telegram-bot.js';
 import { initSlackBot } from './services/slack-bot.js';
 import { initDiscordBot } from './services/discord-bot.js';
@@ -175,11 +175,11 @@ async function start() {
   const { initEventWiring } = await import('./infrastructure/event-wiring.js');
   initEventWiring();
 
-  // ── GitHub sync scheduler ─────────────────────────────────────────
+  // ── Issue sync scheduler ─────────────────────────────────────────
   // Always start — individual projects use their integration token,
   // falling back to GITHUB_TOKEN env var. Projects without any token skip.
-  startGithubSyncScheduler();
-  console.log('🔄 GitHub sync scheduler started (per-project intervals, checking every 60s)');
+  startIssueSyncScheduler();
+  console.log('🔄 Issue sync scheduler started (per-project intervals, checking every 60s)');
 
   // ── Stuck task detector ─────────────────────────────────────────────
   startStuckDetector();
@@ -202,7 +202,7 @@ async function start() {
     stopWorkspaceRetention();
     stopStuckDetector();
     stopVersionChecker();
-    stopGithubSyncScheduler();
+    stopIssueSyncScheduler();
     await stopTelegramBot();
     process.exit(0);
   };
