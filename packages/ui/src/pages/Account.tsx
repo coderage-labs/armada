@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { apiFetch } from '../hooks/useApi';
-import { Shield, Fingerprint, Trash2, User, Key, Lock, Save, Loader2, Bell, Link, Unlink, CheckCircle, MessageCircle, Send } from 'lucide-react';
+import { Shield, Fingerprint, Trash2, User, Key, Lock, Save, Loader2, Bell, Link, Unlink, CheckCircle, MessageCircle, FlaskConical } from 'lucide-react';
 import { LoadingState } from '../components/LoadingState';
 import { PageHeader } from '../components/PageHeader';
 import RegisterPasskey from '../components/RegisterPasskey';
@@ -492,21 +492,27 @@ export default function Account() {
                         <>
                         <Button
                           variant="ghost"
+                          size="icon"
                           onClick={() => handleTestChannel(channelType)}
                           disabled={testingChannel === channelType}
-                          className="flex items-center gap-1 text-[11px] font-medium text-emerald-300 hover:text-emerald-200 bg-emerald-500/10 hover:bg-emerald-500/20 px-2 py-1 rounded-md transition disabled:opacity-50"
+                          className="h-7 w-7 text-emerald-400/70 hover:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-md transition disabled:opacity-50"
+                          title="Send test notification"
                         >
-                          <Send className="w-3 h-3" />
-                          {testingChannel === channelType ? '…' : 'Test'}
+                          {testingChannel === channelType
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            : <FlaskConical className="w-3.5 h-3.5" />}
                         </Button>
                         <Button
                           variant="ghost"
+                          size="icon"
                           onClick={() => handleUnlink(channelType)}
                           disabled={isUnlinking}
-                          className="flex items-center gap-1 text-[11px] font-medium text-red-400/70 hover:text-red-400 bg-red-500/10 hover:bg-red-500/20 px-2 py-1 rounded-md transition disabled:opacity-50"
+                          className="h-7 w-7 text-red-400/50 hover:text-red-400 bg-red-500/10 hover:bg-red-500/20 rounded-md transition disabled:opacity-50"
+                          title="Unlink channel"
                         >
-                          <Unlink className="w-3 h-3" />
-                          {isUnlinking ? '…' : 'Unlink'}
+                          {isUnlinking
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            : <Unlink className="w-3.5 h-3.5" />}
                         </Button>
                         </>
                       ) : (
