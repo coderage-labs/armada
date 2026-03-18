@@ -17,6 +17,7 @@ import { workflows as workflowsTable, workflowRuns, workflowStepRuns, workflowPr
 import { eq, desc, sql, inArray } from 'drizzle-orm';
 import { dispatchWebhook } from './webhook-dispatcher.js';
 import { broadcast } from '../utils/event-bus.js';
+import { getArtifactContextBlock } from '../routes/workflow-artifacts.js';
 
 // Types — mirror shared package types locally to avoid build ordering issues
 interface WorkflowStep {
@@ -388,7 +389,11 @@ async function dispatchStep(
 
   const resolvedPrompt = resolveTemplate(step.prompt || '', vars);
   const workflowContextBlock = buildWorkflowContextBlock(run, workflow, step, stepRun);
-  const prompt = workflowContextBlock + '\n\n' + resolvedPrompt;
+  const artifactBlock = await getArtifactContextBlock(run.id, step.id);
+  const contextWithArtifacts = artifactBlock
+    ? workflowContextBlock + '\n\n' + artifactBlock
+    : workflowContextBlock;
+  const prompt = contextWithArtifacts + '\n\n' + resolvedPrompt;
   const taskId = `wf-${run.id.slice(0, 8)}-${step.id}`;
 
   // Mark step as running and store the resolved prompt
