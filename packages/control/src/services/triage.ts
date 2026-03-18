@@ -264,6 +264,7 @@ If none of the workflows fit, respond with:
       taskId,
       from: 'triage-service',
       fromRole: 'operator',
+      targetAgent: pm.name,
       message: triagePrompt,
       callbackUrl: `${CONTROL_PLANE_URL}/api/triage/callback`,
     });
