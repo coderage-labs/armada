@@ -14,6 +14,7 @@ import { handleSystemCommand } from '../handlers/system.js';
 import { handleToolCommand } from '../handlers/tools.js';
 import { handleRelayCommand } from '../handlers/relay.js';
 import { handleLogsCommand, type LogsHandlerContext } from '../handlers/logs.js';
+import { subscribeToInstanceEvents, unsubscribeFromInstanceEvents } from '../handlers/events.js';
 import { loadCredentials, saveCredentials, CREDENTIALS_PATH } from '../credentials.js';
 import { IdempotencyCache } from './idempotency-cache.js';
 
@@ -45,6 +46,65 @@ const NON_IDEMPOTENT_ACTIONS = new Set([
 
 export function handleCommand(msg: WsMessage, socket: WebSocket): void {
   if (!isCommand(msg)) return; // ignore non-command messages
+
+  // ── events.subscribe / events.unsubscribe ─────────────────────────────────
+  // These are handled inline (not via route) because they need the socket ref
+  // for forwarding SSE events back to the control plane.
+  if (msg.action === 'events.subscribe') {
+    const { instanceId, instanceName, containerHostname } = msg.params as {
+      instanceId?: string;
+      instanceName?: string;
+      containerHostname?: string;
+    };
+
+    if (!instanceId || !instanceName || !containerHostname) {
+      const response: ResponseMessage = {
+        type: 'response',
+        id: msg.id,
+        status: 'error',
+        error: 'events.subscribe: instanceId, instanceName, and containerHostname are required',
+        code: 'UNKNOWN',
+      };
+      if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(response));
+      return;
+    }
+
+    subscribeToInstanceEvents(instanceId, instanceName, containerHostname, socket);
+    const response: ResponseMessage = {
+      type: 'response',
+      id: msg.id,
+      status: 'ok',
+      data: { subscribed: true, instanceId },
+    };
+    if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(response));
+    return;
+  }
+
+  if (msg.action === 'events.unsubscribe') {
+    const { instanceId } = msg.params as { instanceId?: string };
+
+    if (!instanceId) {
+      const response: ResponseMessage = {
+        type: 'response',
+        id: msg.id,
+        status: 'error',
+        error: 'events.unsubscribe: instanceId is required',
+        code: 'UNKNOWN',
+      };
+      if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(response));
+      return;
+    }
+
+    unsubscribeFromInstanceEvents(instanceId);
+    const response: ResponseMessage = {
+      type: 'response',
+      id: msg.id,
+      status: 'ok',
+      data: { unsubscribed: true, instanceId },
+    };
+    if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(response));
+    return;
+  }
 
   // Skip cache for read-only commands
   if (!NON_IDEMPOTENT_ACTIONS.has(msg.action)) {

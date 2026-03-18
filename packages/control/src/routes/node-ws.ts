@@ -259,6 +259,22 @@ wss.on('connection', (ws: WebSocket, _request: IncomingMessage, auth: Extract<Au
         return;
       }
 
+      if (msg.event === 'instance.event' && msg.data) {
+        // An OpenClaw instance event forwarded by the node agent.
+        // Re-emit on the event bus with a namespaced key so SSE clients can filter.
+        const instanceEvent = msg.data as {
+          instanceId?: string;
+          instanceName?: string;
+          eventType?: string;
+          [key: string]: unknown;
+        };
+        const instanceName = instanceEvent.instanceName ?? instanceEvent.instanceId ?? 'unknown';
+        const eventType = instanceEvent.eventType ?? 'unknown';
+        const busKey = `instance.${instanceName}.${eventType}`;
+        eventBus.emit(busKey, { nodeId, ...instanceEvent });
+        return;
+      }
+
       // Other events can be handled here or emitted onto the event bus in future
       return;
     }

@@ -380,4 +380,25 @@ export class WsNodeClient {
   async deleteFile(path: string, recursive = false): Promise<void> {
     await this.send('file.delete', { path, recursive });
   }
+
+  // === Instance event relay ===
+
+  /**
+   * Ask the node agent to start relaying SSE events from the given instance
+   * back to the control plane over the WS tunnel.
+   */
+  async subscribeInstanceEvents(
+    instanceId: string,
+    instanceName: string,
+    containerHostname: string,
+  ): Promise<void> {
+    await this.send('events.subscribe', { instanceId, instanceName, containerHostname });
+  }
+
+  /**
+   * Ask the node agent to stop relaying SSE events from the given instance.
+   */
+  async unsubscribeInstanceEvents(instanceId: string): Promise<void> {
+    await this.send('events.unsubscribe', { instanceId });
+  }
 }

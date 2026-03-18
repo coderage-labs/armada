@@ -152,6 +152,10 @@ export type CredentialAction =
   | 'credential.issued'   // Control → Node: new session credential issued after install-token auth
   | 'credential.rotate';  // Control → Node: rotate existing session credential
 
+export type EventsAction =
+  | 'events.subscribe'
+  | 'events.unsubscribe';
+
 export type WsAction =
   | ContainerAction
   | FileAction
@@ -159,7 +163,8 @@ export type WsAction =
   | SystemAction
   | RelayAction
   | GatewayAction
-  | CredentialAction;
+  | CredentialAction
+  | EventsAction;
 
 // ── Credential error codes ──────────────────────────────────────────────────
 
