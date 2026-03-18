@@ -5,8 +5,27 @@ import { projectIntegrationsRepo } from '../services/integrations/project-integr
 import { getProvider, listProviders } from '../services/integrations/registry.js';
 import { registerToolDef } from '../utils/tool-registry.js';
 import { logActivity } from '../services/activity-service.js';
+import { syncAgentCredentials } from '../services/credential-sync.js';
+import { agentsRepo } from '../repositories/index.js';
+import type { NodeManager } from '../node-manager.js';
 
-const router = Router();
+/** Fire-and-forget: sync credentials for all running agents after integration changes */
+function triggerCredentialSyncForAllAgents(nodeManager: NodeManager): void {
+  const runningAgents = agentsRepo.getAll().filter(a => a.status === 'running');
+  Promise.resolve().then(async () => {
+    const results = await Promise.allSettled(
+      runningAgents.map(a => syncAgentCredentials(a.name, nodeManager)),
+    );
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
+      if (result.status === 'rejected') {
+        console.warn(`[integrations] Credential sync failed for ${runningAgents[i].name}:`, result.reason);
+      }
+    }
+  }).catch(err => {
+    console.warn('[integrations] Credential sync background task failed:', err);
+  });
+}
 
 // ── Tool Definitions ────────────────────────────────────────────────
 
@@ -170,6 +189,9 @@ registerToolDef({
 
 // ── Routes ──────────────────────────────────────────────────────────
 
+export function createIntegrationRoutes(nodeManager: NodeManager): Router {
+const router = Router();
+
 // GET /api/integrations — list all (masked auth)
 router.get('/', (_req, res) => {
   const integrations = integrationsRepo.getAll().map(i => ({
@@ -225,6 +247,7 @@ router.post('/', requireScope('integrations:write'), (req, res, next) => {
 
     logActivity({ eventType: 'integration.created', detail: `Integration "${name}" created (${provider})` });
     res.status(201).json({ ...integration, authConfig: maskAuthConfig(integration.authConfig) });
+    triggerCredentialSyncForAllAgents(nodeManager);
   } catch (err) {
     next(err);
   }
@@ -252,6 +275,7 @@ router.put('/:id', requireScope('integrations:write'), (req, res, next) => {
     const updated = integrationsRepo.update(req.params.id, updateData);
     logActivity({ eventType: 'integration.updated', detail: `Integration "${existing.name}" updated` });
     res.json({ ...updated, authConfig: maskAuthConfig(updated.authConfig) });
+    triggerCredentialSyncForAllAgents(nodeManager);
   } catch (err) {
     next(err);
   }
@@ -354,10 +378,14 @@ router.get('/:id/repos', async (req, res, next) => {
   }
 });
 
+return router;
+}
+
 // ── Project Integration Routes ──────────────────────────────────────
 
 // Mount under /api/projects/:id/integrations (parent router handles /api/projects)
-export const projectIntegrationsRouter = Router({ mergeParams: true });
+export function createProjectIntegrationRoutes(_nodeManager: NodeManager): Router {
+const projectIntegrationsRouter = Router({ mergeParams: true });
 
 // GET /api/projects/:id/integrations — list project's integration configs
 projectIntegrationsRouter.get('/', (req: any, res) => {
@@ -500,4 +528,5 @@ projectIntegrationsRouter.post('/:piId/sync', async (req, res, next) => {
   }
 });
 
-export default router;
+return projectIntegrationsRouter;
+}
