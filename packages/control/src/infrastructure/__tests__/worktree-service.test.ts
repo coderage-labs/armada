@@ -15,7 +15,7 @@ import {
   mergeWorktree,
   cleanupWorktree,
   getActiveWorktrees,
-} from '../worktree-service.js';
+} from '../../services/worktree-service.js';
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
