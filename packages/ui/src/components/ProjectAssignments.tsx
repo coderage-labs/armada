@@ -82,24 +82,30 @@ function AssigneeAvatar({
   displayName: string;
   assigneeType: 'user' | 'agent';
 }) {
-  if (assigneeType === 'agent') {
-    return (
-      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-600 to-blue-600 flex items-center justify-center shrink-0">
-        <Bot className="w-3.5 h-3.5 text-white" />
-      </div>
-    );
-  }
+  const avatarSrc =
+    assigneeType === 'agent'
+      ? `/api/agents/${name}/avatar`
+      : `/api/users/${name}/avatar?size=sm`;
+
+  const FallbackIcon = assigneeType === 'agent' ? Bot : User;
+
   return (
-    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-blue-500 flex items-center justify-center text-white text-xs font-medium overflow-hidden shrink-0">
+    <div
+      className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-medium overflow-hidden shrink-0 ${
+        assigneeType === 'agent'
+          ? 'bg-gradient-to-br from-violet-600 to-blue-600'
+          : 'bg-gradient-to-br from-violet-500 to-blue-500'
+      }`}
+    >
       <img
-        src={`/api/users/${name}/avatar?size=sm`}
+        src={avatarSrc}
         alt={displayName}
         className="w-full h-full object-cover"
         onError={(e) => {
           (e.target as HTMLImageElement).style.display = 'none';
         }}
       />
-      {displayName?.[0]?.toUpperCase() ?? <User className="w-3.5 h-3.5" />}
+      {displayName?.[0]?.toUpperCase() ?? <FallbackIcon className="w-3.5 h-3.5" />}
     </div>
   );
 }
@@ -206,6 +212,21 @@ export default function ProjectAssignments({ projectId }: { projectId: string })
             ? `${assignment!.assigneeType}:${assignment!.assigneeId}`
             : '__none__';
 
+          const resolvedName = hasAssignee
+            ? assignment!.assigneeType === 'agent'
+              ? agents.find(
+                  (a) =>
+                    a.id === assignment!.assigneeId || a.name === assignment!.assigneeId,
+                )?.name
+              : users.find((u) => u.id === assignment!.assigneeId)?.displayName
+            : undefined;
+
+          const displayName =
+            resolvedName ??
+            assignment?.assigneeDisplayName ??
+            assignment?.assigneeName ??
+            assignment?.assigneeId;
+
           return (
             <div
               key={type}
@@ -223,11 +244,11 @@ export default function ProjectAssignments({ projectId }: { projectId: string })
                   <>
                     <AssigneeAvatar
                       name={assignment!.assigneeId!}
-                      displayName={assignment!.assigneeDisplayName || assignment!.assigneeId!}
+                      displayName={displayName!}
                       assigneeType={assignment!.assigneeType!}
                     />
                     <span className="text-sm text-zinc-200 truncate">
-                      {assignment!.assigneeDisplayName || assignment!.assigneeName || assignment!.assigneeId}
+                      {displayName}
                     </span>
                     <Badge
                       variant="secondary"
