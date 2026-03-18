@@ -86,7 +86,7 @@ export const linkedAccountsSchema = z.object({
 }).passthrough();
 
 export const notificationsSchema = z.object({
-  channels: z.array(z.string()),
+  channels: z.array(z.string()).optional().default([]),
   email: z.object({ address: z.string() }).optional(),
   webhook: z.object({ url: z.string() }).optional(),
   preferences: z.object({
