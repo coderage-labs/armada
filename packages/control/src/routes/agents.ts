@@ -491,6 +491,15 @@ export function createAgentRoutes(nodeManager: NodeManager): Router {
       try {
         const resp = await node.relayRequest(containerName, 'GET', '/armada/session') as any;
         const body = resp?.body ?? resp;
+        // Filter sessions to only those belonging to this agent
+        // Session keys contain the agent name: armada:<agentName>:...
+        const agentName = req.params.name;
+        if (body?.sessions && Array.isArray(body.sessions)) {
+          body.sessions = body.sessions.filter((s: any) => {
+            const key = s.sessionKey || s.label || '';
+            return key.includes(agentName) || key.includes(`armada:${agentName}`);
+          });
+        }
         res.json(body);
       } catch (err: any) {
         res.json({ sessions: [], error: 'Agent offline' });
