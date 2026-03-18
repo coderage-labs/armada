@@ -238,7 +238,7 @@ export async function initTelegramBot(): Promise<void> {
             } else {
               const originalText = ctx.callbackQuery.message?.text ?? '';
               await ctx.editMessageText(
-                `${originalText}\n\n🔄 Workflow <b>${escapeHtml(result.workflowName ?? firstWorkflow.name)}</b> dispatched by ${escapeHtml(user.displayName)}`,
+                `${originalText}\n\n🔄 Workflow <b>${escapeHtml(result.workflowName ?? 'unknown')}</b> dispatched by ${escapeHtml(user.displayName)}`,
                 { parse_mode: 'HTML', reply_markup: undefined },
               );
             }
