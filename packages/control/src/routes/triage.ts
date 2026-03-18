@@ -31,7 +31,22 @@ registerToolDef({
   ],
     scope: 'tasks:write',
 });
-import { triageIssue, handleTriageResult, triageNewIssues, markIssueTriaged } from '../services/triage.js';
+
+registerToolDef({
+  name: 'armada_triage_dispatch',
+  description: 'Triage a GitHub issue by selecting a workflow and launching it. Auto-populates issue details as template variables. Marks the issue as triaged.',
+  method: 'POST',
+  path: '/api/triage/dispatch',
+  parameters: [
+    { name: 'projectId', type: 'string', description: 'Project ID', required: true },
+    { name: 'issueNumber', type: 'number', description: 'GitHub issue number', required: true },
+    { name: 'workflowId', type: 'string', description: 'Workflow ID to run', required: true },
+    { name: 'vars', type: 'string', description: 'Additional template variables as JSON (optional)' },
+  ],
+  scope: 'workflows:write',
+});
+
+import { triageIssue, handleTriageResult, triageNewIssues, markIssueTriaged, triageDispatch } from '../services/triage.js';
 import { getCachedIssues } from '../services/github-sync.js';
 
 const router = Router();
@@ -93,6 +108,47 @@ router.post('/mark', requireScope('tasks:write'), (req, res) => {
   }
   markIssueTriaged(projectId, issueNumber);
   res.json({ marked: true });
+});
+
+/** POST /api/triage/dispatch — Unified triage dispatch for humans and agents */
+router.post('/dispatch', requireScope('workflows:write'), async (req, res) => {
+  const { projectId, issueNumber, workflowId, vars: rawVars } = req.body;
+  if (!projectId || !issueNumber || !workflowId) {
+    res.status(400).json({ error: 'projectId, issueNumber, and workflowId are required' });
+    return;
+  }
+
+  // Parse vars if passed as JSON string (from agent tool calls)
+  let extraVars: Record<string, string> = {};
+  if (rawVars) {
+    if (typeof rawVars === 'string') {
+      try {
+        extraVars = JSON.parse(rawVars);
+      } catch {
+        res.status(400).json({ error: 'vars must be valid JSON' });
+        return;
+      }
+    } else if (typeof rawVars === 'object') {
+      extraVars = rawVars;
+    }
+  }
+
+  const result = await triageDispatch({ projectId, issueNumber, workflowId, vars: extraVars });
+
+  if (result.error === 'issue_not_found') {
+    res.status(404).json({ error: `Issue #${issueNumber} not found in cache for project ${projectId}` });
+    return;
+  }
+  if (result.error === 'workflow_not_found') {
+    res.status(404).json({ error: `Workflow ${workflowId} not found or is disabled` });
+    return;
+  }
+  if (result.error) {
+    res.status(500).json({ error: result.error });
+    return;
+  }
+
+  res.json({ ok: true, runId: result.runId, workflowName: result.workflowName });
 });
 
 export default router;
