@@ -13,6 +13,7 @@ import { handlePluginCommand } from '../handlers/plugins.js';
 import { handleSystemCommand } from '../handlers/system.js';
 import { handleToolCommand } from '../handlers/tools.js';
 import { handleRelayCommand } from '../handlers/relay.js';
+import { handleLogsCommand, type LogsHandlerContext } from '../handlers/logs.js';
 import { loadCredentials, saveCredentials, CREDENTIALS_PATH } from '../credentials.js';
 import { IdempotencyCache } from './idempotency-cache.js';
 
@@ -37,6 +38,7 @@ const NON_IDEMPOTENT_ACTIONS = new Set([
   'file.read',
   'file.list',
   'plugin.list',
+  'logs.stream',
 ]);
 
 // ── Command router ────────────────────────────────────────────────────────────
@@ -93,7 +95,7 @@ export function handleCommand(msg: WsMessage, socket: WebSocket): void {
   });
 }
 
-async function route(msg: CommandMessage, ctx?: ContainerHandlerContext): Promise<ResponseMessage> {
+async function route(msg: CommandMessage, ctx?: ContainerHandlerContext & LogsHandlerContext): Promise<ResponseMessage> {
   try {
     const { action } = msg;
 
@@ -108,6 +110,7 @@ async function route(msg: CommandMessage, ctx?: ContainerHandlerContext): Promis
     if (action.startsWith('node.')) return await handleSystemCommand(msg);
     if (action.startsWith('tool.')) return await handleToolCommand(msg);
     if (action === 'instance.relay') return await handleRelayCommand(msg);
+    if (action.startsWith('logs.')) return await handleLogsCommand(msg, ctx);
 
     return {
       type: 'response',
