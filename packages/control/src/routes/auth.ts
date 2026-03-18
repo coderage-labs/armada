@@ -116,7 +116,7 @@ router.put('/me', (req, res) => {
 // ── Channel Linking ───────────────────────────────────────────────────
 
 // POST /api/auth/me/link — link a channel identity via verification code
-router.post('/me/link', (req, res) => {
+router.post('/me/link', async (req, res) => {
   if (!req.caller) { res.status(401).json({ error: 'Auth required' }); return; }
   const { code } = req.body;
   if (!code) { res.status(400).json({ error: 'code is required' }); return; }
