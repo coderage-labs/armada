@@ -313,9 +313,75 @@ If none of the workflows fit, respond with:
   }
 }
 
+// ── Unified dispatch logic ──────────────────────────────────────────────────
+
+interface DispatchInput {
+  projectId: string;
+  issueNumber: number;
+  workflowId: string;
+  vars?: Record<string, string>;
+}
+
+interface DispatchResult {
+  runId?: string;
+  workflowName?: string;
+  error?: string;
+}
+
+/**
+ * Core dispatch logic: look up issue + workflow, build AUTO_VARS, start run, mark triaged.
+ * Used by both the /api/triage/dispatch endpoint and the PM agent callback handler.
+ */
+export async function triageDispatch(input: DispatchInput): Promise<DispatchResult> {
+  const { projectId, issueNumber, workflowId, vars: extraVars = {} } = input;
+
+  // 1. Look up the issue from cache
+  const issues = getCachedIssues(projectId);
+  const issue = issues.find(i => i.number === issueNumber);
+  if (!issue) {
+    return { error: 'issue_not_found' };
+  }
+
+  // 2. Look up and validate workflow
+  const workflow = getWorkflowById(workflowId);
+  if (!workflow || !workflow.enabled) {
+    return { error: 'workflow_not_found' };
+  }
+
+  // 3. Build vars: AUTO_VARS merged with any caller-supplied vars
+  const AUTO_VARS: Record<string, string> = {
+    issueTitle: issue.title,
+    issueBody: issue.body || '',
+    issueNumber: String(issue.number),
+    issueLabels: (issue.labels || []).join(', '),
+    issueUrl: issue.htmlUrl || (issue as any).url || '',
+  };
+  const mergedVars = { ...AUTO_VARS, ...extraVars };
+
+  // 4. Start the workflow run (use issue htmlUrl as triggerRef)
+  try {
+    const triggerRef = issue.htmlUrl || (issue as any).url || String(issueNumber);
+    const run = await startRun(workflow, 'issue', triggerRef, mergedVars, projectId);
+
+    // 5. Mark issue as triaged
+    markIssueTriage(projectId, issueNumber);
+
+    logActivity({
+      eventType: 'triage.launched',
+      agentName: 'triage-service',
+      detail: `Launched workflow "${workflow.name}" for issue #${issueNumber} via dispatch`,
+    });
+
+    console.log(`[triage] Dispatch: launched workflow "${workflow.name}" (run ${run.id}) for issue #${issueNumber}`);
+    return { runId: run.id, workflowName: workflow.name };
+  } catch (err: any) {
+    return { error: `Failed to start workflow: ${err.message}` };
+  }
+}
+
 /**
  * Handle triage callback — PM agent returns structured JSON.
- * Parse it and start the workflow if valid.
+ * Parse it and start the workflow using shared dispatch logic.
  */
 export async function handleTriageResult(
   taskId: string,
@@ -337,53 +403,62 @@ export async function handleTriageResult(
     return { launched: false, error: `No workflow selected: ${triageResult.reasoning}` };
   }
 
-  const workflow = getWorkflowById(triageResult.workflowId);
-  if (!workflow) {
-    return { launched: false, error: `Workflow ${triageResult.workflowId} not found` };
-  }
-
-  // Extract issue info from task ID
+  // Extract issue number from task ID: triage-{projectId8}-{issueNumber}
   const issueMatch = taskId.match(/triage-\w+-(\d+)/);
-  const issueNumber = issueMatch ? issueMatch[1] : undefined;
+  const issueNumberFromId = issueMatch ? parseInt(issueMatch[1], 10) : undefined;
 
-  // Extract project ID from triage task ID: triage-{projectId8}-{issueNumber}
+  // Extract project ID from triage task ID
   const projectMatch = taskId.match(/triage-(\w+)-\d+/);
   const triageProjectId = projectMatch ? findProjectByPrefix(projectMatch[1]) : undefined;
 
-  // Merge cached issue data into vars (authoritative — PM doesn't need to echo these)
+  // Retrieve cached issue data to supplement the dispatch (for issueUrl etc.)
   const cachedIssue = pendingTriageIssues.get(taskId);
-  const mergedVars: Record<string, any> = {
-    ...triageResult.vars,
-    ...(cachedIssue ? {
-      issueNumber: cachedIssue.number,
-      issueTitle: cachedIssue.title,
-      issueBody: cachedIssue.body,
-      issueLabels: cachedIssue.labels.join(', '),
-    } : {}),
-  };
   pendingTriageIssues.delete(taskId);
 
-  // Start the workflow run
-  try {
-    const run = await startRun(
-      workflow,
-      'issue',
-      issueNumber ? `#${issueNumber}` : taskId,
-      mergedVars,
-      triageProjectId,
-    );
-
-    logActivity({
-      eventType: 'triage.launched',
-      agentName: 'triage-service',
-      detail: `Launched workflow "${workflow.name}" for issue #${issueNumber}: ${triageResult.reasoning}`,
-    });
-
-    console.log(`[triage] Launched workflow "${workflow.name}" (run ${run.id}) — reason: ${triageResult.reasoning}`);
-    return { launched: true, runId: run.id };
-  } catch (err: any) {
-    return { launched: false, error: `Failed to start workflow: ${err.message}` };
+  if (!triageProjectId || issueNumberFromId === undefined) {
+    // Fall back to old logic if we can't parse the task ID
+    const workflow = getWorkflowById(triageResult.workflowId);
+    if (!workflow) {
+      return { launched: false, error: `Workflow ${triageResult.workflowId} not found` };
+    }
+    const mergedVars: Record<string, any> = {
+      ...triageResult.vars,
+      ...(cachedIssue ? {
+        issueNumber: cachedIssue.number,
+        issueTitle: cachedIssue.title,
+        issueBody: cachedIssue.body,
+        issueLabels: cachedIssue.labels.join(', '),
+      } : {}),
+    };
+    try {
+      const run = await startRun(workflow, 'issue', taskId, mergedVars, triageProjectId);
+      logActivity({ eventType: 'triage.launched', agentName: 'triage-service', detail: `Launched workflow "${workflow.name}": ${triageResult.reasoning}` });
+      return { launched: true, runId: run.id };
+    } catch (err: any) {
+      return { launched: false, error: `Failed to start workflow: ${err.message}` };
+    }
   }
+
+  // Use shared dispatch logic — PM-provided vars layer on top of AUTO_VARS
+  const dispatchResult = await triageDispatch({
+    projectId: triageProjectId,
+    issueNumber: issueNumberFromId,
+    workflowId: triageResult.workflowId,
+    vars: triageResult.vars || {},
+  });
+
+  if (dispatchResult.error) {
+    if (dispatchResult.error === 'issue_not_found') {
+      return { launched: false, error: `Issue #${issueNumberFromId} not found in cache` };
+    }
+    if (dispatchResult.error === 'workflow_not_found') {
+      return { launched: false, error: `Workflow ${triageResult.workflowId} not found or disabled` };
+    }
+    return { launched: false, error: dispatchResult.error };
+  }
+
+  console.log(`[triage] PM triage: launched workflow "${dispatchResult.workflowName}" — reason: ${triageResult.reasoning}`);
+  return { launched: true, runId: dispatchResult.runId };
 }
 
 /**

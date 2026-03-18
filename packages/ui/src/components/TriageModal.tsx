@@ -155,29 +155,15 @@ export default function TriageModal({
 
     setRunning(true);
     try {
-      // Build all vars: auto + manual
-      const allAutoVars = issue
-        ? Object.fromEntries(Object.entries(AUTO_VARS).map(([k, fn]) => [k, fn(issue)]))
-        : {};
-
-      await apiFetch(`/api/workflows/${selectedWorkflow.id}/run`, {
+      await apiFetch('/api/triage/dispatch', {
         method: 'POST',
         body: JSON.stringify({
-          vars: { ...allAutoVars, ...manualVars },
           projectId,
-          triggerRef: issue.htmlUrl,
+          issueNumber: issue.number,
+          workflowId: selectedWorkflow.id,
+          vars: manualVars,
         }),
       });
-
-      // Mark issue as triaged
-      try {
-        await apiFetch('/api/triage/mark', {
-          method: 'POST',
-          body: JSON.stringify({ projectId, issueNumber: issue.number }),
-        });
-      } catch {
-        // non-fatal — workflow already started
-      }
 
       toast.success(`Workflow "${selectedWorkflow.name}" started for #${issue.number}`);
       onSuccess();
