@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { encrypt, decrypt, isEncrypted, decryptIfNeeded, _resetKeyCache } from '../crypto.js';
+import { encrypt, decrypt, isEncrypted, decryptIfNeeded, _resetKeyCache } from '../../utils/crypto.js';
 
 describe('crypto utilities', () => {
   beforeEach(() => {
