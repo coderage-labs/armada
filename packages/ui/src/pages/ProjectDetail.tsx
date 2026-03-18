@@ -168,6 +168,18 @@ function formatDate(dateStr: string): string {
   });
 }
 
+const PROJECT_COLOURS = [
+  '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e',
+  '#14b8a6', '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7',
+  '#d946ef', '#ec4899', '#f43f5e', '#6b7280', '#78716c', '#737373',
+];
+
+const PROJECT_EMOJIS = [
+  '🚀', '⚡', '🔧', '🎯', '📦', '🌐', '🔒', '💡',
+  '📊', '🎨', '🔬', '📝', '🏗️', '🤖', '⭐', '🔥',
+  '💎', '🧪', '📈', '🛠️', '🎮', '🌟', '🔑', '📱',
+];
+
 const LABEL_COLORS: Record<string, string> = {
   bug: 'bg-red-500/20 border-red-500/30 text-red-300',
   enhancement: 'bg-blue-500/20 border-blue-500/30 text-blue-300',
@@ -1726,24 +1738,61 @@ function SettingsTab({ project, onUpdated }: { project: Project; onUpdated: (p: 
               className="w-full rounded-lg bg-zinc-800/50 border border-zinc-800 text-zinc-200 text-sm px-3 py-2 focus:outline-none focus:border-violet-500/50"
             />
           </div>
-          <div className="flex gap-3">
-            <div className="flex-1">
-              <label className="text-[10px] uppercase text-zinc-500 tracking-wider block mb-1">Icon</label>
-              <Input
-                value={icon}
-                onChange={e => { setIcon(e.target.value); setSaved(false); }}
-                placeholder="📁"
-                className="w-full rounded-lg bg-zinc-800/50 border border-zinc-800 text-zinc-200 text-sm px-3 py-2 focus:outline-none focus:border-violet-500/50"
-              />
+          <div>
+            <label className="text-[10px] uppercase text-zinc-500 tracking-wider block mb-1">Icon</label>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-2xl w-8 text-center">{icon || '—'}</span>
+              {icon && (
+                <button
+                  type="button"
+                  onClick={() => { setIcon(''); setSaved(false); }}
+                  className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700"
+                >
+                  Clear
+                </button>
+              )}
             </div>
-            <div>
-              <label className="text-[10px] uppercase text-zinc-500 tracking-wider block mb-1">Color</label>
-              <Input
-                type="color"
-                value={color}
-                onChange={e => { setColor(e.target.value); setSaved(false); }}
-                className="h-9 w-12 rounded-lg bg-zinc-800/50 border border-zinc-800 cursor-pointer"
-              />
+            <div className="flex flex-wrap gap-1 p-2 rounded-lg bg-zinc-800/50 border border-zinc-800">
+              {PROJECT_EMOJIS.map(emoji => (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => { setIcon(emoji); setSaved(false); }}
+                  title={emoji}
+                  className={`w-8 h-8 flex items-center justify-center rounded text-lg transition-all hover:bg-zinc-700 ${
+                    icon === emoji
+                      ? 'bg-violet-600/40 ring-1 ring-violet-500'
+                      : ''
+                  }`}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="text-[10px] uppercase text-zinc-500 tracking-wider block mb-1">Color</label>
+            <div className="flex flex-wrap gap-1.5 p-2 rounded-lg bg-zinc-800/50 border border-zinc-800">
+              {PROJECT_COLOURS.map(c => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => { setColor(c); setSaved(false); }}
+                  title={c}
+                  className={`w-6 h-6 rounded-full transition-all hover:scale-110 flex items-center justify-center ${
+                    color === c
+                      ? 'ring-2 ring-offset-2 ring-offset-zinc-900 ring-white scale-110'
+                      : ''
+                  }`}
+                  style={{ backgroundColor: c }}
+                >
+                  {color === c && (
+                    <svg className="w-3 h-3 text-white drop-shadow" viewBox="0 0 12 12" fill="none">
+                      <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
+                </button>
+              ))}
             </div>
           </div>
         </div>
