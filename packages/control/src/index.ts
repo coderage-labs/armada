@@ -15,6 +15,7 @@ import { registerAllProviders } from './services/integrations/index.js';
 import { startVersionChecker, stopVersionChecker } from './services/version-checker.js';
 import { startStuckDetector, stopStuckDetector } from './services/stuck-detector.js';
 import { pluginManager } from './services/plugin-manager.js';
+import { providerApiKeyRepo } from './repositories/provider-api-key-repo.js';
 
 
 const PORT = parseInt(process.env.PORT ?? '3001', 10);
@@ -29,6 +30,16 @@ async function start() {
 
   // Seed default plugins
   pluginManager.seed();
+
+  // Migrate any legacy plain-text API keys to encrypted form (idempotent)
+  try {
+    const migrated = providerApiKeyRepo.migrateEncryption();
+    if (migrated > 0) {
+      console.log(`🔐 Encrypted ${migrated} legacy API key(s) at rest`);
+    }
+  } catch (err: any) {
+    console.warn('[startup] API key encryption migration failed (non-fatal):', err.message);
+  }
 
   // Migrate legacy owner assignments to project_assignments table (#77)
   try {

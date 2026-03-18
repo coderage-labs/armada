@@ -74,8 +74,8 @@ const router = Router();
 
 function maskApiKey(key: string | null): string | null {
   if (!key) return null;
-  if (key.length <= 4) return '••••••';
-  return '••••••' + key.slice(-4);
+  if (key.length <= 6) return '••••••';
+  return key.slice(0, 3) + '...' + key.slice(-3);
 }
 
 function maskKey(k: ProviderApiKey): ProviderApiKey {
