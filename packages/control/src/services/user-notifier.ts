@@ -253,8 +253,7 @@ export async function deliverToUser(
   const deliveries: Promise<void>[] = [];
 
   // Telegram — system channel must be enabled + user must have a linked identity
-  // Backwards compat: fall back to legacy notifications.telegram.chatId
-  const telegramId = userChannels.telegram?.platformId || user.notifications?.telegram?.chatId;
+  const telegramId = userChannels.telegram?.platformId;
   if (enabledTypes.has('telegram') && telegramId) {
     const isGate = payload.event === 'workflow.gate';
     deliveries.push(

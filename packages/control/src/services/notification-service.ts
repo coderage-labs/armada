@@ -34,23 +34,16 @@ export interface NotificationPayload {
 
 // ── Channel-specific send helpers ────────────────────────────────────
 
-async function sendTelegram(channel: NotificationChannel, text: string): Promise<void> {
-  const { token, chat_id } = channel.config as { token?: string; chat_id?: string };
-  if (!token || !chat_id) {
-    console.warn(`[notification-service] Telegram channel "${channel.name}" missing token or chat_id`);
+async function sendTelegram(channel: NotificationChannel, _text: string): Promise<void> {
+  const { token } = channel.config as { token?: string };
+  if (!token) {
+    console.warn(`[notification-service] Telegram channel "${channel.name}" missing token`);
     return;
   }
-  const url = `https://api.telegram.org/bot${token}/sendMessage`;
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id, text, parse_mode: 'HTML' }),
-    signal: AbortSignal.timeout(10_000),
-  });
-  if (!resp.ok) {
-    const body = await resp.text().catch(() => '');
-    console.error(`[notification-service] Telegram send failed (${resp.status}): ${body}`);
-  }
+  // System-level broadcast via a static chat_id is no longer supported.
+  // Telegram notifications are delivered per-user via user.channels.telegram.platformId
+  // through the user-notifier service. This channel entry only needs a token to indicate
+  // that the Telegram bot is enabled for per-user delivery.
 }
 
 async function sendSlack(channel: NotificationChannel, text: string): Promise<void> {

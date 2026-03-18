@@ -62,7 +62,6 @@ interface UserFormData {
   linkedAccounts: { telegram?: string; github?: string; email?: string; callbackUrl?: string; hooksToken?: string };
   notifications: {
     channels: string[];
-    telegram?: { chatId: string };
     email?: { address: string };
     webhook?: { url: string };
     preferences: { gates: boolean; completions: boolean; failures: boolean; quietHours?: { start: string; end: string } };
@@ -111,7 +110,6 @@ function UserDialog({
         linkedAccounts: { ...user.linkedAccounts } as UserFormData['linkedAccounts'],
         notifications: {
           channels: user.notifications?.channels ?? [],
-          telegram: user.notifications?.telegram,
           email: user.notifications?.email,
           webhook: user.notifications?.webhook,
           preferences: {

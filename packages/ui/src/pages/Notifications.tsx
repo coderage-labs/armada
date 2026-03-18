@@ -44,7 +44,6 @@ interface FieldDef { key: string; label: string; placeholder: string; secret?: b
 const CONFIG_FIELDS: Record<ChannelType, FieldDef[]> = {
   telegram: [
     { key: 'token',   label: 'Bot Token',   placeholder: '123456:ABC-DEF…', secret: true },
-    { key: 'chat_id', label: 'Chat ID',      placeholder: '-1001234567890' },
   ],
   slack: [
     { key: 'webhook_url', label: 'Webhook URL', placeholder: 'https://hooks.slack.com/services/…', secret: true },
