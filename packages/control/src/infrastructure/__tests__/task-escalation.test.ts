@@ -46,7 +46,7 @@ vi.mock('../../repositories/index.js', () => ({
   userProjectsRepo: { getUsersForProject: vi.fn() },
 }));
 
-vi.mock('../telegram-bot.js', () => ({
+vi.mock('../../services/telegram-bot.js', () => ({
   sendGateNotification: vi.fn(),
   sendPlainNotification: vi.fn(),
 }));
@@ -61,21 +61,21 @@ vi.mock('../../db/drizzle-schema.js', () => ({
   workflowStepRuns: {},
 }));
 
-vi.mock('../slack-bot.js', () => ({
+vi.mock('../../services/slack-bot.js', () => ({
   sendSlackGateNotification: vi.fn(),
   sendSlackNotification: vi.fn(),
 }));
 
-vi.mock('../discord-bot.js', () => ({
+vi.mock('../../services/discord-bot.js', () => ({
   sendDiscordGateNotification: vi.fn(),
   sendDiscordNotification: vi.fn(),
 }));
 
 // ── Import after mocks ───────────────────────────────────────────────
 
-import { deliverToUser } from '../user-notifier.js';
+import { deliverToUser } from '../../services/user-notifier.js';
 import { notificationChannelRepo, usersRepo, userProjectsRepo } from '../../repositories/index.js';
-import { sendPlainNotification } from '../telegram-bot.js';
+import { sendPlainNotification } from '../../services/telegram-bot.js';
 
 const mockGetEnabled = vi.mocked(notificationChannelRepo.getEnabled);
 const mockGetAll = vi.mocked(usersRepo.getAll);
