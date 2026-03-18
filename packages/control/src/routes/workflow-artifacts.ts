@@ -229,46 +229,15 @@ router.get('/:runId/artifacts/:artifactId', requireScope('workflows:read'), asyn
       return;
     }
 
-    // For tool/API access: return content as JSON so agents can read it inline
-    const isText = artifact.mimeType.startsWith('text/') ||
-      artifact.mimeType === 'application/json' ||
-      artifact.mimeType === 'application/javascript' ||
-      artifact.mimeType === 'application/xml' ||
-      artifact.mimeType === 'application/yaml' ||
-      artifact.filename.endsWith('.md') ||
-      artifact.filename.endsWith('.txt') ||
-      artifact.filename.endsWith('.json') ||
-      artifact.filename.endsWith('.yml') ||
-      artifact.filename.endsWith('.yaml') ||
-      artifact.filename.endsWith('.ts') ||
-      artifact.filename.endsWith('.js') ||
-      artifact.filename.endsWith('.py') ||
-      artifact.filename.endsWith('.sh');
-
-    if (isText && artifact.size < 1_000_000) {
-      // Return text content inline as JSON — agents can read it directly
-      const content = readFileSync(artifact.storagePath, 'utf-8');
-      res.json({
-        id: artifact.id,
-        filename: artifact.filename,
-        stepId: artifact.stepId,
-        mimeType: artifact.mimeType,
-        size: artifact.size,
-        content,
-      });
-    } else {
-      // Binary or large files: return base64-encoded
-      const buffer = readFileSync(artifact.storagePath);
-      res.json({
-        id: artifact.id,
-        filename: artifact.filename,
-        stepId: artifact.stepId,
-        mimeType: artifact.mimeType,
-        size: artifact.size,
-        encoding: 'base64',
-        content: buffer.toString('base64'),
-      });
-    }
+    // For tool/API access: stream the raw file content
+    // The agent plugin is responsible for saving it to the agent's workspace
+    res.setHeader('Content-Type', artifact.mimeType);
+    res.setHeader('Content-Length', artifact.size);
+    res.setHeader('X-Artifact-Id', artifact.id);
+    res.setHeader('X-Artifact-Filename', artifact.filename);
+    res.setHeader('X-Artifact-Step', artifact.stepId);
+    const stream = createReadStream(artifact.storagePath);
+    stream.pipe(res);
   } catch (err) {
     console.error('[workflow-artifacts] GET download error:', err);
     res.status(500).json({ error: 'Internal server error' });

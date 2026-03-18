@@ -458,6 +458,34 @@ async function executearmadaTool(def: ArmadaToolDef, args: Record<string, any>):
       const queryStr = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
       const resp = await fetch(`${url}${queryStr}`, { headers, signal: AbortSignal.timeout(30_000) });
       if (!resp.ok) return { error: `Armada API ${resp.status}: ${await resp.text().catch(() => '')}` };
+
+      // Check if response is a file (artifact download) — save to workspace
+      const contentType = resp.headers.get('content-type') || '';
+      const artifactFilename = resp.headers.get('x-artifact-filename');
+      if (artifactFilename && !contentType.includes('application/json')) {
+        try {
+          const { writeFileSync, mkdirSync } = await import('node:fs');
+          const { join, dirname } = await import('node:path');
+          const artifactStep = resp.headers.get('x-artifact-step') || 'unknown';
+          const saveDir = join(process.cwd(), '.armada-artifacts', artifactStep);
+          mkdirSync(saveDir, { recursive: true });
+          const savePath = join(saveDir, artifactFilename);
+          const buffer = Buffer.from(await resp.arrayBuffer());
+          writeFileSync(savePath, buffer);
+          return {
+            saved: true,
+            path: savePath,
+            filename: artifactFilename,
+            step: artifactStep,
+            size: buffer.length,
+            message: `Artifact saved to ${savePath} — use file tools (read, grep, etc.) to inspect it.`,
+          };
+        } catch (saveErr: any) {
+          _logger.warn(`[armada-agent] Failed to save artifact: ${saveErr.message}`);
+          // Fall through to JSON parse
+        }
+      }
+
       return resp.json().catch(() => ({ status: 'ok' }));
     }
 
