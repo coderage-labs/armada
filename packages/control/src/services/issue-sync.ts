@@ -1,4 +1,4 @@
-import { projectsRepo, settingsRepo } from '../repositories/index.js';
+import { projectsRepo, settingsRepo, projectReposRepo } from '../repositories/index.js';
 import { getDrizzle } from '../db/drizzle.js';
 import { githubIssueCache, triagedIssues, issueDependencies } from '../db/drizzle-schema.js';
 import { eq, sql, and } from 'drizzle-orm';
@@ -111,17 +111,44 @@ export async function syncProjectIssues(projectId: string): Promise<{ fetched: n
   const project = projectsRepo.get(projectId);
   if (!project) throw new Error('Project not found');
 
+  // Prefer project_repos table; fall back to config.repositories for backwards compat
+  const linkedRepos = projectReposRepo.getByProject(projectId);
   const config = JSON.parse(project.configJson || '{}');
-  const repos: Array<{ url: string }> = config.repositories || [];
-  const token = resolveGitHubToken(projectId);
+  const legacyRepos: Array<{ url: string }> = config.repositories || [];
+
+  // Build list of {slug, token} pairs to fetch
+  type RepoFetch = { slug: string; token: string };
+  const repoFetches: RepoFetch[] = [];
+
+  if (linkedRepos.length > 0) {
+    for (const lr of linkedRepos) {
+      if (lr.provider !== 'github') continue;
+      let token = '';
+      try {
+        const integration = (await import('./integrations/integrations-repo.js')).integrationsRepo.getById(lr.integrationId);
+        if (integration?.authConfig?.token) {
+          token = integration.authConfig.token as string;
+        }
+      } catch {}
+      if (!token) token = resolveGitHubToken(projectId);
+      repoFetches.push({ slug: lr.fullName, token });
+    }
+  } else {
+    // Legacy fallback: config.repositories + global token
+    const token = resolveGitHubToken(projectId);
+    for (const repo of legacyRepos) {
+      const match = repo.url.match(/(?:github\.com\/)?([^/]+\/[^/]+?)(?:\.git)?$/);
+      if (!match) continue;
+      const slug = match[1].replace(/^\//, '');
+      const parts = slug.split('/');
+      if (parts.length < 2) continue;
+      repoFetches.push({ slug, token });
+    }
+  }
 
   const allIssues: GitHubIssue[] = [];
 
-  for (const repo of repos) {
-    // Parse owner/repo from url
-    const match = repo.url.match(/(?:github\.com\/)?([^/]+\/[^/]+?)(?:\.git)?$/);
-    if (!match) continue;
-    const slug = match[1].replace(/^\//, '');
+  for (const { slug, token: repoToken } of repoFetches) {
     const parts = slug.split('/');
     if (parts.length < 2) continue;
     const owner = parts[0];
@@ -133,7 +160,7 @@ export async function syncProjectIssues(projectId: string): Promise<{ fetched: n
       `${GITHUB_API}/repos/${owner}/${repoName}/issues?state=open&per_page=100&sort=updated`,
       {
         headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(repoToken ? { Authorization: `Bearer ${repoToken}` } : {}),
           Accept: 'application/vnd.github.v3+json',
         },
         signal: AbortSignal.timeout(30_000),
@@ -266,7 +293,8 @@ export function startIssueSyncScheduler() {
 
     for (const project of projects) {
       const config = JSON.parse(project.configJson || '{}');
-      if ((config.repositories || []).length === 0) continue;
+      const linkedReposCount = projectReposRepo.getByProject(project.id).length;
+      if (linkedReposCount === 0 && (config.repositories || []).length === 0) continue;
 
       // Resolve per-project interval
       const intervalMs = resolveProjectIntervalMs(config);

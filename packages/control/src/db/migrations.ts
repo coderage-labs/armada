@@ -469,6 +469,68 @@ const migrations: Migration[] = [
       'CREATE INDEX IF NOT EXISTS idx_issue_deps_issue ON issue_dependencies(repo, issue_number)',
     ],
   },
+
+  // ── project_repos (#166) ──────────────────────────────────────────
+  {
+    version: 39,
+    description: 'Create project_repos table for linking repos to source control integrations (#166)',
+    sql: [
+      `CREATE TABLE IF NOT EXISTS project_repos (
+        id              TEXT PRIMARY KEY,
+        project_id      TEXT NOT NULL,
+        integration_id  TEXT NOT NULL,
+        full_name       TEXT NOT NULL,
+        default_branch  TEXT DEFAULT 'main',
+        clone_url       TEXT,
+        provider        TEXT NOT NULL,
+        is_private      INTEGER NOT NULL DEFAULT 0,
+        created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+        UNIQUE(project_id, full_name)
+      )`,
+      'CREATE INDEX IF NOT EXISTS idx_project_repos_project ON project_repos(project_id)',
+      'CREATE INDEX IF NOT EXISTS idx_project_repos_integration ON project_repos(integration_id)',
+    ],
+  },
+
+  // ── migrate config.repositories → project_repos (#166) ───────────
+  {
+    version: 40,
+    description: 'Migrate existing config.repositories data into project_repos table (#166)',
+    run(db) {
+      const { v4: uuidv4 } = require('uuid');
+      const projects = db.prepare('SELECT id, config_json FROM projects').all() as Array<{ id: string; config_json: string }>;
+
+      for (const project of projects) {
+        let config: any = {};
+        try { config = JSON.parse(project.config_json || '{}'); } catch { continue; }
+        if (!Array.isArray(config.repositories) || config.repositories.length === 0) continue;
+
+        // Find a GitHub integration for this project
+        const piRows = db.prepare(
+          `SELECT pi.id, pi.integration_id, i.provider, i.auth_config
+           FROM project_integrations pi
+           JOIN integrations i ON i.id = pi.integration_id
+           WHERE pi.project_id = ? AND i.provider IN ('github', 'bitbucket', 'gitlab')
+           LIMIT 1`,
+        ).get(project.id) as { id: string; integration_id: string; provider: string; auth_config: string } | undefined;
+
+        if (!piRows) continue;
+
+        for (const repo of config.repositories as Array<{ url: string; defaultBranch?: string }>) {
+          const match = repo.url?.match(/(?:github\.com\/)?([^/]+\/[^/]+?)(?:\.git)?$/);
+          if (!match) continue;
+          const fullName = match[1].replace(/^\//, '');
+          const existing = db.prepare('SELECT id FROM project_repos WHERE project_id = ? AND full_name = ?').get(project.id, fullName);
+          if (existing) continue;
+          const id = uuidv4();
+          db.prepare(
+            `INSERT OR IGNORE INTO project_repos (id, project_id, integration_id, full_name, default_branch, provider, is_private)
+             VALUES (?, ?, ?, ?, ?, ?, 0)`,
+          ).run(id, project.id, piRows.integration_id, fullName, repo.defaultBranch || 'main', piRows.provider);
+        }
+      }
+    },
+  },
 ];
 
 /**
