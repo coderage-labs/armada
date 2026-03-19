@@ -55,6 +55,15 @@ export const projectReposRepo = {
     return row ? rowToProjectRepo(row) : null;
   },
 
+  getByFullName(fullName: string): ProjectRepo[] {
+    return getDrizzle()
+      .select()
+      .from(projectRepos)
+      .where(eq(projectRepos.fullName, fullName))
+      .all()
+      .map(rowToProjectRepo);
+  },
+
   getByProjectAndName(projectId: string, fullName: string): ProjectRepo | null {
     const row = getDrizzle()
       .select()

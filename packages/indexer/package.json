@@ -1,0 +1,21 @@
+{
+  "name": "@coderage-labs/armada-indexer",
+  "version": "0.1.0",
+  "description": "Codebase intelligence indexer \u2014 tree-sitter AST parsing into a queryable knowledge graph",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.7.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
+  }
+}

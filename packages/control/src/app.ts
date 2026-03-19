@@ -53,6 +53,7 @@ import { installScriptRoutes } from './routes/install-script.js';
 import { notificationChannelsRoutes } from './routes/notification-channels.js';
 import workflowArtifactRoutes from './routes/workflow-artifacts.js';
 import projectReposRoutes from './routes/project-repos.js';
+import { codebaseRouter } from './routes/codebase.js';
 
 export interface AppOptions {
   nodeManager: NodeManager;
@@ -117,6 +118,7 @@ export function createApp(opts: AppOptions): express.Express {
   app.use('/api/projects/:id/assignments', assignmentRoutes);
   app.use('/api/projects/:id/integrations', createProjectIntegrationRoutes(nodeManager));
   app.use('/api/projects/:id/repos2', projectReposRoutes);
+  app.use('/api/codebase', codebaseRouter);
   app.use('/api/webhooks', webhookRoutes);
   app.use('/api/webhooks/inbound', webhooksInboundMgmtRouter);
   app.use('/api/tools', createToolRoutes(nodeManager));
