@@ -203,6 +203,8 @@ interface DispatchFn {
     toolCategories?: string[];
     /** Resolved workflow template variables — used for workspace pre-provisioning */
     vars?: Record<string, any>;
+    /** Override repo for this step (multi-repo workflows) */
+    stepRepo?: string;
   }): Promise<{ agentName: string; armadaTaskId: string } | { error: string }>;
 }
 
@@ -546,6 +548,7 @@ async function dispatchStep(
       isolateGit: step.isolateGit,
       toolCategories: step.toolCategories,
       vars: mergedUserVars,
+      stepRepo: (step as any).repo,
     });
 
     if ('error' in result) {

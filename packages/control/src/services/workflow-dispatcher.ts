@@ -140,19 +140,22 @@ export function initWorkflowDispatcher() {
       // instance container before sending the task so the agent can start
       // work immediately without needing to clone manually.
       let discoveryContext = '';
-      if (opts.role === 'development' && opts.vars?.issueRepo) {
-        const issueRepo = opts.vars.issueRepo as string;
-        const issueNumber = opts.vars.issueNumber as number | undefined;
-        const issueTitle = opts.vars.issueTitle as string | undefined;
-        const repoName = issueRepo.split('/').pop() || 'work';
+      // Resolve the repo for this step: step.repo > vars.issueRepo
+      const stepRepo = (opts as any).stepRepo as string | undefined;
+      const targetRepo = stepRepo || opts.vars?.issueRepo as string | undefined;
+      if (opts.role === 'development' && targetRepo) {
+        const issueNumber = opts.vars?.issueNumber as number | undefined;
+        const issueTitle = opts.vars?.issueTitle as string | undefined;
+        const repoName = targetRepo.split('/').pop() || 'work';
         const slugTitle = issueTitle
           ? issueTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30).replace(/-+$/, '')
           : 'impl';
         const branch = `feature/${issueNumber ? `${issueNumber}-` : ''}${slugTitle}`;
-        const workPath = `/tmp/work/${repoName}`;
+        // Use step-specific path to avoid collisions in multi-repo workflows
+        const workPath = `/tmp/work/${opts.stepId}/${repoName}`;
         try {
           const wsNode = getNodeClient(instance.nodeId);
-          await wsNode.cloneWorkspace(instance.name, issueRepo, branch, workPath);
+          await wsNode.cloneWorkspace(instance.name, targetRepo, branch, workPath);
           console.log(`[workflow-dispatcher] Provisioned workspace for step "${opts.stepId}": ${workPath} (branch: ${branch})`);
 
           // Run workspace discovery after clone to inject stack info into the task prompt
