@@ -7,7 +7,7 @@
  */
 
 import { commandDispatcher } from '../ws/command-dispatcher.js';
-import type { ProgressMessage } from '@coderage-labs/armada-shared';
+import type { ProgressMessage, RepoDiscovery } from '@coderage-labs/armada-shared';
 
 export class WsNodeClient {
   constructor(public readonly nodeId: string) {}
@@ -404,6 +404,39 @@ export class WsNodeClient {
       branch: string;
       status: string;
     }>;
+  }
+
+  /**
+   * Execute a shell command inside an instance container at a given working directory.
+   * Returns exit code and combined stdout/stderr output.
+   *
+   * @param instanceName  Instance name (without the armada-instance- prefix)
+   * @param path          Working directory inside the container
+   * @param cmd           Shell command string to execute (run via sh -c)
+   */
+  async execInWorkspace(
+    instanceName: string,
+    path: string,
+    cmd: string,
+    timeoutMs = 120_000,
+  ): Promise<{ exitCode: number; output: string }> {
+    const containerName = `armada-instance-${instanceName}`;
+    return this.send('workspace.exec', { instanceId: containerName, path, cmd }, timeoutMs) as Promise<{
+      exitCode: number;
+      output: string;
+    }>;
+  }
+
+  /**
+   * Discover workspace stacks and armada.json config inside a container.
+   * Walks up to 2 levels deep detecting Node, Go, Python, Rust, Terraform, Java, etc.
+   *
+   * @param instanceName  Instance name (without the armada-instance- prefix)
+   * @param path          Absolute path inside the container to discover from
+   */
+  async discoverWorkspace(instanceName: string, path: string): Promise<RepoDiscovery> {
+    const containerName = `armada-instance-${instanceName}`;
+    return this.send('workspace.discover', { instanceId: containerName, path }, 30_000) as Promise<RepoDiscovery>;
   }
 
   // === Instance event relay ===
