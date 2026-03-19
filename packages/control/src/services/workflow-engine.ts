@@ -346,8 +346,8 @@ function evaluateStepCondition(
   // Strip markdown formatting from resolved text (agents often use **bold**, *italic*, etc.)
   resolved = resolved.replace(/\*\*/g, '').replace(/\*/g, '').replace(/`/g, '');
 
-  // "X contains 'text'"
-  const containsMatch = resolved.match(/^(.+?)\s+contains\s+'([^']+)'$/i);
+  // "X contains 'text'" — use \s+contains\s+ as delimiter, not anchored to start/end
+  const containsMatch = resolved.match(/^([\s\S]+?)\s+contains\s+'([^']+)'$/i);
   if (containsMatch) return containsMatch[1].includes(containsMatch[2]);
 
   // "X not empty"
@@ -356,7 +356,7 @@ function evaluateStepCondition(
   }
 
   // "X equals 'text'"
-  const equalsMatch = resolved.match(/^(.+?)\s+equals\s+'([^']+)'$/i);
+  const equalsMatch = resolved.match(/^([\s\S]+?)\s+equals\s+'([^']+)'$/i);
   if (equalsMatch) return equalsMatch[1].trim() === equalsMatch[2];
 
   // Boolean literals
@@ -439,7 +439,9 @@ async function advanceRun(
 
     // Check condition — skip if condition evaluates to false (planned skip, not failure)
     if (step.condition) {
+      console.log(`[workflow-engine] Evaluating condition for step "${step.id}": ${step.condition}`);
       const shouldRun = evaluateStepCondition(step.condition, run, stepRuns);
+      console.log(`[workflow-engine] Condition result for step "${step.id}": ${shouldRun}`);
       if (!shouldRun) {
         markStepStatus(stepRun.id, 'skipped');
         getDrizzle().run(sql`UPDATE workflow_step_runs SET output = 'Skipped: condition not met' WHERE id = ${stepRun.id}`);
