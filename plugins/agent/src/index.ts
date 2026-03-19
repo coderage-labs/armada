@@ -1469,10 +1469,17 @@ export default function register(api: any) {
       _logger.info(`[armada-agent] Started — ${_config!.instanceName} (${_config!.role}) in org ${_config!.org}`);
       _logger.info(`[armada-agent] Control plane URL: ${getApiBaseUrl()}`);
 
-      // Ensure git credential config is set (credentials live at /etc/armada/git-credentials)
+      // Ensure git credentials are available at ~/.git-credentials (where the default store helper looks)
       try {
         const { execSync } = await import('node:child_process');
-        execSync("git config --global credential.helper 'store --file=/etc/armada/git-credentials'", { stdio: 'ignore' });
+        const { existsSync, copyFileSync } = await import('node:fs');
+        const credSource = '/etc/armada/git-credentials';
+        const credDest = `${process.env.HOME || '/home/node'}/.git-credentials`;
+        if (existsSync(credSource)) {
+          copyFileSync(credSource, credDest);
+          _logger.info(`[armada-agent] Copied git credentials to ${credDest}`);
+        }
+        execSync("git config --global credential.helper store", { stdio: 'ignore' });
         execSync("git config --global user.email 'armada@coderage.co.uk'", { stdio: 'ignore' });
         execSync("git config --global user.name 'Armada Agent'", { stdio: 'ignore' });
         _logger.info(`[armada-agent] Git credential helper configured`);
