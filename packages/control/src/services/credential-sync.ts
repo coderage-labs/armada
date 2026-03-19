@@ -134,6 +134,23 @@ export async function syncAgentCredentials(agentName: string, nodeManager: NodeM
     plainCreds + '\n',
   );
 
+  // Write .gitconfig to the persistent openclaw directory.
+  // /home/node/.openclaw maps to /data/armada/instances/{name} on the node.
+  // Git picks it up via GIT_CONFIG_GLOBAL or include directives.
+  const gitConfigContent = [
+    '[credential]',
+    '\thelper = store --file=/etc/armada/git-credentials',
+    '[user]',
+    '\temail = armada@coderage.co.uk',
+    '\tname = Armada Agent',
+    '',
+  ].join('\n');
+  await node.writeInstanceFile(
+    instance.name,
+    `armada/instances/${instance.name}/.gitconfig`,
+    gitConfigContent,
+  );
+
   console.log(`[credential-sync] Synced ${gitCredentials.length} git credential(s) for agent ${agentName}`);
 
   // 2. Sync API keys to secrets.json

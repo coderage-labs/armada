@@ -1468,6 +1468,18 @@ export default function register(api: any) {
     start: async () => {
       _logger.info(`[armada-agent] Started — ${_config!.instanceName} (${_config!.role}) in org ${_config!.org}`);
       _logger.info(`[armada-agent] Control plane URL: ${getApiBaseUrl()}`);
+
+      // Ensure git credential config is set (credentials live at /etc/armada/git-credentials)
+      try {
+        const { execSync } = await import('node:child_process');
+        execSync("git config --global credential.helper 'store --file=/etc/armada/git-credentials'", { stdio: 'ignore' });
+        execSync("git config --global user.email 'armada@coderage.co.uk'", { stdio: 'ignore' });
+        execSync("git config --global user.name 'Armada Agent'", { stdio: 'ignore' });
+        _logger.info(`[armada-agent] Git credential helper configured`);
+      } catch (err: any) {
+        _logger.warn(`[armada-agent] Failed to configure git: ${err.message}`);
+      }
+
       // Start periodic heartbeats to control plane (every 30s)
       sendHeartbeats();
       heartbeatTimer = setInterval(sendHeartbeats, 30_000);
