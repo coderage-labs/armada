@@ -447,8 +447,8 @@ async function advanceRun(
 
     // Check gate
     if (step.gate === 'manual' || (step as any).manualGate === true) {
-      markStepStatus(stepRun.id, 'waiting_gate');
-      if (_notifyFn) {
+      const changed = markStepStatus(stepRun.id, 'waiting_gate');
+      if (_notifyFn && changed) {
         // Get previous step output from context
         const previousOutput = getPreviousStepOutput(run, step);
         _notifyFn({
@@ -504,9 +504,11 @@ async function advanceRun(
     });
     const finalStatus = anyRequiredFailed ? 'failed' : 'completed';
 
-    getDrizzle().run(sql`
-      UPDATE workflow_runs SET status = ${finalStatus}, completed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ${run.id}
+    // Only transition if still running (prevents duplicate completion notifications)
+    const updateResult = getDrizzle().run(sql`
+      UPDATE workflow_runs SET status = ${finalStatus}, completed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ${run.id} AND status = 'running'
     `);
+    if ((updateResult as any).changes === 0) return; // Already completed by another concurrent advanceRun
 
     // ── Clean up workspace worktrees for this run ──────────────────────
     if (_cleanupWorkspacesFn) {
@@ -1341,16 +1343,23 @@ export async function cancelRun(runId: string): Promise<void> {
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
-function markStepStatus(stepRunId: string, status: StepRunStatus) {
+/** Mark step status. Returns true if actually changed (prevents duplicate notifications). */
+function markStepStatus(stepRunId: string, status: StepRunStatus): boolean {
   const db = getDrizzle();
+  let changed: boolean;
   if (status === 'waiting_gate') {
-    db.run(sql`UPDATE workflow_step_runs SET status = ${status}, started_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ${stepRunId}`);
+    const result = db.run(sql`UPDATE workflow_step_runs SET status = ${status}, started_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ${stepRunId} AND status != ${status}`);
+    changed = (result as any).changes > 0;
   } else {
-    db.update(workflowStepRuns).set({ status }).where(eq(workflowStepRuns.id, stepRunId)).run();
+    const result = db.update(workflowStepRuns).set({ status }).where(eq(workflowStepRuns.id, stepRunId)).run();
+    changed = (result as any).changes > 0;
   }
   // Broadcast step change for SSE listeners
-  const sr = db.select({ runId: workflowStepRuns.runId, stepId: workflowStepRuns.stepId }).from(workflowStepRuns).where(eq(workflowStepRuns.id, stepRunId)).get();
-  if (sr) broadcast('workflow:step', { runId: sr.runId, stepId: sr.stepId, status });
+  if (changed) {
+    const sr = db.select({ runId: workflowStepRuns.runId, stepId: workflowStepRuns.stepId }).from(workflowStepRuns).where(eq(workflowStepRuns.id, stepRunId)).get();
+    if (sr) broadcast('workflow:step', { runId: sr.runId, stepId: sr.stepId, status });
+  }
+  return changed;
 }
 
 function getPreviousStepOutput(run: WorkflowRun, currentStep: WorkflowStep): string | null {
