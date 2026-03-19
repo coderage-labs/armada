@@ -670,6 +670,21 @@ export const issueDependencies = sqliteTable('issue_dependencies', {
   createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 });
 
+// ── project_repos (#166) ─────────────────────────────────────────────
+export const projectRepos = sqliteTable('project_repos', {
+  id: text('id').primaryKey(),
+  projectId: text('project_id').notNull(),
+  integrationId: text('integration_id').notNull(),
+  fullName: text('full_name').notNull(),
+  defaultBranch: text('default_branch').default('main'),
+  cloneUrl: text('clone_url'),
+  provider: text('provider').notNull(),
+  isPrivate: integer('is_private').notNull().default(0),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+}, (table) => [
+  unique().on(table.projectId, table.fullName),
+]);
+
 // ── notification_channels (#512) ────────────────────────────────────
 export const notificationChannels = sqliteTable('notification_channels', {
   id: text('id').primaryKey(),

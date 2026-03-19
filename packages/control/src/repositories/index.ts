@@ -35,3 +35,5 @@ export { notificationChannelRepo } from './notification-channel-repo.js';
 export type { NotificationChannel, NotificationChannelType } from './notification-channel-repo.js';
 export { assignmentRepo, migrateOwnerAssignments } from './assignment-repo.js';
 export type { Assignment, AssignmentType, AssigneeType, ResolvedAssignee } from './assignment-repo.js';
+export { projectReposRepo } from './project-repos-repo.js';
+export type { ProjectRepo } from './project-repos-repo.js';

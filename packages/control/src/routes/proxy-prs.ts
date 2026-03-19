@@ -7,8 +7,7 @@ import { requireScope } from '../middleware/scopes.js';
 import { getProvider } from '../services/integrations/registry.js';
 import { integrationsRepo } from '../services/integrations/integrations-repo.js';
 import { projectIntegrationsRepo } from '../services/integrations/project-integrations-repo.js';
-import { agentsRepo, templatesRepo } from '../repositories/index.js';
-import { projectsRepo } from '../repositories/index.js';
+import { agentsRepo, templatesRepo, projectsRepo, projectReposRepo } from '../repositories/index.js';
 import { logActivity } from '../services/activity-service.js';
 import { registerToolDef } from '../utils/tool-registry.js';
 import type { IntegrationProvider, PRFilters } from '../services/integrations/types.js';
@@ -42,13 +41,32 @@ function auditLog(agent: string, project: string, action: string, detail?: strin
   });
 }
 
-/** Find the VCS integration for a project and normalise repo list */
+/** Find the VCS integration for a project and normalise repo list.
+ *  Prefers project_repos table; falls back to project_integrations.vcs config for backwards compat. */
 function resolveVcsIntegration(projectId: string): {
   projectIntegration: any;
   integration: any;
   provider: IntegrationProvider;
   repos: string[];
 } | null {
+  // Prefer project_repos table
+  const linkedRepos = projectReposRepo.getByProject(projectId);
+  if (linkedRepos.length > 0) {
+    // Use the first integration found (most recently linked)
+    const firstRepo = linkedRepos[0];
+    const integration = integrationsRepo.getById(firstRepo.integrationId);
+    if (integration && integration.status === 'active') {
+      const provider = getProvider(integration.provider);
+      if (provider) {
+        const repos = linkedRepos
+          .filter(r => r.integrationId === firstRepo.integrationId)
+          .map(r => r.fullName);
+        return { projectIntegration: null, integration, provider, repos };
+      }
+    }
+  }
+
+  // Legacy fallback: project_integrations with capability=vcs
   const pis = projectIntegrationsRepo.getByProject(projectId);
   const vcsPI = pis.find(pi => pi.capability === 'vcs' && pi.enabled);
   if (!vcsPI) return null;

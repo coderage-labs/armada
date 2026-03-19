@@ -7,7 +7,7 @@
  *   2. Git credentials → resolved from project integrations, written to git-credentials.json
  */
 
-import { agentsRepo, instancesRepo, projectsRepo } from '../repositories/index.js';
+import { agentsRepo, instancesRepo, projectsRepo, projectReposRepo } from '../repositories/index.js';
 import { projectIntegrationsRepo } from './integrations/project-integrations-repo.js';
 import { integrationsRepo } from './integrations/integrations-repo.js';
 import type { NodeManager } from '../node-manager.js';
@@ -32,54 +32,96 @@ function resolveGitCredentials(agentName: string): GitCredential[] {
   const projects = projectsRepo.getAll();
 
   for (const project of projects) {
-    const projectIntegrations = projectIntegrationsRepo.getByProject(project.id);
+    // Prefer project_repos table for repo-to-integration mapping
+    const linkedRepos = projectReposRepo.getByProject(project.id);
 
-    for (const pi of projectIntegrations) {
-      if (!pi.enabled) continue;
-      const integration = integrationsRepo.getById(pi.integrationId);
-      if (!integration) continue;
-      if (integration.status !== 'active') continue;
+    if (linkedRepos.length > 0) {
+      // Group by integration to build credentials
+      const byIntegration = new Map<string, string[]>();
+      for (const lr of linkedRepos) {
+        const list = byIntegration.get(lr.integrationId) || [];
+        list.push(lr.fullName);
+        byIntegration.set(lr.integrationId, list);
+      }
 
-      const token = integration.authConfig?.token as string | undefined;
-      if (!token || seenTokens.has(token)) continue;
-      seenTokens.add(token);
+      for (const [integrationId, repoNames] of byIntegration) {
+        const integration = integrationsRepo.getById(integrationId);
+        if (!integration || integration.status !== 'active') continue;
 
-      // Determine host and paths based on provider
-      let host = 'github.com';
-      const paths: string[] = [];
+        const token = integration.authConfig?.token as string | undefined;
+        if (!token || seenTokens.has(token)) continue;
+        seenTokens.add(token);
 
-      if (integration.provider === 'github') {
-        host = (integration.authConfig?.url as string)?.replace('https://api.', '').replace('https://', '') || 'github.com';
-        // Scope to repos configured on the project
-        const config = JSON.parse(project.configJson || '{}');
-        const repos: Array<{ url: string }> = config.repositories || [];
-        for (const repo of repos) {
-          const match = repo.url.match(/(?:github\.com\/)?([^/]+\/[^/]+?)(?:\.git)?$/);
-          if (match) {
-            const slug = match[1].replace(/^\//, '');
-            // Add org-level wildcard
-            const org = slug.split('/')[0];
-            if (!paths.includes(`${org}/*`) && !paths.includes('*')) {
+        let host = 'github.com';
+        const paths: string[] = [];
+
+        if (integration.provider === 'github') {
+          host = (integration.authConfig?.url as string)?.replace('https://api.', '').replace('https://', '') || 'github.com';
+          for (const fullName of repoNames) {
+            const org = fullName.split('/')[0];
+            if (org && !paths.includes(`${org}/*`) && !paths.includes('*')) {
               paths.push(`${org}/*`);
             }
           }
+        } else if (integration.provider === 'bitbucket') {
+          host = 'bitbucket.org';
         }
-      } else if (integration.provider === 'bitbucket') {
-        host = 'bitbucket.org';
-      }
 
-      // If no specific paths, allow all (wildcard)
-      if (paths.length === 0) {
-        paths.push('*');
-      }
+        if (paths.length === 0) paths.push('*');
 
-      credentials.push({
-        host,
-        protocol: 'https',
-        username: 'x-access-token',
-        password: token,
-        paths,
-      });
+        credentials.push({
+          host,
+          protocol: 'https',
+          username: 'x-access-token',
+          password: token,
+          paths,
+        });
+      }
+    } else {
+      // Legacy fallback: read from project_integrations + config.repositories
+      const projectIntegrations = projectIntegrationsRepo.getByProject(project.id);
+
+      for (const pi of projectIntegrations) {
+        if (!pi.enabled) continue;
+        const integration = integrationsRepo.getById(pi.integrationId);
+        if (!integration) continue;
+        if (integration.status !== 'active') continue;
+
+        const token = integration.authConfig?.token as string | undefined;
+        if (!token || seenTokens.has(token)) continue;
+        seenTokens.add(token);
+
+        let host = 'github.com';
+        const paths: string[] = [];
+
+        if (integration.provider === 'github') {
+          host = (integration.authConfig?.url as string)?.replace('https://api.', '').replace('https://', '') || 'github.com';
+          const config = JSON.parse(project.configJson || '{}');
+          const repos: Array<{ url: string }> = config.repositories || [];
+          for (const repo of repos) {
+            const match = repo.url.match(/(?:github\.com\/)?([^/]+\/[^/]+?)(?:\.git)?$/);
+            if (match) {
+              const slug = match[1].replace(/^\//, '');
+              const org = slug.split('/')[0];
+              if (!paths.includes(`${org}/*`) && !paths.includes('*')) {
+                paths.push(`${org}/*`);
+              }
+            }
+          }
+        } else if (integration.provider === 'bitbucket') {
+          host = 'bitbucket.org';
+        }
+
+        if (paths.length === 0) paths.push('*');
+
+        credentials.push({
+          host,
+          protocol: 'https',
+          username: 'x-access-token',
+          password: token,
+          paths,
+        });
+      }
     }
   }
 
