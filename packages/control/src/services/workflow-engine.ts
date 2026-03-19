@@ -312,7 +312,13 @@ async function advanceRun(
     const deps = step.waitFor || [];
     const allDepsMet = deps.every(depId => {
       const depRun = stepRuns.find(sr => sr.stepId === depId);
-      return depRun && (depRun.status === 'completed' || (depRun.status === 'skipped'));
+      const depStep = steps.find(s => s.id === depId);
+      // Only 'completed' satisfies a dependency.
+      // 'skipped' only counts if the step is explicitly marked optional.
+      return depRun && (
+        depRun.status === 'completed' ||
+        (depRun.status === 'skipped' && depStep?.optional === true)
+      );
     });
 
     // Check if any required dep failed
@@ -362,9 +368,21 @@ async function advanceRun(
   const anyGated = updatedStepRuns.some(sr => sr.status === 'waiting_gate');
 
   if (allDone) {
+    // A workflow fails if any non-optional step failed, OR if any non-optional
+    // step was skipped due to a failed dependency (cascade failure).
     const anyRequiredFailed = updatedStepRuns.some(sr => {
       const step = steps.find(s => s.id === sr.stepId);
-      return sr.status === 'failed' && !step?.optional;
+      if (step?.optional) return false;
+      if (sr.status === 'failed') return true;
+      // A skipped non-optional step means a dependency failed — treat as failure
+      if (sr.status === 'skipped' && step && (step.waitFor || []).length > 0) {
+        const hasFailedDep = (step.waitFor || []).some(depId => {
+          const depRun = updatedStepRuns.find(d => d.stepId === depId);
+          return depRun && (depRun.status === 'failed' || depRun.status === 'skipped');
+        });
+        return hasFailedDep;
+      }
+      return false;
     });
     const finalStatus = anyRequiredFailed ? 'failed' : 'completed';
 
