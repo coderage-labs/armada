@@ -278,9 +278,9 @@ export async function handleWorkspaceProvision(msg: CommandMessage): Promise<Res
     repoName = repo.split('/').pop() || 'repo';
   }
 
-  const basePath = `/data/repos/${repoOrg}/${repoName}`;
+  const basePath = `/home/node/repos/${repoOrg}/${repoName}`;
   const runPrefix = runId.slice(0, 8);
-  const worktreePath = `/data/worktrees/${runPrefix}/${stepId}`;
+  const worktreePath = `/home/node/worktrees/${runPrefix}/${stepId}`;
 
   console.log(`[workspace] Provisioning worktree for run ${runPrefix}, step ${stepId}: ${worktreePath}`);
 
@@ -292,7 +292,7 @@ export async function handleWorkspaceProvision(msg: CommandMessage): Promise<Res
 
     if (checkBase.output.trim() === 'missing') {
       console.log(`[workspace] Base repo not found — cloning ${repo} to ${basePath}`);
-      const mkdirResult = await containerExec(instanceId, ['mkdir', '-p', `/data/repos/${repoOrg}`]);
+      const mkdirResult = await containerExec(instanceId, ['mkdir', '-p', `/home/node/repos/${repoOrg}`]);
       if (mkdirResult.exitCode !== 0) {
         console.warn(`[workspace] mkdir failed: ${mkdirResult.output}`);
       }
@@ -322,7 +322,7 @@ export async function handleWorkspaceProvision(msg: CommandMessage): Promise<Res
 
     // Step 2: Create worktree directory parent
     const mkWorktreeParent = await containerExec(instanceId, [
-      'mkdir', '-p', `/data/worktrees/${runPrefix}`,
+      'mkdir', '-p', `/home/node/worktrees/${runPrefix}`,
     ]);
     if (mkWorktreeParent.exitCode !== 0) {
       console.warn(`[workspace] mkdir for worktrees dir failed: ${mkWorktreeParent.output}`);
@@ -434,7 +434,7 @@ export async function handleWorkspaceCleanup(msg: CommandMessage): Promise<Respo
   }
 
   const runPrefix = runId.slice(0, 8);
-  const runDir = `/data/worktrees/${runPrefix}`;
+  const runDir = `/home/node/worktrees/${runPrefix}`;
 
   console.log(`[workspace] Cleaning up worktrees for run ${runPrefix} in ${instanceId}`);
 
