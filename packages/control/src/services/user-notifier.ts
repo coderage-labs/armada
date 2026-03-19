@@ -47,6 +47,11 @@ export interface NotifyCompletionOptions {
   runId: string;
   status: 'completed' | 'failed';
   projectId: string;
+  /** For failed runs: which step failed */
+  failedStepId?: string;
+  failedStepName?: string;
+  /** Error message or last output on failure (will be truncated to 500 chars) */
+  failureDetail?: string;
 }
 
 export interface NotifyTriageOperatorFallbackOptions {
@@ -93,7 +98,8 @@ export function isInQuietHours(user: ArmadaUser): boolean {
 
 /**
  * Notify users when a manual gate is reached.
- * - Filtered by project assignment (falls back to all users if no assignments)
+ * - Only notifies the assigned approver for the project
+ * - Falls back to all assigned users (or all users) if no approver is assigned
  * - Filtered by gatePolicy.notifyOnly if set
  * - operator users: always notified (unless excluded by gatePolicy)
  * - human users: only if notifications.preferences.gates === true
@@ -102,20 +108,38 @@ export function isInQuietHours(user: ArmadaUser): boolean {
 export async function notifyGate(opts: NotifyGateOptions): Promise<void> {
   const { workflowName, stepId, runId, previousOutput, projectId, gatePolicy } = opts;
 
-  // Get users assigned to project via assignments (or all users if none assigned)
-  let users = assignmentRepo.getAllAssignedUsers(projectId);
-  if (users.length === 0) {
-    users = usersRepo.getAll();
+  // Resolve approver assignment — only notify the assigned approver
+  let targetUsers: ArmadaUser[] = [];
+  const approverAssignment = assignmentRepo.getAssignment(projectId, 'approver');
+
+  if (approverAssignment) {
+    if (approverAssignment.assigneeType === 'user') {
+      const user = usersRepo.getById(approverAssignment.assigneeId);
+      if (user) targetUsers = [user];
+    }
+    // If assignee is an agent, no user notification needed — agents handle their own state
+  } else {
+    // No approver assigned — fall back to all assigned users or all users
+    targetUsers = assignmentRepo.getAllAssignedUsers(projectId);
+    if (targetUsers.length === 0) {
+      targetUsers = usersRepo.getAll();
+    }
   }
 
   // Filter by gatePolicy.notifyOnly if set
   if (gatePolicy?.notifyOnly && gatePolicy.notifyOnly.length > 0) {
-    users = users.filter(u => gatePolicy.notifyOnly!.includes(u.type));
+    targetUsers = targetUsers.filter(u => gatePolicy.notifyOnly!.includes(u.type));
   }
 
   const telegramNotifications: TelegramNotification[] = [];
+  // Deduplication: track notified user IDs to avoid duplicate notifications
+  const notifiedUserIds = new Set<string>();
 
-  for (const user of users) {
+  for (const user of targetUsers) {
+    // Skip if already notified this user for this event
+    if (notifiedUserIds.has(user.id)) continue;
+    notifiedUserIds.add(user.id);
+
     try {
       const shouldNotify =
         user.type === 'operator' ||
@@ -155,21 +179,46 @@ export async function notifyGate(opts: NotifyGateOptions): Promise<void> {
 
 /**
  * Notify users when a workflow completes or fails.
- * - Filtered by project assignment (falls back to all users if no assignments)
+ * - Only notifies the project owner for completion/failure events
+ * - If no owner is assigned, does not notify anyone (no broadcast fallback)
  * - operator users: always notified
  * - human users: only if matching preference (completions/failures) is true
  * - Completions/failures are skipped during quiet hours
+ * - Deduplicates: a user with multiple roles only receives one notification
  */
 export async function notifyCompletion(opts: NotifyCompletionOptions): Promise<void> {
-  const { workflowName, runId, status, projectId } = opts;
+  const { workflowName, runId, status, projectId, failedStepId, failedStepName, failureDetail } = opts;
 
-  // Get users assigned to project via assignments (or all users if none assigned)
-  let users = assignmentRepo.getAllAssignedUsers(projectId);
-  if (users.length === 0) {
-    users = usersRepo.getAll();
+  // Resolve owner assignment — only notify the project owner
+  const ownerAssignment = assignmentRepo.getAssignment(projectId, 'owner');
+
+  let targetUsers: ArmadaUser[] = [];
+
+  if (ownerAssignment) {
+    if (ownerAssignment.assigneeType === 'user') {
+      const user = usersRepo.getById(ownerAssignment.assigneeId);
+      if (user) targetUsers = [user];
+    }
+    // If owner is an agent, no user notification needed
+  } else {
+    // No owner assigned — fall back to all assigned users for failures only
+    // For completions with no owner, don't notify anyone
+    if (status === 'failed') {
+      targetUsers = assignmentRepo.getAllAssignedUsers(projectId);
+      if (targetUsers.length === 0) {
+        targetUsers = usersRepo.getAll();
+      }
+    }
   }
 
-  for (const user of users) {
+  // Deduplication: track notified user IDs to avoid duplicate notifications
+  const notifiedUserIds = new Set<string>();
+
+  for (const user of targetUsers) {
+    // Skip if already notified this user for this event
+    if (notifiedUserIds.has(user.id)) continue;
+    notifiedUserIds.add(user.id);
+
     try {
       const shouldNotify =
         user.type === 'operator' ||
@@ -185,11 +234,16 @@ export async function notifyCompletion(opts: NotifyCompletionOptions): Promise<v
         continue;
       }
 
-      const message = formatCompletionMessage(workflowName, runId, status);
+      const message = status === 'failed' && (failedStepId || failureDetail)
+        ? formatFailureMessage(workflowName, runId, failedStepId, failedStepName, failureDetail)
+        : formatCompletionMessage(workflowName, runId, status);
       await deliverToUser(user, message, {
         event: `workflow.${status}`,
         runId,
         workflowName,
+        failedStepId,
+        failedStepName,
+        failureDetail,
       });
     } catch (err: any) {
       console.error(`[user-notifier] Failed to notify user ${user.name}: ${err.message}`);
@@ -364,6 +418,25 @@ function formatCompletionMessage(
 ): string {
   const emoji = status === 'completed' ? '✅' : '❌';
   return `${emoji} Workflow <b>${escapeHtml(workflowName)}</b> ${status}\n\n<code>${runId}</code>`;
+}
+
+function formatFailureMessage(
+  workflowName: string,
+  runId: string,
+  failedStepId?: string,
+  failedStepName?: string,
+  failureDetail?: string,
+): string {
+  let msg = `❌ Workflow <b>${escapeHtml(workflowName)}</b> failed\n\n<code>${runId}</code>`;
+  if (failedStepId) {
+    const stepLabel = failedStepName ? `${escapeHtml(failedStepName)} (${escapeHtml(failedStepId)})` : escapeHtml(failedStepId);
+    msg += `\n\n<b>Failed step:</b> ${stepLabel}`;
+  }
+  if (failureDetail) {
+    const truncated = failureDetail.length > 500 ? failureDetail.slice(0, 500) + '...' : failureDetail;
+    msg += `\n\n<b>Error:</b>\n<pre>${escapeHtml(truncated)}</pre>`;
+  }
+  return msg;
 }
 
 function formatTriageFallbackMessage(

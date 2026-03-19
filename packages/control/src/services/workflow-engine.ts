@@ -214,6 +214,11 @@ interface NotifyOptions {
     notifyOnly?: ('human' | 'operator')[];
     approveOnly?: ('human' | 'operator')[];
   };
+  /** For failed notifications: which step failed */
+  failedStepId?: string;
+  failedStepName?: string;
+  /** Error message or last output (will be truncated by notifier) */
+  failureDetail?: string;
 }
 
 let _dispatchFn: DispatchFn | null = null;
@@ -369,11 +374,25 @@ async function advanceRun(
     }
 
     if (_notifyFn) {
+      // For failed runs, include details about which step failed and why
+      const failedStepRun = finalStatus === 'failed'
+        ? updatedStepRuns.find(sr => {
+            const step = steps.find(s => s.id === sr.stepId);
+            return sr.status === 'failed' && !step?.optional;
+          })
+        : undefined;
+      const failedStep = failedStepRun ? steps.find(s => s.id === failedStepRun.stepId) : undefined;
+
       _notifyFn({
         type: finalStatus === 'completed' ? 'completed' : 'failed',
         workflowName: workflow.name,
         runId: run.id,
         projectId: run.projectId,
+        ...(finalStatus === 'failed' && failedStepRun && {
+          failedStepId: failedStepRun.stepId,
+          failedStepName: failedStep?.name,
+          failureDetail: failedStepRun.output ?? undefined,
+        }),
       });
     }
   } else if (anyGated) {
@@ -697,10 +716,19 @@ export async function onStepCompleted(
       }
 
       if (nextIter >= maxIter) {
+        const maxIterMsg = `Max review loop iterations (${maxIter}) exceeded without approval`;
         console.log(`[workflow-engine] Review step "${stepId}" exceeded max loop iterations (${maxIter}). Failing.`);
-        db.run(sql`UPDATE workflow_step_runs SET status = 'failed', output = ${'Max review loop iterations (' + maxIter + ') exceeded without approval'}, completed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ${stepRun.id}`);
+        db.run(sql`UPDATE workflow_step_runs SET status = 'failed', output = ${maxIterMsg}, completed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ${stepRun.id}`);
         db.run(sql`UPDATE workflow_runs SET status = 'failed', completed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ${runId}`);
-        if (_notifyFn) _notifyFn({ type: 'failed', workflowName: workflow.name, runId, projectId: run.projectId });
+        if (_notifyFn) _notifyFn({
+          type: 'failed',
+          workflowName: workflow.name,
+          runId,
+          projectId: run.projectId,
+          failedStepId: stepId,
+          failedStepName: stepDef?.name,
+          failureDetail: maxIterMsg,
+        });
         return;
       }
     }
@@ -844,6 +872,9 @@ export async function rejectGate(runId: string, stepId: string, reason?: string)
         workflowName: workflow.name,
         runId: run.id,
         projectId: run.projectId,
+        failedStepId: stepId,
+        failedStepName: stepDef?.name,
+        failureDetail: reason ? `Gate rejected: ${reason}` : 'Gate rejected',
       });
     }
   } else {
