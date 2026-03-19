@@ -194,6 +194,11 @@ export function initWorkflowDispatcher() {
         runId: opts.runId,
         status: opts.type,
         projectId: opts.projectId,
+        issueNumber: opts.issueNumber,
+        issueTitle: opts.issueTitle,
+        issueRepo: opts.issueRepo,
+        stepsCompleted: opts.stepsCompleted,
+        totalSteps: opts.totalSteps,
         ...(opts.type === 'failed' && {
           failedStepId: opts.failedStepId,
           failedStepName: opts.failedStepName,

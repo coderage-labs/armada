@@ -52,6 +52,13 @@ export interface NotifyCompletionOptions {
   failedStepName?: string;
   /** Error message or last output on failure (will be truncated to 500 chars) */
   failureDetail?: string;
+  /** Context from workflow run variables */
+  issueNumber?: number;
+  issueTitle?: string;
+  issueRepo?: string;
+  /** Number of steps completed */
+  stepsCompleted?: number;
+  totalSteps?: number;
 }
 
 export interface NotifyTriageOperatorFallbackOptions {
@@ -236,7 +243,13 @@ export async function notifyCompletion(opts: NotifyCompletionOptions): Promise<v
 
       const message = status === 'failed' && (failedStepId || failureDetail)
         ? formatFailureMessage(workflowName, runId, failedStepId, failedStepName, failureDetail)
-        : formatCompletionMessage(workflowName, runId, status);
+        : formatCompletionMessage(workflowName, runId, status, {
+            issueNumber: opts.issueNumber,
+            issueTitle: opts.issueTitle,
+            issueRepo: opts.issueRepo,
+            stepsCompleted: opts.stepsCompleted,
+            totalSteps: opts.totalSteps,
+          });
       await deliverToUser(user, message, {
         event: `workflow.${status}`,
         runId,
@@ -415,9 +428,23 @@ function formatCompletionMessage(
   workflowName: string,
   runId: string,
   status: 'completed' | 'failed',
+  opts?: { issueNumber?: number; issueTitle?: string; issueRepo?: string; stepsCompleted?: number; totalSteps?: number },
 ): string {
   const emoji = status === 'completed' ? '✅' : '❌';
-  return `${emoji} Workflow <b>${escapeHtml(workflowName)}</b> ${status}\n\n<code>${runId}</code>`;
+  let msg = `${emoji} Workflow <b>${escapeHtml(workflowName)}</b> ${status}`;
+
+  if (opts?.issueNumber) {
+    msg += `\n\n<b>Issue:</b> #${opts.issueNumber}`;
+    if (opts.issueTitle) msg += ` — ${escapeHtml(opts.issueTitle)}`;
+    if (opts.issueRepo) msg += `\nhttps://github.com/${opts.issueRepo}/issues/${opts.issueNumber}`;
+  }
+
+  if (opts?.stepsCompleted !== undefined && opts?.totalSteps) {
+    msg += `\n<b>Steps:</b> ${opts.stepsCompleted}/${opts.totalSteps} completed`;
+  }
+
+  msg += `\n\n<code>${runId}</code>`;
+  return msg;
 }
 
 function formatFailureMessage(

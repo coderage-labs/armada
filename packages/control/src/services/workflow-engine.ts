@@ -219,6 +219,12 @@ interface NotifyOptions {
   failedStepName?: string;
   /** Error message or last output (will be truncated by notifier) */
   failureDetail?: string;
+  /** Context from workflow run variables */
+  issueNumber?: number;
+  issueTitle?: string;
+  issueRepo?: string;
+  stepsCompleted?: number;
+  totalSteps?: number;
 }
 
 let _dispatchFn: DispatchFn | null = null;
@@ -383,11 +389,18 @@ async function advanceRun(
         : undefined;
       const failedStep = failedStepRun ? steps.find(s => s.id === failedStepRun.stepId) : undefined;
 
+      const vars = (run.context as any)?._vars ?? {};
+      const completedCount = updatedStepRuns.filter(sr => sr.status === 'completed').length;
       _notifyFn({
         type: finalStatus === 'completed' ? 'completed' : 'failed',
         workflowName: workflow.name,
         runId: run.id,
         projectId: run.projectId,
+        issueNumber: vars.issueNumber,
+        issueTitle: vars.issueTitle,
+        issueRepo: vars.issueRepo,
+        stepsCompleted: completedCount,
+        totalSteps: steps.length,
         ...(finalStatus === 'failed' && failedStepRun && {
           failedStepId: failedStepRun.stepId,
           failedStepName: failedStep?.name,
