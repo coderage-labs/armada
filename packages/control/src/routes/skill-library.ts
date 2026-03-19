@@ -9,6 +9,7 @@ import { logActivity } from '../services/activity-service.js';
 registerToolDef({
   category: 'plugins',
   name: 'armada_skill_library_list',
+  scope: 'plugins:read',
   description: 'List all skills in the armada skill library.',
   method: 'GET', path: '/api/skills/library',
   parameters: [],
@@ -17,6 +18,7 @@ registerToolDef({
 registerToolDef({
   category: 'plugins',
   name: 'armada_skill_library_get',
+  scope: 'plugins:read',
   description: 'Get a single skill from the library by ID or name.',
   method: 'GET', path: '/api/skills/library/:id',
   parameters: [

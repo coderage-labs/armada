@@ -8,6 +8,7 @@ import type { NodeManager } from '../node-manager.js';
 registerToolDef({
   category: 'plugins',
   name: 'armada_skills',
+  scope: 'plugins:read',
   description: 'List all available skills across armada nodes.',
   method: 'GET', path: '/api/skills',
   parameters: [],

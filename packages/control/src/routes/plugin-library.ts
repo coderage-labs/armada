@@ -9,6 +9,7 @@ import { mutationService } from '../services/mutation-service.js';
 registerToolDef({
   category: 'plugins',
   name: 'armada_plugin_library_list',
+  scope: 'plugins:read',
   description: 'List all plugins in the plugin library.',
   method: 'GET', path: '/api/plugins/library',
   parameters: [],
@@ -17,6 +18,7 @@ registerToolDef({
 registerToolDef({
   category: 'plugins',
   name: 'armada_plugin_library_get',
+  scope: 'plugins:read',
   description: 'Get a single plugin from the library by ID or name.',
   method: 'GET', path: '/api/plugins/library/:id',
   parameters: [

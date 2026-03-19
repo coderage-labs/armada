@@ -42,6 +42,7 @@ registerToolDef({
 registerToolDef({
   category: 'system',
   name: 'armada_provider_discover_models',
+  scope: 'models:read',
   description: 'Discover available models from a provider (requires API key configured).',
   method: 'GET', path: '/api/providers/:id/models',
   parameters: [{ name: 'id', type: 'string', description: 'Provider ID', required: true }],
@@ -59,6 +60,7 @@ registerToolDef({
 registerToolDef({
   category: 'system',
   name: 'armada_provider_keys_list',
+  scope: 'models:read',
   description: 'List API keys for a provider (masked).',
   method: 'GET', path: '/api/providers/:id/keys',
   parameters: [{ name: 'id', type: 'string', description: 'Provider ID', required: true }],
