@@ -1247,9 +1247,19 @@ function getStepRunsForRun(runId: string): WorkflowStepRun[] {
 }
 
 function parseWorkflow(row: any): Workflow {
+  // Resolve projectId from the workflow_projects junction table
+  let projectId = row.projectId ?? row.project_id;
+  if (!projectId) {
+    try {
+      const wpRow = getDrizzle().select().from(workflowProjects)
+        .where(eq(workflowProjects.workflowId, row.id))
+        .get();
+      if (wpRow) projectId = wpRow.projectId;
+    } catch { /* table may not exist in tests */ }
+  }
   return {
     id: row.id,
-    projectId: row.projectId ?? row.project_id,
+    projectId,
     name: row.name,
     description: row.description || '',
     steps: JSON.parse(row.stepsJson ?? row.steps_json ?? '[]'),
