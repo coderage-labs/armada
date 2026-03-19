@@ -112,14 +112,26 @@ export async function syncAgentCredentials(agentName: string, nodeManager: NodeM
   const gitCredentials = resolveGitCredentials(agentName);
   const credentialsPayload = JSON.stringify({ credentials: gitCredentials }, null, 2);
 
-  // Write git-credentials.json to the instance's credential directory on the node.
-  // Node DATA_DIR is /data. The credential file lives at:
-  //   /data/armada/instance-{name}/credentials/git-credentials.json
-  // which is bind-mounted as /etc/armada/git-credentials.json (ro) in the container.
+  // Write credentials to the instance's credential directory on the node.
+  // Node DATA_DIR is /data. Path: /data/armada/instance-{name}/credentials/
+  // Bind-mounted as /etc/armada/ (read-only) inside the container.
+
+  // JSON format (for tooling/debugging)
   await node.writeInstanceFile(
     instance.name,
     `armada/instance-${instance.name}/credentials/git-credentials.json`,
     credentialsPayload,
+  );
+
+  // Plain-text format for git credential store helper
+  // Format: https://username:password@host (one per line)
+  const plainCreds = gitCredentials
+    .map(c => `${c.protocol}://${c.username}:${c.password}@${c.host}`)
+    .join('\n');
+  await node.writeInstanceFile(
+    instance.name,
+    `armada/instance-${instance.name}/credentials/git-credentials`,
+    plainCreds + '\n',
   );
 
   console.log(`[credential-sync] Synced ${gitCredentials.length} git credential(s) for agent ${agentName}`);

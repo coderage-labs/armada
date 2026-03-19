@@ -773,7 +773,9 @@ export default function register(api: any) {
 
   // ── HTTP: Receive results ───────────────────────────────────────
 
+  _logger.info(`[armada-control] registerHttpRoute available: ${typeof api.registerHttpRoute === 'function'}`);
   if (typeof api.registerHttpRoute === 'function') {
+    _logger.info('[armada-control] Registering /armada/result HTTP route');
     api.registerHttpRoute({
       auth: 'plugin',
       path: '/armada/result',
@@ -898,12 +900,21 @@ export default function register(api: any) {
       path: '/armada/notify',
       handler: async (req: IncomingMessage, res: ServerResponse) => {
         const body = await readBody(req);
-        const { event, workflowName, runId, stepId, previousOutput } = body;
+        const { event, workflowName, runId, stepId, previousOutput, issueNumber, issueTitle, issueUrl, projectId, projectName, reason } = body;
 
-        if (!event || !runId) return sendJson(res, 400, { error: 'Missing event or runId' });
+        if (!event) return sendJson(res, 400, { error: 'Missing event' });
 
         let message: string;
-        if (event === 'workflow.gate') {
+        if (event === 'triage.user_triager') {
+          message = [
+            `[armada TRIAGE] Issue #${issueNumber}: ${issueTitle}`,
+            `Project: ${projectName}`,
+            issueUrl ? `URL: ${issueUrl}` : '',
+            reason ? `\n${reason}` : '',
+            `\nYou are the triager for this project. Use armada_find_tools("workflows") to load workflow tools, then review the issue and select the appropriate workflow.`,
+            `If unsure, ask Chris.`,
+          ].filter(Boolean).join('\n');
+        } else if (event === 'workflow.gate') {
           const preview = previousOutput && previousOutput.length > 500
             ? previousOutput.slice(0, 500) + '...'
             : previousOutput || '';
