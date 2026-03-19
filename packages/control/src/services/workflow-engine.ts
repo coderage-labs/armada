@@ -249,7 +249,7 @@ export async function startRun(
 ): Promise<WorkflowRun> {
   const db = getDrizzle();
   const runId = randomUUID();
-  const resolvedProjectId = projectId || workflow.projectId || '';
+  const resolvedProjectId = projectId || workflow.projectId || (workflow as any).projectIds?.[0] || '';
 
   // Store trigger variables in context so all steps can access them
   const initialContext = extraVars && Object.keys(extraVars).length > 0
