@@ -10,7 +10,7 @@ import {
   Search, ExternalLink, Bot,
   Workflow, Activity, Pencil, Zap, Loader2, AlertCircle,
   Hash, Circle, BarChart3, CheckCircle2, Timer, TrendingUp,
-  Settings, Package, X, Plug, GitBranch, Plus, FolderKanban,
+  Settings, Package, X, Plug, GitBranch, Plus, FolderKanban, Lock, Trash2,
   Crown, User,
 } from 'lucide-react';
 import {
@@ -39,6 +39,23 @@ interface ProjectRepository {
   url: string;
   defaultBranch?: string;
   cloneDir?: string;
+}
+
+interface LinkedRepo {
+  id: string;
+  projectId: string;
+  integrationId: string;
+  fullName: string;
+  defaultBranch: string;
+  provider: string;
+  isPrivate: boolean;
+}
+
+interface RepoSearchResult {
+  fullName: string;
+  name: string;
+  defaultBranch: string;
+  isPrivate: boolean;
 }
 
 interface Project {
@@ -1652,6 +1669,11 @@ function SettingsTab({ project, onUpdated }: { project: Project; onUpdated: (p: 
   const [confirmDialog, setConfirmDialog] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
   const [saved, setSaved] = useState(false);
   const [repoSaving, setRepoSaving] = useState(false);
+  const [linkedRepos, setLinkedRepos] = useState<LinkedRepo[]>([]);
+  const [repoSearchQuery, setRepoSearchQuery] = useState('');
+  const [repoSearchResults, setRepoSearchResults] = useState<RepoSearchResult[]>([]);
+  const [repoSearching, setRepoSearching] = useState(false);
+  const [showRepoSearch, setShowRepoSearch] = useState(false);
 
   useEffect(() => {
     setName(project.name);
@@ -1664,6 +1686,44 @@ function SettingsTab({ project, onUpdated }: { project: Project; onUpdated: (p: 
     setSyncInterval(project.issueSyncIntervalMinutes ?? 5);
     setSaved(false);
   }, [project.id]);
+
+  // Fetch linked repos from repos2 API
+  useEffect(() => {
+    apiFetch<{ repos: LinkedRepo[] }>(`/api/projects/${project.id}/repos2`)
+      .then(data => setLinkedRepos(data.repos || []))
+      .catch(() => {});
+  }, [project.id]);
+
+  async function searchRepos(q: string) {
+    if (!q.trim()) { setRepoSearchResults([]); return; }
+    setRepoSearching(true);
+    try {
+      const data = await apiFetch<{ repos: RepoSearchResult[] }>(
+        `/api/projects/${project.id}/repos2/search?q=${encodeURIComponent(q)}`
+      );
+      const linked = new Set(linkedRepos.map(r => r.fullName));
+      setRepoSearchResults((data.repos || []).filter(r => !linked.has(r.fullName)));
+    } catch { setRepoSearchResults([]); }
+    setRepoSearching(false);
+  }
+
+  async function addLinkedRepo(result: RepoSearchResult) {
+    try {
+      const repo = await apiFetch<LinkedRepo>(`/api/projects/${project.id}/repos2`, {
+        method: 'POST',
+        body: JSON.stringify({ fullName: result.fullName, defaultBranch: result.defaultBranch, provider: 'github' }),
+      });
+      setLinkedRepos(prev => [...prev, repo]);
+      setRepoSearchResults(prev => prev.filter(r => r.fullName !== result.fullName));
+    } catch { /* ignore */ }
+  }
+
+  async function removeLinkedRepo(repoId: string) {
+    try {
+      await apiFetch(`/api/projects/${project.id}/repos2/${repoId}`, { method: 'DELETE' });
+      setLinkedRepos(prev => prev.filter(r => r.id !== repoId));
+    } catch { /* ignore */ }
+  }
 
   async function handleSave() {
     setSaving(true);
@@ -1852,10 +1912,73 @@ function SettingsTab({ project, onUpdated }: { project: Project; onUpdated: (p: 
         />
       </div>
 
-      {/* Repositories */}
+      {/* Repositories (Integration-linked) */}
       <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 space-y-3">
-        <h3 className="text-sm font-semibold text-zinc-200 flex items-center gap-1.5">
-          <Package className="w-4 h-4" /> Repositories ({repos.length})
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-zinc-200 flex items-center gap-1.5">
+            <Package className="w-4 h-4" /> Repositories ({linkedRepos.length})
+          </h3>
+          <button onClick={() => setShowRepoSearch(!showRepoSearch)} className="flex items-center gap-1.5 text-xs text-violet-400 hover:text-violet-300 transition-colors">
+            <Plus className="w-3.5 h-3.5" /> Add Repository
+          </button>
+        </div>
+        {linkedRepos.length === 0 && !showRepoSearch && (
+          <p className="text-xs text-zinc-500">No repositories linked. Click &quot;Add Repository&quot; to search.</p>
+        )}
+        {linkedRepos.map(repo => (
+          <div key={repo.id} className="flex items-center justify-between py-2 px-3 rounded-md bg-zinc-800/50 border border-zinc-800">
+            <div className="flex items-center gap-2">
+              <GitBranch className="w-4 h-4 text-zinc-400" />
+              <a href={`https://github.com/${repo.fullName}`} target="_blank" rel="noopener noreferrer" className="text-sm text-zinc-200 hover:text-violet-300 transition-colors">{repo.fullName}</a>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-700 text-zinc-400">{repo.defaultBranch}</span>
+              {repo.isPrivate && <Lock className="w-3 h-3 text-zinc-500" />}
+            </div>
+            <button onClick={() => removeLinkedRepo(repo.id)} className="text-zinc-500 hover:text-red-400 transition-colors">
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        ))}
+        {showRepoSearch && (
+          <div className="space-y-3 pt-2 border-t border-zinc-800">
+            <div className="flex items-center gap-2">
+              <Search className="w-4 h-4 text-zinc-400" />
+              <Input
+                value={repoSearchQuery}
+                onChange={e => { setRepoSearchQuery(e.target.value); searchRepos(e.target.value); }}
+                placeholder="Search repositories..."
+                className="flex-1 rounded-lg bg-zinc-800/50 border border-zinc-800 text-zinc-200 text-sm px-3 py-2 focus:outline-none focus:border-violet-500/50"
+                autoFocus
+              />
+            </div>
+            {repoSearching && <p className="text-xs text-zinc-500">Searching...</p>}
+            {repoSearchResults.map(result => (
+              <div key={result.fullName} className="flex items-center justify-between py-2 px-3 rounded-md bg-zinc-800/30 border border-zinc-800/50">
+                <div className="flex items-center gap-2">
+                  <GitBranch className="w-4 h-4 text-zinc-500" />
+                  <span className="text-sm text-zinc-300">{result.fullName}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-700/50 text-zinc-500">{result.defaultBranch}</span>
+                  {result.isPrivate && <Lock className="w-3 h-3 text-zinc-500" />}
+                </div>
+                <button onClick={() => addLinkedRepo(result)} className="text-xs text-violet-400 hover:text-violet-300 px-2 py-1 rounded bg-violet-500/10 hover:bg-violet-500/20 transition-colors">
+                  Add
+                </button>
+              </div>
+            ))}
+            {!repoSearching && repoSearchQuery && repoSearchResults.length === 0 && (
+              <p className="text-xs text-zinc-500">No matching repositories found.</p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Legacy Repositories (URL-based) */}
+      <details className="rounded-lg border border-zinc-800 bg-zinc-900/50">
+        <summary className="p-4 text-xs text-zinc-500 cursor-pointer hover:text-zinc-400">
+          Advanced: Add repository by URL ({repos.length} legacy)
+        </summary>
+        <div className="p-5 pt-0 space-y-3">
+        <h3 className="text-sm font-semibold text-zinc-200 flex items-center gap-1.5 sr-only">
+          Legacy Repositories
         </h3>
         {repos.length > 0 && (
           <div className="space-y-1">
@@ -1923,7 +2046,8 @@ function SettingsTab({ project, onUpdated }: { project: Project; onUpdated: (p: 
             + Add Repository
           </Button>
         )}
-      </div>
+        </div>
+      </details>
 
       {/* Save Button */}
       <div className="flex items-center gap-3">
