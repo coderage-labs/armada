@@ -39,6 +39,10 @@ interface WorkflowStep {
   maxLoopIterations?: number;
   isolateGit?: boolean;
   toolCategories?: string[];
+  /** Optional condition — if evaluates to false, step is skipped (not a failure) */
+  condition?: string;
+  /** Per-step repo for multi-repo workflows */
+  repo?: string;
 }
 interface RetryState {
   retryCount: number;
@@ -316,6 +320,50 @@ export async function startRun(
   return run;
 }
 
+// ── Condition evaluation for conditional step execution ─────────────
+
+function evaluateStepCondition(
+  condition: string,
+  run: WorkflowRun,
+  stepRuns: WorkflowStepRun[],
+): boolean {
+  const vars = (run.context as any)?._vars ?? {};
+
+  // Replace {{vars.X}} with actual values
+  let resolved = condition;
+  for (const [key, value] of Object.entries(vars)) {
+    resolved = resolved.replace(new RegExp(`\\{\\{vars\\.${key}\\}\\}`, 'g'), String(value ?? ''));
+  }
+
+  // Replace {{steps.X.output}} with step output
+  for (const sr of stepRuns) {
+    resolved = resolved.replace(
+      new RegExp(`\\{\\{steps\\.${sr.stepId}\\.output\\}\\}`, 'g'),
+      sr.output ?? '',
+    );
+  }
+
+  // "X contains 'text'"
+  const containsMatch = resolved.match(/^(.+?)\s+contains\s+'([^']+)'$/i);
+  if (containsMatch) return containsMatch[1].includes(containsMatch[2]);
+
+  // "X not empty"
+  if (resolved.trim().endsWith('not empty')) {
+    return resolved.replace(/\s+not\s+empty$/i, '').trim().length > 0;
+  }
+
+  // "X equals 'text'"
+  const equalsMatch = resolved.match(/^(.+?)\s+equals\s+'([^']+)'$/i);
+  if (equalsMatch) return equalsMatch[1].trim() === equalsMatch[2];
+
+  // Boolean literals
+  if (resolved.trim().toLowerCase() === 'false') return false;
+  if (resolved.trim().toLowerCase() === 'true') return true;
+
+  // Default: truthy (non-empty = run)
+  return resolved.trim().length > 0;
+}
+
 // ── Advance a run — find and dispatch ready steps ───────────────────
 
 async function advanceRun(
@@ -344,10 +392,10 @@ async function advanceRun(
       const depRun = stepRuns.find(sr => sr.stepId === depId);
       const depStep = steps.find(s => s.id === depId);
       // Only 'completed' satisfies a dependency.
-      // 'skipped' only counts if the step is explicitly marked optional.
+      // 'skipped' counts if: step is optional, OR step was condition-skipped (planned skip).
       return depRun && (
         depRun.status === 'completed' ||
-        (depRun.status === 'skipped' && depStep?.optional === true)
+        (depRun.status === 'skipped' && (depStep?.optional === true || depStep?.condition != null))
       );
     });
 
@@ -367,6 +415,17 @@ async function advanceRun(
     }
 
     if (!allDepsMet) continue;
+
+    // Check condition — skip if condition evaluates to false (planned skip, not failure)
+    if (step.condition) {
+      const shouldRun = evaluateStepCondition(step.condition, run, stepRuns);
+      if (!shouldRun) {
+        markStepStatus(stepRun.id, 'skipped');
+        getDrizzle().run(sql`UPDATE workflow_step_runs SET output = 'Skipped: condition not met' WHERE id = ${stepRun.id}`);
+        madeProgress = true;
+        continue;
+      }
+    }
 
     // Check gate
     if (step.gate === 'manual' || (step as any).manualGate === true) {
@@ -408,13 +467,20 @@ async function advanceRun(
       const step = steps.find(s => s.id === sr.stepId);
       if (step?.optional) return false;
       if (sr.status === 'failed') return true;
-      // A skipped non-optional step means a dependency failed — treat as failure
-      if (sr.status === 'skipped' && step && (step.waitFor || []).length > 0) {
-        const hasFailedDep = (step.waitFor || []).some(depId => {
-          const depRun = updatedStepRuns.find(d => d.stepId === depId);
-          return depRun && (depRun.status === 'failed' || depRun.status === 'skipped');
-        });
-        return hasFailedDep;
+      // A skipped non-optional step — check if it's a planned skip (condition) or failure cascade
+      if (sr.status === 'skipped') {
+        // Condition-skipped steps are intentional, not failures
+        if (sr.output?.startsWith('Skipped: condition')) return false;
+        // Steps with a condition that was evaluated are planned skips
+        if (step?.condition) return false;
+        // Otherwise check if it was cascade-skipped due to failed deps
+        if (step && (step.waitFor || []).length > 0) {
+          const hasFailedDep = (step.waitFor || []).some(depId => {
+            const depRun = updatedStepRuns.find(d => d.stepId === depId);
+            return depRun && (depRun.status === 'failed' || depRun.status === 'skipped');
+          });
+          return hasFailedDep;
+        }
       }
       return false;
     });
