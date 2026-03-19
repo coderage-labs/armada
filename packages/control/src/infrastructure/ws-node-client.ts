@@ -381,6 +381,31 @@ export class WsNodeClient {
     await this.send('file.delete', { path, recursive });
   }
 
+  // === Workspace Provisioning ===
+
+  /**
+   * Clone a git repo into an instance container and create a feature branch.
+   * Runs `git clone` + `git checkout -b` (+ optional `npm install`) inside the container.
+   *
+   * @param instanceName  Instance name (without the armada-instance- prefix)
+   * @param repo          GitHub repo in "owner/repo" format
+   * @param branch        Branch name to create in the cloned repo
+   * @param path          Optional target path inside the container (default: /tmp/work/<repoName>)
+   */
+  async cloneWorkspace(
+    instanceName: string,
+    repo: string,
+    branch: string,
+    path?: string,
+  ): Promise<{ path: string; branch: string; status: string }> {
+    const containerName = `armada-instance-${instanceName}`;
+    return this.send('workspace.clone', { instanceId: containerName, repo, branch, path }, 300_000) as Promise<{
+      path: string;
+      branch: string;
+      status: string;
+    }>;
+  }
+
   // === Instance event relay ===
 
   /**

@@ -14,6 +14,7 @@ import { handleSystemCommand } from '../handlers/system.js';
 import { handleToolCommand } from '../handlers/tools.js';
 import { handleRelayCommand } from '../handlers/relay.js';
 import { handleLogsCommand, type LogsHandlerContext } from '../handlers/logs.js';
+import { handleWorkspaceCommand } from '../handlers/workspace.js';
 import { subscribeToInstanceEvents, unsubscribeFromInstanceEvents } from '../handlers/events.js';
 import { loadCredentials, saveCredentials, CREDENTIALS_PATH } from '../credentials.js';
 import { IdempotencyCache } from './idempotency-cache.js';
@@ -171,6 +172,7 @@ async function route(msg: CommandMessage, ctx?: ContainerHandlerContext & LogsHa
     if (action.startsWith('tool.')) return await handleToolCommand(msg);
     if (action === 'instance.relay') return await handleRelayCommand(msg);
     if (action.startsWith('logs.')) return await handleLogsCommand(msg, ctx);
+    if (action.startsWith('workspace.')) return await handleWorkspaceCommand(msg);
 
     return {
       type: 'response',
