@@ -343,6 +343,9 @@ function evaluateStepCondition(
     );
   }
 
+  // Strip markdown formatting from resolved text (agents often use **bold**, *italic*, etc.)
+  resolved = resolved.replace(/\*\*/g, '').replace(/\*/g, '').replace(/`/g, '');
+
   // "X contains 'text'"
   const containsMatch = resolved.match(/^(.+?)\s+contains\s+'([^']+)'$/i);
   if (containsMatch) return containsMatch[1].includes(containsMatch[2]);
