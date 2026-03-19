@@ -522,7 +522,9 @@ export async function createInboundContext(
   const { finalizeInboundContext } = runtime.channel.reply;
   const { resolveStorePath, recordInboundSession } = runtime.channel.session;
 
-  const short = opts.taskId.split('-').slice(0, 2).join('-');
+  // Use full taskId for session key — each workflow step gets its own session/lane.
+  // Previously used only first 2 dash-parts, which grouped all steps of a run on one lane.
+  const short = opts.taskId;
   // When targetAgent is specified, scope the session to that agent
   const agentId = opts.targetAgent || 'main';
   // Include targetAgent in session key for multi-agent instance isolation
@@ -850,7 +852,8 @@ export async function injectAndWaitForResponse(
   const sessionPendingTasks = getOrCreateGlobalMap<string, Set<string>>(ARMADA_PENDING_SYM);
   const coordinatorCallbacks = getOrCreateGlobalMap<string, (result: SubTaskResult) => void>(ARMADA_COORD_CB_SYM);
 
-  const short = opts.taskId.split('-').slice(0, 2).join('-');
+  // Use full taskId — each step gets its own session lane
+  const short = opts.taskId;
   const sessionKey = opts.sessionKey || `armada:${opts.from}:${short}`;
   const chatId = `armada:${opts.from}`;
 
