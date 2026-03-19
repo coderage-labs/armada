@@ -194,6 +194,11 @@ export function initWorkflowDispatcher() {
         runId: opts.runId,
         status: opts.type,
         projectId: opts.projectId,
+        ...(opts.type === 'failed' && {
+          failedStepId: opts.failedStepId,
+          failedStepName: opts.failedStepName,
+          failureDetail: opts.failureDetail,
+        }),
       }).catch(err => {
         console.error(`[workflow-dispatcher] Failed to send completion notification:`, err);
       });
