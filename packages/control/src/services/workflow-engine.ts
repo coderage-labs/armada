@@ -313,8 +313,13 @@ async function advanceRun(
   if (run.status !== 'running' && run.status !== 'paused') return;
   // Paused runs can still advance non-gated steps (gates only block THEIR step)
 
-  const stepRuns = getStepRunsForRun(run.id);
   const steps = workflow.steps;
+
+  // Loop until no more steps can be advanced (handles cascade skips)
+  let madeProgress = true;
+  while (madeProgress) {
+    madeProgress = false;
+    const stepRuns = getStepRunsForRun(run.id); // Re-fetch each pass
 
   for (const step of steps) {
     const stepRun = stepRuns.find(sr => sr.stepId === step.id);
@@ -333,16 +338,18 @@ async function advanceRun(
       );
     });
 
-    // Check if any required dep failed
+    // Check if any required dep failed or was cascade-skipped
     const anyDepFailed = deps.some(depId => {
       const depRun = stepRuns.find(sr => sr.stepId === depId);
       const depStep = steps.find(s => s.id === depId);
-      return depRun && depRun.status === 'failed' && !depStep?.optional;
+      if (depStep?.optional) return false;
+      return depRun && (depRun.status === 'failed' || depRun.status === 'skipped');
     });
 
     if (anyDepFailed) {
-      // Skip this step if a required dependency failed
+      // Skip this step — a required dependency failed or was cascade-skipped
       markStepStatus(stepRun.id, 'skipped');
+      madeProgress = true; // Trigger another pass for cascade
       continue;
     }
 
@@ -370,7 +377,9 @@ async function advanceRun(
 
     // Dispatch this step
     await dispatchStep(run, workflow, step, stepRun, extraVars);
+    madeProgress = true;
   }
+  } // end while (madeProgress)
 
   // Check if run is complete
   const updatedStepRuns = getStepRunsForRun(run.id);
