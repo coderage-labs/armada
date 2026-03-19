@@ -421,10 +421,11 @@ async function advanceRun(
     });
 
     // Check if any required dep failed or was cascade-skipped
+    // Condition-skipped deps are planned, not failures
     const anyDepFailed = deps.some(depId => {
       const depRun = stepRuns.find(sr => sr.stepId === depId);
       const depStep = steps.find(s => s.id === depId);
-      if (depStep?.optional) return false;
+      if (depStep?.optional || depStep?.condition) return false; // planned skips aren't failures
       return depRun && (depRun.status === 'failed' || depRun.status === 'skipped');
     });
 
