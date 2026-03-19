@@ -384,7 +384,25 @@ async function advanceRun(
 
   for (const step of steps) {
     const stepRun = stepRuns.find(sr => sr.stepId === step.id);
-    if (!stepRun || stepRun.status !== 'pending') continue;
+    if (!stepRun) continue;
+    // Skip already-completed/failed/skipped steps
+    if (['completed', 'failed', 'skipped', 'running'].includes(stepRun.status)) continue;
+    // For waiting_gate steps, re-check if deps have since failed
+    if (stepRun.status === 'waiting_gate') {
+      const deps = step.waitFor || [];
+      const gateDepFailed = deps.some(depId => {
+        const depRun = stepRuns.find(sr => sr.stepId === depId);
+        const depStep = steps.find(s => s.id === depId);
+        if (depStep?.optional || depStep?.condition) return false;
+        return depRun && (depRun.status === 'failed' || depRun.status === 'skipped');
+      });
+      if (gateDepFailed) {
+        markStepStatus(stepRun.id, 'skipped');
+        madeProgress = true;
+      }
+      continue;
+    }
+    if (stepRun.status !== 'pending') continue;
 
     // Check if all dependencies are satisfied
     const deps = step.waitFor || [];
