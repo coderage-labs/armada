@@ -9,6 +9,8 @@ export const ALL_SCOPES = [
   'tasks:read', 'tasks:write',
   'templates:read', 'templates:write',
   'integrations:read', 'integrations:write',
+  'issues:read', 'issues:write',
+  'prs:read', 'prs:write',
   'projects:read', 'projects:write',
   'models:read', 'models:write',
   'nodes:read', 'nodes:write',
