@@ -135,6 +135,31 @@ export function initWorkflowDispatcher() {
         }
       }
 
+      // ── Workspace pre-provisioning ────────────────────────────────────
+      // For development steps with an issueRepo, clone the repo into the
+      // instance container before sending the task so the agent can start
+      // work immediately without needing to clone manually.
+      if (opts.role === 'development' && opts.vars?.issueRepo) {
+        const issueRepo = opts.vars.issueRepo as string;
+        const issueNumber = opts.vars.issueNumber as number | undefined;
+        const issueTitle = opts.vars.issueTitle as string | undefined;
+        const repoName = issueRepo.split('/').pop() || 'work';
+        const slugTitle = issueTitle
+          ? issueTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30).replace(/-+$/, '')
+          : 'impl';
+        const branch = `feature/${issueNumber ? `${issueNumber}-` : ''}${slugTitle}`;
+        const workPath = `/tmp/work/${repoName}`;
+
+        try {
+          const wsNode = getNodeClient(instance.nodeId);
+          await wsNode.cloneWorkspace(instance.name, issueRepo, branch, workPath);
+          console.log(`[workflow-dispatcher] Provisioned workspace for step "${opts.stepId}": ${workPath} (branch: ${branch})`);
+        } catch (err: any) {
+          // Non-fatal — the agent can still clone manually
+          console.warn(`[workflow-dispatcher] Workspace provisioning failed for step "${opts.stepId}": ${err.message}`);
+        }
+      }
+
       // Use instance proxyUrl for callback so agents can reach the control plane through the node proxy
       const callbackBaseUrl = process.env.ARMADA_AGENT_GATEWAY_URL || 'http://armada-node:3002';
       const body = JSON.stringify({

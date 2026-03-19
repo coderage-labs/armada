@@ -201,6 +201,8 @@ interface DispatchFn {
     isolateGit?: boolean;
     /** Restrict tool loading to these categories for this step */
     toolCategories?: string[];
+    /** Resolved workflow template variables — used for workspace pre-provisioning */
+    vars?: Record<string, any>;
   }): Promise<{ agentName: string; armadaTaskId: string } | { error: string }>;
 }
 
@@ -543,6 +545,7 @@ async function dispatchStep(
       taskId,
       isolateGit: step.isolateGit,
       toolCategories: step.toolCategories,
+      vars: mergedUserVars,
     });
 
     if ('error' in result) {
