@@ -13,7 +13,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { getDrizzle } from '../db/drizzle.js';
-import { workflows as workflowsTable, workflowRuns, workflowStepRuns, workflowProjects, issueDependencies } from '../db/drizzle-schema.js';
+import { workflows as workflowsTable, workflowRuns, workflowStepRuns, workflowProjects, issueDependencies, triagedIssues } from '../db/drizzle-schema.js';
 import { eq, and, desc, sql, inArray } from 'drizzle-orm';
 import { dispatchWebhook } from './webhook-dispatcher.js';
 import { broadcast } from '../utils/event-bus.js';
@@ -266,6 +266,18 @@ export async function startRun(
     status: 'running',
     contextJson: JSON.stringify(initialContext),
   }).run();
+
+  // Mark the issue as triaged so it doesn't get re-triaged on future sync cycles
+  if (resolvedProjectId && extraVars?.issueNumber) {
+    try {
+      db.insert(triagedIssues).values({
+        id: randomUUID(),
+        projectId: resolvedProjectId,
+        issueNumber: extraVars.issueNumber,
+        triagedAt: new Date().toISOString(),
+      }).onConflictDoNothing().run();
+    } catch { /* ignore — table may not have unique constraint */ }
+  }
 
   // Create step run entries for all steps
   for (let i = 0; i < workflow.steps.length; i++) {
