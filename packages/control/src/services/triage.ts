@@ -496,7 +496,8 @@ export async function triageNewIssues(): Promise<{ project: string; triaged: num
   const results: { project: string; triaged: number; skipped: number }[] = [];
 
   for (const project of projects) {
-    const issues = getCachedIssues(project.id);
+    const allIssues = getCachedIssues(project.id);
+    const issues = allIssues.filter(i => i.state === 'open');
     if (issues.length === 0) continue;
 
     // Check which issues already have tasks in the DB
