@@ -658,6 +658,18 @@ export const workflowArtifacts = sqliteTable('workflow_artifacts', {
   createdAt: text('created_at').notNull(),
 });
 
+// ── issue_dependencies (#159) ────────────────────────────────────────
+export const issueDependencies = sqliteTable('issue_dependencies', {
+  id: text('id').primaryKey(),
+  projectId: text('project_id').notNull(),
+  repo: text('repo').notNull(),
+  issueNumber: integer('issue_number').notNull(),
+  blockedByRepo: text('blocked_by_repo').notNull(),
+  blockedByIssueNumber: integer('blocked_by_issue_number').notNull(),
+  resolved: integer('resolved').notNull().default(0),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+});
+
 // ── notification_channels (#512) ────────────────────────────────────
 export const notificationChannels = sqliteTable('notification_channels', {
   id: text('id').primaryKey(),

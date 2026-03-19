@@ -1,6 +1,6 @@
 import { projectsRepo, settingsRepo } from '../repositories/index.js';
 import { getDrizzle } from '../db/drizzle.js';
-import { githubIssueCache, triagedIssues } from '../db/drizzle-schema.js';
+import { githubIssueCache, triagedIssues, issueDependencies } from '../db/drizzle-schema.js';
 import { eq, sql, and } from 'drizzle-orm';
 import { logActivity } from './activity-service.js';
 import { eventBus } from '../infrastructure/event-bus.js';
@@ -57,6 +57,54 @@ function resolveGitHubToken(projectId: string): string {
     console.warn(`[issue-sync] Failed to resolve integration token for project ${projectId}:`, err.message);
   }
   return process.env.GITHUB_TOKEN || '';
+}
+
+/**
+ * Parse "blocked by" / "depends on" references from an issue body and
+ * upsert them into the issue_dependencies table.
+ *
+ * Supported patterns:
+ *   blocked by #123          → same repo
+ *   depends on #123          → same repo
+ *   blocked by owner/repo#123 → cross-repo
+ */
+export function parseDependencies(
+  projectId: string,
+  issueRepo: string,
+  issueNumber: number,
+  body: string,
+): void {
+  if (!body) return;
+
+  const db = getDrizzle();
+  const DEPENDENCY_RE = /(?:blocked by|depends on)\s+(?:([a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+))?#(\d+)/gi;
+
+  let match: RegExpExecArray | null;
+  while ((match = DEPENDENCY_RE.exec(body)) !== null) {
+    const blockedByRepo = match[1] ? match[1] : issueRepo;
+    const blockedByIssueNumber = parseInt(match[2], 10);
+    if (!blockedByRepo || !blockedByIssueNumber) continue;
+
+    const id = `${projectId}:${issueRepo}:${issueNumber}:${blockedByRepo}:${blockedByIssueNumber}`;
+    db.insert(issueDependencies).values({
+      id,
+      projectId,
+      repo: issueRepo,
+      issueNumber,
+      blockedByRepo,
+      blockedByIssueNumber,
+      resolved: 0,
+    }).onConflictDoUpdate({
+      target: [issueDependencies.id],
+      set: {
+        // Keep resolved state — don't reset if already resolved
+        repo: sql`excluded.repo`,
+        issueNumber: sql`excluded.issue_number`,
+        blockedByRepo: sql`excluded.blocked_by_repo`,
+        blockedByIssueNumber: sql`excluded.blocked_by_issue_number`,
+      },
+    }).run();
+  }
 }
 
 export async function syncProjectIssues(projectId: string): Promise<{ fetched: number }> {
@@ -147,6 +195,11 @@ export async function syncProjectIssues(projectId: string): Promise<{ fetched: n
         cachedAt: sql`excluded.cached_at`,
       },
     }).run();
+  }
+
+  // Parse and upsert issue dependencies from issue bodies
+  for (const issue of allIssues) {
+    parseDependencies(projectId, issue.repo || '', issue.number, issue.body || '');
   }
 
   // Mark cached issues NOT in the fresh response as closed (they were closed/deleted on GitHub)
