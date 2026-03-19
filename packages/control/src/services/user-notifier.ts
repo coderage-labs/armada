@@ -196,25 +196,29 @@ export async function notifyGate(opts: NotifyGateOptions): Promise<void> {
 export async function notifyCompletion(opts: NotifyCompletionOptions): Promise<void> {
   const { workflowName, runId, status, projectId, failedStepId, failedStepName, failureDetail } = opts;
 
-  // Resolve owner assignment — only notify the project owner
+  // Resolve owner and triager — both should receive completion/failure notifications
   const ownerAssignment = assignmentRepo.getAssignment(projectId, 'owner');
+  const triagerAssignment = assignmentRepo.getAssignment(projectId, 'triager');
 
   let targetUsers: ArmadaUser[] = [];
 
-  if (ownerAssignment) {
-    if (ownerAssignment.assigneeType === 'user') {
-      const user = usersRepo.getById(ownerAssignment.assigneeId);
-      if (user) targetUsers = [user];
-    }
-    // If owner is an agent, no user notification needed
-  } else {
-    // No owner assigned — fall back to all assigned users for failures only
-    // For completions with no owner, don't notify anyone
-    if (status === 'failed') {
-      targetUsers = assignmentRepo.getAllAssignedUsers(projectId);
-      if (targetUsers.length === 0) {
-        targetUsers = usersRepo.getAll();
-      }
+  // Add owner
+  if (ownerAssignment?.assigneeType === 'user') {
+    const user = usersRepo.getById(ownerAssignment.assigneeId);
+    if (user) targetUsers.push(user);
+  }
+
+  // Add triager (they dispatched the work, they should know the outcome)
+  if (triagerAssignment?.assigneeType === 'user') {
+    const user = usersRepo.getById(triagerAssignment.assigneeId);
+    if (user && !targetUsers.some(u => u.id === user.id)) targetUsers.push(user);
+  }
+
+  // If neither assigned, fall back for failures only
+  if (targetUsers.length === 0 && status === 'failed') {
+    targetUsers = assignmentRepo.getAllAssignedUsers(projectId);
+    if (targetUsers.length === 0) {
+      targetUsers = usersRepo.getAll();
     }
   }
 
