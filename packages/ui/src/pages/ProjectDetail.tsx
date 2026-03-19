@@ -1658,17 +1658,11 @@ function SettingsTab({ project, onUpdated }: { project: Project; onUpdated: (p: 
   const [icon, setIcon] = useState(project.icon || '');
   const [color, setColor] = useState(project.color || '#8b5cf6');
   const [contextMd, setContextMd] = useState(project.contextMd || '');
-  const [repos, setRepos] = useState<ProjectRepository[]>(project.repositories || []);
-  const [showAddRepo, setShowAddRepo] = useState(false);
-  const [newRepoUrl, setNewRepoUrl] = useState('');
-  const [newRepoBranch, setNewRepoBranch] = useState('');
-  const [newRepoDir, setNewRepoDir] = useState('');
   const [wipLimit, setWipLimit] = useState(project.maxConcurrent || 3);
   const [syncInterval, setSyncInterval] = useState(project.issueSyncIntervalMinutes ?? 5);
   const [saving, setSaving] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
   const [saved, setSaved] = useState(false);
-  const [repoSaving, setRepoSaving] = useState(false);
   const [linkedRepos, setLinkedRepos] = useState<LinkedRepo[]>([]);
   const [repoSearchQuery, setRepoSearchQuery] = useState('');
   const [repoSearchResults, setRepoSearchResults] = useState<RepoSearchResult[]>([]);
@@ -1681,7 +1675,6 @@ function SettingsTab({ project, onUpdated }: { project: Project; onUpdated: (p: 
     setIcon(project.icon || '');
     setColor(project.color || '#8b5cf6');
     setContextMd(project.contextMd || '');
-    setRepos(project.repositories || []);
     setWipLimit(project.maxConcurrent || 3);
     setSyncInterval(project.issueSyncIntervalMinutes ?? 5);
     setSaved(false);
@@ -1737,32 +1730,6 @@ function SettingsTab({ project, onUpdated }: { project: Project; onUpdated: (p: 
       setTimeout(() => setSaved(false), 2000);
     } catch { /* ignore */ }
     setSaving(false);
-  }
-
-  async function saveRepos(newRepos: ProjectRepository[]) {
-    setRepoSaving(true);
-    try {
-      const updated = await apiFetch<Project>(`/api/projects/${project.id}`, {
-        method: 'PUT',
-        body: JSON.stringify({ repositories: newRepos }),
-      });
-      setRepos(updated.repositories || []);
-      onUpdated(updated);
-    } catch { /* ignore */ }
-    setRepoSaving(false);
-  }
-
-  async function handleAddRepo(e: React.FormEvent) {
-    e.preventDefault();
-    if (!newRepoUrl.trim()) return;
-    const repo: ProjectRepository = { url: newRepoUrl.trim() };
-    if (newRepoBranch.trim()) repo.defaultBranch = newRepoBranch.trim();
-    if (newRepoDir.trim()) repo.cloneDir = newRepoDir.trim();
-    await saveRepos([...repos, repo]);
-    setNewRepoUrl('');
-    setNewRepoBranch('');
-    setNewRepoDir('');
-    setShowAddRepo(false);
   }
 
   async function handleArchive() {
@@ -1970,84 +1937,6 @@ function SettingsTab({ project, onUpdated }: { project: Project; onUpdated: (p: 
           </div>
         )}
       </div>
-
-      {/* Legacy Repositories (URL-based) */}
-      <details className="rounded-lg border border-zinc-800 bg-zinc-900/50">
-        <summary className="p-4 text-xs text-zinc-500 cursor-pointer hover:text-zinc-400">
-          Advanced: Add repository by URL ({repos.length} legacy)
-        </summary>
-        <div className="p-5 pt-0 space-y-3">
-        <h3 className="text-sm font-semibold text-zinc-200 flex items-center gap-1.5 sr-only">
-          Legacy Repositories
-        </h3>
-        {repos.length > 0 && (
-          <div className="space-y-1">
-            {repos.map((repo, i) => (
-              <div key={i} className="group flex items-center gap-2 text-xs px-2.5 py-2 rounded-lg bg-zinc-900/50 border border-zinc-800">
-                <span className="text-zinc-300 font-mono flex-1">
-                  {repo.url.startsWith('http') ? (
-                    <a href={repo.url} target="_blank" rel="noopener noreferrer" className="hover:text-violet-300 transition-colors">
-                      {repo.url.replace(/^https?:\/\/github\.com\//, '')}
-                    </a>
-                  ) : (
-                    <a href={`https://github.com/${repo.url}`} target="_blank" rel="noopener noreferrer" className="hover:text-violet-300 transition-colors">
-                      {repo.url}
-                    </a>
-                  )}
-                </span>
-                {repo.defaultBranch && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/20 border border-blue-500/30 text-blue-300">
-                    {repo.defaultBranch}
-                  </span>
-                )}
-                <Button
-                  variant="ghost" onClick={() => saveRepos(repos.filter((_, j) => j !== i))}
-                  disabled={repoSaving}
-                  className="opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-red-400 transition-all"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
-        {showAddRepo ? (
-          <form onSubmit={handleAddRepo} className="space-y-2 p-2.5 rounded-lg bg-zinc-900/50 border border-zinc-800">
-            <Input
-              value={newRepoUrl}
-              onChange={e => setNewRepoUrl(e.target.value)}
-              placeholder="owner/repo or https://github.com/..."
-              className="w-full rounded-lg bg-zinc-800/50 border border-zinc-800 text-zinc-200 text-xs px-2.5 py-1.5 focus:outline-none focus:border-violet-500/50 font-mono"
-              autoFocus
-            />
-            <div className="grid grid-cols-2 gap-2">
-              <Input
-                value={newRepoBranch}
-                onChange={e => setNewRepoBranch(e.target.value)}
-                placeholder="branch (default: main)"
-                className="rounded-lg bg-zinc-800/50 border border-zinc-800 text-zinc-200 text-xs px-2.5 py-1.5 focus:outline-none focus:border-violet-500/50"
-              />
-              <Input
-                value={newRepoDir}
-                onChange={e => setNewRepoDir(e.target.value)}
-                placeholder="clone dir (optional)"
-                className="rounded-lg bg-zinc-800/50 border border-zinc-800 text-zinc-200 text-xs px-2.5 py-1.5 focus:outline-none focus:border-violet-500/50 font-mono"
-              />
-            </div>
-            <div className="flex gap-2 justify-end">
-              <Button variant="ghost" type="button" onClick={() => setShowAddRepo(false)} className="px-2 py-1 text-xs text-zinc-500 hover:text-zinc-300">Cancel</Button>
-              <Button variant="ghost" type="submit" disabled={!newRepoUrl.trim() || repoSaving} className="px-3 py-1 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white text-xs font-medium">
-                {repoSaving ? 'Adding…' : 'Add'}
-              </Button>
-            </div>
-          </form>
-        ) : (
-          <Button variant="ghost" onClick={() => setShowAddRepo(true)} className="text-xs text-violet-400 hover:text-violet-300 transition-colors">
-            + Add Repository
-          </Button>
-        )}
-        </div>
-      </details>
 
       {/* Save Button */}
       <div className="flex items-center gap-3">
