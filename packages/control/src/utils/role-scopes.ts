@@ -7,10 +7,13 @@ export const ROLE_SCOPES: Record<string, string[]> = {
   'research': [
     'workflows:read', 'projects:read', 'tasks:read',
     'agents:read', 'instances:read',
+    'integrations:read', 'integrations:write', // needed for issue/PR tools
   ],
   'development': [
     'workflows:read', 'workflows:write', 'projects:read', 'tasks:read',
     'agents:read', 'instances:read',
+    'integrations:read', 'integrations:write', // needed for issue/PR tools
+    'system:read',
   ],
   'project-management': [
     'workflows:read', 'workflows:write',
@@ -18,6 +21,7 @@ export const ROLE_SCOPES: Record<string, string[]> = {
     'tasks:read', 'tasks:write',
     'agents:read', 'agents:write',
     'instances:read',
+    'integrations:read', 'integrations:write', // needed for issue/PR tools
   ],
   'general': ['*'],  // backwards compat — all tools
 };
