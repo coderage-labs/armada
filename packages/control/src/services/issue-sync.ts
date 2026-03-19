@@ -149,6 +149,21 @@ export async function syncProjectIssues(projectId: string): Promise<{ fetched: n
     }).run();
   }
 
+  // Mark cached issues NOT in the fresh response as closed (they were closed/deleted on GitHub)
+  const freshNumbers = new Set(allIssues.map(i => `${i.repo}:${i.number}`));
+  const cached = db.select().from(githubIssueCache)
+    .where(eq(githubIssueCache.projectId, projectId))
+    .all();
+  for (const row of cached) {
+    const key = `${row.repo}:${row.issueNumber}`;
+    if (!freshNumbers.has(key) && row.state === 'open') {
+      db.update(githubIssueCache)
+        .set({ state: 'closed', cachedAt: now })
+        .where(eq(githubIssueCache.id, row.id))
+        .run();
+    }
+  }
+
   return { fetched: allIssues.length };
 }
 
@@ -221,9 +236,9 @@ export function startIssueSyncScheduler() {
 
         const { fetched } = await syncProjectIssues(project.id);
 
-        // After sync, check for brand-new untriaged issues
+        // After sync, check for brand-new untriaged open issues
         const afterSync = getCachedIssues(project.id);
-        const newIssues = afterSync.filter(i => !beforeNumbers.has(i.number));
+        const newIssues = afterSync.filter(i => !beforeNumbers.has(i.number) && i.state === 'open');
 
         if (newIssues.length > 0) {
           const db = getDrizzle();
