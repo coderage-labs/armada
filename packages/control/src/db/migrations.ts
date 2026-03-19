@@ -497,7 +497,7 @@ const migrations: Migration[] = [
     version: 40,
     description: 'Migrate existing config.repositories data into project_repos table (#166)',
     run(db) {
-      const { v4: uuidv4 } = require('uuid');
+      const uuidv4 = () => crypto.randomUUID();
       const projects = db.prepare('SELECT id, config_json FROM projects').all() as Array<{ id: string; config_json: string }>;
 
       for (const project of projects) {
