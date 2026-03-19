@@ -10,6 +10,7 @@
 import Docker from 'dockerode';
 import type { CommandMessage, ResponseMessage } from '@coderage-labs/armada-shared';
 import { WsErrorCode } from '@coderage-labs/armada-shared';
+import { discoverWorkspace } from './workspace-discovery.js';
 
 const docker = new Docker({ socketPath: '/var/run/docker.sock' });
 
@@ -153,10 +154,99 @@ export async function handleWorkspaceClone(msg: CommandMessage): Promise<Respons
   }
 }
 
+export async function handleWorkspaceExec(msg: CommandMessage): Promise<ResponseMessage> {
+  const params = msg.params as {
+    instanceId: string;
+    path: string;
+    cmd: string;
+  };
+
+  const { instanceId, path: workPath, cmd } = params;
+  if (!instanceId || !workPath || !cmd) {
+    return {
+      type: 'response',
+      id: msg.id,
+      status: 'error',
+      error: 'instanceId, path, and cmd are required',
+      code: WsErrorCode.UNKNOWN,
+    };
+  }
+
+  console.log(`[workspace] Exec in ${instanceId}:${workPath}: ${cmd}`);
+
+  try {
+    const result = await containerExec(instanceId, [
+      'sh', '-c', `cd "${workPath}" && ${cmd}`,
+    ]);
+
+    return {
+      type: 'response',
+      id: msg.id,
+      status: 'ok',
+      data: { exitCode: result.exitCode, output: result.output },
+    };
+  } catch (err: any) {
+    return {
+      type: 'response',
+      id: msg.id,
+      status: 'error',
+      error: `Workspace exec failed: ${err.message}`,
+      code: WsErrorCode.UNKNOWN,
+    };
+  }
+}
+
+export async function handleWorkspaceDiscover(msg: CommandMessage): Promise<ResponseMessage> {
+  const params = msg.params as {
+    instanceId: string;
+    path: string;
+  };
+
+  const { instanceId, path: workPath } = params;
+  if (!instanceId || !workPath) {
+    return {
+      type: 'response',
+      id: msg.id,
+      status: 'error',
+      error: 'instanceId and path are required',
+      code: WsErrorCode.UNKNOWN,
+    };
+  }
+
+  console.log(`[workspace] Discovering workspace in ${instanceId}:${workPath}`);
+
+  try {
+    // Create an exec function bound to this container
+    const exec = (cmd: string[]) => containerExec(instanceId, cmd);
+    const discovery = await discoverWorkspace(exec, workPath);
+
+    console.log(`[workspace] Discovery complete: rootConfig=${!!discovery.rootConfig}, detected=${discovery.detected.length} packages`);
+
+    return {
+      type: 'response',
+      id: msg.id,
+      status: 'ok',
+      data: discovery,
+    };
+  } catch (err: any) {
+    return {
+      type: 'response',
+      id: msg.id,
+      status: 'error',
+      error: `Workspace discovery failed: ${err.message}`,
+      code: WsErrorCode.UNKNOWN,
+    };
+  }
+}
+
 export async function handleWorkspaceCommand(msg: CommandMessage): Promise<ResponseMessage> {
   switch (msg.action) {
     case 'workspace.clone':
       return handleWorkspaceClone(msg);
+    case 'workspace.discover':
+      return handleWorkspaceDiscover(msg);
+    case 'workspace.exec':
+      return handleWorkspaceExec(msg);
     default:
       return {
         type: 'response',

@@ -800,6 +800,27 @@ export interface Changeset {
   requiresRestart?: boolean;
 }
 
+// ── Workspace Discovery (#172) ──────────────────────────────────────
+
+export interface BuildConfig {
+  install?: string;
+  verify?: string;
+  test?: string;
+  context?: string;
+  conventions?: string;
+}
+
+export interface DetectedPackage {
+  path: string;       // Relative path in repo
+  stack: string;      // 'node' | 'go' | 'python' | 'rust' | 'terraform' | 'java-maven' | 'java-gradle' | 'docker'
+  buildConfig: BuildConfig;  // Inferred commands
+}
+
+export interface RepoDiscovery {
+  rootConfig?: BuildConfig;   // From armada.json at root
+  detected: DetectedPackage[]; // Auto-detected packages
+}
+
 // ── Changeset Conflict Resolution (#320) ───────────────────────────
 
 export interface ConflictCheck {

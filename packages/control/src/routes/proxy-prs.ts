@@ -7,10 +7,11 @@ import { requireScope } from '../middleware/scopes.js';
 import { getProvider } from '../services/integrations/registry.js';
 import { integrationsRepo } from '../services/integrations/integrations-repo.js';
 import { projectIntegrationsRepo } from '../services/integrations/project-integrations-repo.js';
-import { agentsRepo, templatesRepo, projectsRepo, projectReposRepo } from '../repositories/index.js';
+import { agentsRepo, templatesRepo, projectsRepo, projectReposRepo, instancesRepo } from '../repositories/index.js';
 import { logActivity } from '../services/activity-service.js';
 import { registerToolDef } from '../utils/tool-registry.js';
 import type { IntegrationProvider, PRFilters } from '../services/integrations/types.js';
+import { getNodeClient } from '../infrastructure/node-client.js';
 
 const router = Router();
 
@@ -337,7 +338,7 @@ router.post('/comment', requireScope('prs:write'), async (req, res, next) => {
 registerToolDef({
   category: 'issues',
   name: 'armada_pr_create',
-  description: 'Create a pull request',
+  description: 'Create a pull request. If workspacePath is provided, runs the verify command from armada.json (or auto-detected build config) before creating the PR — the PR is only created if verification passes.',
   method: 'POST',
   path: '/api/proxy/prs/create',
   parameters: [
@@ -349,6 +350,7 @@ registerToolDef({
     { name: 'base', type: 'string', description: 'Target branch (defaults to repo default branch)' },
     { name: 'draft', type: 'boolean', description: 'Create as draft PR (default: false)' },
     { name: 'labels', type: 'string', description: 'JSON array of label names' },
+    { name: 'workspacePath', type: 'string', description: 'Absolute path in the calling agent\'s container to run build verification from (reads armada.json or auto-detects). PR is blocked if verify fails.' },
   ],
     scope: 'prs:write',
 });
@@ -356,7 +358,7 @@ registerToolDef({
 router.post('/create', requireScope('prs:write'), async (req, res, next) => {
   try {
     const agentName = (req.caller as any)?.agentName ?? null;
-    const { project: projectRef, repo, title, body, head, base, draft, labels } = req.body;
+    const { project: projectRef, repo, title, body, head, base, draft, labels, workspacePath } = req.body;
     if (!projectRef || !repo || !title || !body || !head) return res.status(400).json({ error: 'project, repo, title, body, and head are required' });
 
     const project = resolveProject(projectRef);
@@ -369,6 +371,53 @@ router.post('/create', requireScope('prs:write'), async (req, res, next) => {
     const { integration, provider, repos: configRepos } = resolved;
     if (!provider.createPR) return res.status(501).json({ error: `Provider ${integration.provider} does not support createPR` });
     if (!validateRepo(configRepos, repo)) return res.status(403).json({ error: `Repo ${repo} is not configured for project ${project.name}` });
+
+    // ── Build verification (optional) ────────────────────────────────
+    // When workspacePath is provided, discover the build config and run
+    // the verify command inside the calling agent's container. PR creation
+    // is blocked if verification fails.
+    if (workspacePath && agentName) {
+      try {
+        // Resolve the calling agent's instance to find its node
+        const agents = agentsRepo.getAll();
+        const callerAgent = agents.find(a => a.name === agentName);
+        const instanceId = callerAgent?.instanceId;
+        const instance = instanceId ? instancesRepo.getById(instanceId) : null;
+
+        if (instance?.nodeId) {
+          const nodeClient = getNodeClient(instance.nodeId);
+          const discovery = await nodeClient.discoverWorkspace(instance.name, workspacePath);
+
+          // Prefer rootConfig verify; fall back to first detected stack's verify
+          const verifyCmd = discovery.rootConfig?.verify
+            ?? discovery.detected.find(d => d.buildConfig.verify)?.buildConfig.verify;
+
+          if (verifyCmd) {
+            console.log(`[proxy-prs] Running build verification for ${agentName}: ${verifyCmd}`);
+
+            // Execute the verify command in the container via workspace.exec
+            const verifyResult = await nodeClient.execInWorkspace(instance.name, workspacePath, verifyCmd, 120_000);
+
+            if (verifyResult.exitCode !== 0) {
+              auditLog(agentName, project.name, 'create-blocked', `${repo} — verify failed`);
+              return res.status(422).json({
+                error: 'Build verification failed — PR not created',
+                verifyCmd,
+                output: verifyResult.output,
+                exitCode: verifyResult.exitCode,
+              });
+            }
+
+            console.log(`[proxy-prs] Build verification passed for ${agentName}`);
+          }
+        } else {
+          console.warn(`[proxy-prs] workspacePath provided but could not resolve instance for agent ${agentName} — skipping verification`);
+        }
+      } catch (verifyErr: any) {
+        // Log but don't block PR creation if verification infrastructure fails
+        console.warn(`[proxy-prs] Build verification error (non-blocking): ${verifyErr.message}`);
+      }
+    }
 
     // Parse labels — accept both JSON array and string array
     let parsedLabels: string[] | undefined;

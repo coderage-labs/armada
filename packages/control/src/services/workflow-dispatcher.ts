@@ -139,6 +139,7 @@ export function initWorkflowDispatcher() {
       // For development steps with an issueRepo, clone the repo into the
       // instance container before sending the task so the agent can start
       // work immediately without needing to clone manually.
+      let discoveryContext = '';
       if (opts.role === 'development' && opts.vars?.issueRepo) {
         const issueRepo = opts.vars.issueRepo as string;
         const issueNumber = opts.vars.issueNumber as number | undefined;
@@ -149,11 +150,46 @@ export function initWorkflowDispatcher() {
           : 'impl';
         const branch = `feature/${issueNumber ? `${issueNumber}-` : ''}${slugTitle}`;
         const workPath = `/tmp/work/${repoName}`;
-
         try {
           const wsNode = getNodeClient(instance.nodeId);
           await wsNode.cloneWorkspace(instance.name, issueRepo, branch, workPath);
           console.log(`[workflow-dispatcher] Provisioned workspace for step "${opts.stepId}": ${workPath} (branch: ${branch})`);
+
+          // Run workspace discovery after clone to inject stack info into the task prompt
+          try {
+            const discovery = await wsNode.discoverWorkspace(instance.name, workPath);
+            const lines: string[] = [];
+
+            if (discovery.rootConfig) {
+              lines.push('[WORKSPACE CONFIG]');
+              const cfg = discovery.rootConfig;
+              if (cfg.install) lines.push(`Install: ${cfg.install}`);
+              if (cfg.verify) lines.push(`Verify: ${cfg.verify}`);
+              if (cfg.test) lines.push(`Test: ${cfg.test}`);
+              if (cfg.context) lines.push(`Context: ${cfg.context}`);
+              if (cfg.conventions) lines.push(`Conventions: ${cfg.conventions}`);
+              lines.push('[END WORKSPACE CONFIG]');
+            }
+
+            if (discovery.detected.length > 0) {
+              lines.push('[DETECTED STACKS]');
+              for (const pkg of discovery.detected) {
+                const cfgParts: string[] = [];
+                if (pkg.buildConfig.verify) cfgParts.push(`verify: ${pkg.buildConfig.verify}`);
+                if (pkg.buildConfig.test) cfgParts.push(`test: ${pkg.buildConfig.test}`);
+                lines.push(`- ${pkg.path} (${pkg.stack})${cfgParts.length ? ': ' + cfgParts.join(', ') : ''}`);
+              }
+              lines.push('[END DETECTED STACKS]');
+            }
+
+            if (lines.length > 0) {
+              discoveryContext = '\n\n' + lines.join('\n');
+              console.log(`[workflow-dispatcher] Discovery context injected for step "${opts.stepId}"`);
+            }
+          } catch (discErr: any) {
+            // Non-fatal — discovery is best-effort
+            console.warn(`[workflow-dispatcher] Workspace discovery failed for step "${opts.stepId}": ${discErr.message}`);
+          }
         } catch (err: any) {
           // Non-fatal — the agent can still clone manually
           console.warn(`[workflow-dispatcher] Workspace provisioning failed for step "${opts.stepId}": ${err.message}`);
@@ -166,7 +202,7 @@ export function initWorkflowDispatcher() {
         taskId: opts.taskId,
         from: 'workflow-engine',
         fromRole: 'operator',
-        message: opts.message + worktreeContext,
+        message: opts.message + worktreeContext + (discoveryContext ?? ''),
         callbackUrl: `${callbackBaseUrl}/api/tasks/${opts.taskId}/result`,
         projectId: opts.projectId,
         ...(agent.targetAgent && { targetAgent: agent.targetAgent }),
