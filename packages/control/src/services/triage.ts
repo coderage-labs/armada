@@ -624,3 +624,22 @@ eventBus.on('github.new_issues', (event) => {
     console.error('[triage] Auto-triage failed:', err);
   });
 });
+
+// ── Auto-triage unblocked issues (#159) ─────────────────────────────────────
+// When a workflow completes and unblocks a dependent issue, trigger triage for it.
+eventBus.on('issue.unblocked', (event) => {
+  const { projectId, repo, issueNumber } = event.data as { projectId: string; repo: string; issueNumber: number };
+  console.log(`[triage] Auto-triage triggered for unblocked issue #${issueNumber} in ${repo} (project ${projectId})`);
+
+  // Look up the cached issue so we have the full GitHubIssue object
+  const issues = getCachedIssues(projectId);
+  const issue = issues.find(i => i.number === issueNumber && i.repo === repo);
+  if (!issue) {
+    console.warn(`[triage] Unblocked issue #${issueNumber} not found in cache for project ${projectId} — skipping auto-triage`);
+    return;
+  }
+
+  triageIssue(projectId, issue).catch((err: Error) => {
+    console.error(`[triage] Auto-triage of unblocked issue #${issueNumber} failed:`, err.message);
+  });
+});

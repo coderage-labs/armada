@@ -449,6 +449,26 @@ const migrations: Migration[] = [
       'CREATE INDEX IF NOT EXISTS idx_workflow_artifacts_step_id ON workflow_artifacts(run_id, step_id)',
     ],
   },
+
+  // ── issue_dependencies (#159) ─────────────────────────────────────
+  {
+    version: 38,
+    description: 'Create issue_dependencies table for auto-dispatch on completion (#159)',
+    sql: [
+      `CREATE TABLE IF NOT EXISTS issue_dependencies (
+        id                     TEXT PRIMARY KEY,
+        project_id             TEXT NOT NULL,
+        repo                   TEXT NOT NULL,
+        issue_number           INTEGER NOT NULL,
+        blocked_by_repo        TEXT NOT NULL,
+        blocked_by_issue_number INTEGER NOT NULL,
+        resolved               INTEGER NOT NULL DEFAULT 0,
+        created_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+      )`,
+      'CREATE INDEX IF NOT EXISTS idx_issue_deps_blocked_by ON issue_dependencies(blocked_by_repo, blocked_by_issue_number)',
+      'CREATE INDEX IF NOT EXISTS idx_issue_deps_issue ON issue_dependencies(repo, issue_number)',
+    ],
+  },
 ];
 
 /**

@@ -13,13 +13,14 @@
 
 import { randomUUID } from 'node:crypto';
 import { getDrizzle } from '../db/drizzle.js';
-import { workflows as workflowsTable, workflowRuns, workflowStepRuns, workflowProjects } from '../db/drizzle-schema.js';
+import { workflows as workflowsTable, workflowRuns, workflowStepRuns, workflowProjects, issueDependencies } from '../db/drizzle-schema.js';
 import { eq, and, desc, sql, inArray } from 'drizzle-orm';
 import { dispatchWebhook } from './webhook-dispatcher.js';
 import { broadcast } from '../utils/event-bus.js';
 import { getArtifactContextBlock } from '../routes/workflow-artifacts.js';
 import { projectsRepo, agentsRepo, instancesRepo } from '../repositories/index.js';
 import { getNodeClient } from '../infrastructure/node-client.js';
+import { eventBus } from '../infrastructure/event-bus.js';
 
 // Types — mirror shared package types locally to avoid build ordering issues
 interface WorkflowStep {
@@ -406,6 +407,13 @@ async function advanceRun(
           failedStepName: failedStep?.name,
           failureDetail: failedStepRun.output ?? undefined,
         }),
+      });
+    }
+
+    // ── Auto-dispatch unblocked issues (#159) ────────────────────────
+    if (finalStatus === 'completed') {
+      checkAndDispatchUnblockedIssues(run).catch((err: Error) => {
+        console.error('[workflow-engine] Failed to check unblocked issues:', err.message);
       });
     }
   } else if (anyGated) {
@@ -1653,4 +1661,81 @@ export function getGateUpstreamSteps(
     const step = workflow.steps.find(s => s.id === depId);
     return { id: depId, name: step?.name ?? depId };
   });
+}
+
+// ── Auto-dispatch unblocked issues (#159) ────────────────────────────
+
+/**
+ * Called after a workflow run completes successfully.
+ * Marks any dependencies on the completed issue as resolved, then checks
+ * if any previously-blocked issues are now fully unblocked.
+ * If so (and the WIP limit allows), emits an event to trigger triage.
+ */
+async function checkAndDispatchUnblockedIssues(run: WorkflowRun): Promise<void> {
+  const vars = (run.context as any)?._vars ?? {};
+  const issueNumber = vars.issueNumber as number | undefined;
+  const issueRepo = vars.issueRepo as string | undefined;
+
+  if (!issueNumber || !issueRepo) {
+    // Run wasn't triggered by a GitHub issue — nothing to unblock
+    return;
+  }
+
+  const db = getDrizzle();
+
+  // Mark all dependencies where this issue was the blocker as resolved
+  db.run(sql`
+    UPDATE issue_dependencies
+    SET resolved = 1
+    WHERE blocked_by_repo = ${issueRepo}
+      AND blocked_by_issue_number = ${issueNumber}
+      AND resolved = 0
+  `);
+
+  // Find issues that were blocked by this one
+  const dependents = db.select().from(issueDependencies)
+    .where(
+      and(
+        eq(issueDependencies.blockedByRepo, issueRepo),
+        eq(issueDependencies.blockedByIssueNumber, issueNumber),
+      ),
+    )
+    .all();
+
+  if (dependents.length === 0) return;
+
+  for (const dep of dependents) {
+    // Check if ALL blockers for this dependent issue are now resolved
+    const unresolvedCount = db.all(sql`
+      SELECT COUNT(*) as cnt
+      FROM issue_dependencies
+      WHERE repo = ${dep.repo}
+        AND issue_number = ${dep.issueNumber}
+        AND resolved = 0
+    `) as Array<{ cnt: number }>;
+
+    const remaining = unresolvedCount[0]?.cnt ?? 0;
+    if (remaining > 0) {
+      console.log(`[workflow-engine] Issue #${dep.issueNumber} in ${dep.repo} still has ${remaining} unresolved blocker(s) — skipping`);
+      continue;
+    }
+
+    // Check WIP limit for the project
+    const activeRuns = getActiveWorkflowRuns().filter(r => r.projectId === dep.projectId);
+    const project = projectsRepo.get(dep.projectId);
+    const maxConcurrent = project?.maxConcurrent ?? 3;
+
+    if (activeRuns.length >= maxConcurrent) {
+      console.log(`[workflow-engine] WIP limit (${maxConcurrent}) reached for project "${project?.name ?? dep.projectId}" — issue #${dep.issueNumber} will be picked up on next completion`);
+      continue;
+    }
+
+    // All blockers resolved and WIP allows — emit event to trigger triage
+    console.log(`[workflow-engine] Issue #${dep.issueNumber} in ${dep.repo} is now unblocked — emitting issue.unblocked`);
+    eventBus.emit('issue.unblocked', {
+      projectId: dep.projectId,
+      repo: dep.repo,
+      issueNumber: dep.issueNumber,
+    });
+  }
 }
