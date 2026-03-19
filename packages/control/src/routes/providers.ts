@@ -12,6 +12,7 @@ import type { ModelProvider, ProviderApiKey } from '@coderage-labs/armada-shared
 registerToolDef({
   category: 'system',
   name: 'armada_providers_list',
+  scope: 'models:read',
   description: 'List all model providers (Anthropic, OpenAI, OpenRouter, Google).',
   method: 'GET', path: '/api/providers', parameters: [],
 });
@@ -19,6 +20,7 @@ registerToolDef({
 registerToolDef({
   category: 'system',
   name: 'armada_provider_get',
+  scope: 'models:read',
   description: 'Get a model provider by ID.',
   method: 'GET', path: '/api/providers/:id',
   parameters: [{ name: 'id', type: 'string', description: 'Provider ID', required: true }],

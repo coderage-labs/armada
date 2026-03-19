@@ -10,6 +10,7 @@ const router = Router();
 registerToolDef({
   category: 'hierarchy',
   name: 'armada_hierarchy',
+  scope: 'agents:read',
   description: 'Get the task routing rules. Shows which roles can assign tasks to which other roles.',
   method: 'GET', path: '/api/hierarchy',
   parameters: [],

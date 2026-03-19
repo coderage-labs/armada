@@ -20,6 +20,7 @@ const armadaVersion: string = JSON.parse(readFileSync(pkgPath, 'utf-8')).version
 registerToolDef({
   category: 'system',
   name: 'armada_health',
+  scope: 'system:read',
   description: 'Quick health check — agent count and uptime.',
   method: 'GET', path: '/api/health',
   parameters: [],
@@ -28,6 +29,7 @@ registerToolDef({
 registerToolDef({
   category: 'system',
   name: 'armada_system_status',
+  scope: 'system:read',
   description: 'Full armada system status — agent counts, node health, resource usage (CPU, memory, disk).',
   method: 'GET', path: '/api/status',
   parameters: [],

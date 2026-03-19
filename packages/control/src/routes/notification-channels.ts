@@ -10,6 +10,7 @@ import { registerToolDef } from '../utils/tool-registry.js';
 registerToolDef({
   category: 'notifications',
   name: 'armada_notification_channels_list',
+  scope: 'system:read',
   description: 'List all configured notification channels.',
   method: 'GET',
   path: '/api/notification-channels',

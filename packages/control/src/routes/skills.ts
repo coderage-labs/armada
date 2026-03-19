@@ -16,6 +16,7 @@ registerToolDef({
 registerToolDef({
   category: 'plugins',
   name: 'armada_agent_skills',
+  scope: 'plugins:read',
   description: 'List skills installed on a specific agent.',
   method: 'GET', path: '/api/agents/:name/skills',
   parameters: [

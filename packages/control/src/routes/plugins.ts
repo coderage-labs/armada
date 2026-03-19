@@ -12,6 +12,7 @@ const router = Router();
 registerToolDef({
   category: 'plugins',
   name: 'armada_plugins',
+  scope: 'plugins:read',
   description: 'List all plugins available in the armada shared plugins directory.',
   method: 'GET', path: '/api/plugins',
   parameters: [],

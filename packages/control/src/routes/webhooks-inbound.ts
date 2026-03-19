@@ -21,6 +21,7 @@ const mgmtRouter = Router();
 registerToolDef({
   category: 'integrations',
   name: 'armada_inbound_webhooks_list',
+  scope: 'webhooks:read',
   description: 'List all configured inbound webhooks.',
   method: 'GET',
   path: '/api/webhooks/inbound',

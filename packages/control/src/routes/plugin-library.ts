@@ -69,6 +69,7 @@ registerToolDef({
 registerToolDef({
   category: 'plugins',
   name: 'armada_plugin_library_usage',
+  scope: 'plugins:read',
   description: 'Get which templates use a library plugin.',
   method: 'GET', path: '/api/plugins/library/:id/usage',
   parameters: [

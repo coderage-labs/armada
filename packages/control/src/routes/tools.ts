@@ -18,6 +18,7 @@ registerToolDef({
 registerToolDef({
   category: 'tools',
   name: 'armada_tools_list',
+  scope: 'system:read',
   description: 'List binary tools installed on the node agent.',
   method: 'GET',
   path: '/api/tools',

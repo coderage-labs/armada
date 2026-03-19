@@ -7,6 +7,7 @@ const router = Router();
 registerToolDef({
   category: 'admin',
   name: 'armada_deploys',
+  scope: 'system:read',
   description: 'List recent deployment history for agents.',
   method: 'GET', path: '/api/deploys',
   parameters: [],

@@ -69,6 +69,7 @@ registerToolDef({
 registerToolDef({
   category: 'plugins',
   name: 'armada_skill_library_usage',
+  scope: 'plugins:read',
   description: 'Get which templates use a library skill.',
   method: 'GET', path: '/api/skills/library/:id/usage',
   parameters: [

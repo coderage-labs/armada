@@ -80,6 +80,7 @@ router.get('/stream', (req, res) => {
 registerToolDef({
   category: 'tasks',
   name: 'armada_activity_list',
+  scope: 'tasks:read',
   description: 'List recent armada activity events with optional filtering by agent or event type',
   method: 'GET',
   path: '/api/activity',
