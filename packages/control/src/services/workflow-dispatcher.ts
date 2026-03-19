@@ -6,7 +6,7 @@
 
 import { agentsRepo, instancesRepo, projectsRepo } from '../repositories/index.js';
 import { tasksRepo } from '../repositories/index.js';
-import { setWorkflowDispatcher, setWorkflowNotifier, onStepCompleted } from './workflow-engine.js';
+import { setWorkflowDispatcher, setWorkflowNotifier, setWorkspaceCleanupFn, onStepCompleted } from './workflow-engine.js';
 import { getAgentsByRoleWithCapacity } from './health-monitor.js';
 import { notifyGate, notifyCompletion } from './user-notifier.js';
 import { getNodeClient } from '../infrastructure/node-client.js';
@@ -151,12 +151,18 @@ export function initWorkflowDispatcher() {
           ? issueTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30).replace(/-+$/, '')
           : 'impl';
         const branch = `feature/${issueNumber ? `${issueNumber}-` : ''}${slugTitle}`;
-        // Use step-specific path to avoid collisions in multi-repo workflows
-        const workPath = `/tmp/work/${opts.stepId}/${repoName}`;
+        let workPath: string | undefined;
         try {
           const wsNode = getNodeClient(instance.nodeId);
-          await wsNode.cloneWorkspace(instance.name, targetRepo, branch, workPath);
-          console.log(`[workflow-dispatcher] Provisioned workspace for step "${opts.stepId}": ${workPath} (branch: ${branch})`);
+          const provisionResult = await wsNode.provisionWorkspace(instance.name, {
+            repo: targetRepo,
+            branch,
+            stepId: opts.stepId,
+            runId: opts.runId,
+            installCmd: undefined, // Let the node discover from armada.json
+          });
+          workPath = provisionResult.path;
+          console.log(`[workflow-dispatcher] Provisioned worktree for step "${opts.stepId}": ${workPath} (branch: ${branch})`);
 
           // Run workspace discovery after clone to inject stack info into the task prompt
           try {
@@ -274,6 +280,11 @@ export function initWorkflowDispatcher() {
     }
   });
 
+  // ── Register workspace cleanup hook ──────────────────────────────────
+  setWorkspaceCleanupFn(async (run) => {
+    await cleanupWorkspacesForRun(run.id);
+  });
+
   console.log('🔄 Workflow dispatcher initialized');
 }
 
@@ -318,6 +329,54 @@ async function _cleanupWorktreeForTask(taskId: string): Promise<void> {
   }
   // cleanupWorktree already removes from _activeWorktrees; remove from local map too
   _worktreeTasks.delete(taskId);
+}
+
+/**
+ * Clean up all workspace worktrees provisioned for a workflow run.
+ * Finds the agent/instance that ran this run's steps and calls cleanupWorkspaces.
+ */
+async function cleanupWorkspacesForRun(runId: string): Promise<void> {
+  // Find steps that were run with a task in this run (any step run with an agent assigned)
+  // We need the instance name — look up from any agent that ran steps in this run
+  const stepRunsWithAgents = Array.from(_worktreeTasks.entries())
+    .filter(([taskId]) => taskId.startsWith(`wf-${runId.slice(0, 8)}`));
+
+  // Also query tasks repo to find which agents ran steps for this run
+  const runTasks = tasksRepo.getAll?.().filter((t: any) => t.workflowRunId === runId) ?? [];
+
+  const instanceNames = new Set<string>();
+
+  for (const task of runTasks) {
+    if (!task.toAgent) continue;
+    const agentRecord = agentsRepo.getAll().find((a: any) => a.name === task.toAgent);
+    const instance = agentRecord?.instanceId ? instancesRepo.getById(agentRecord.instanceId) : undefined;
+    if (instance?.name) {
+      instanceNames.add(instance.name);
+    }
+  }
+
+  if (instanceNames.size === 0) {
+    // No agents found — nothing to clean up
+    console.log(`[workflow-dispatcher] No instances found for run ${runId.slice(0, 8)} — skipping workspace cleanup`);
+    return;
+  }
+
+  for (const instanceName of instanceNames) {
+    try {
+      const agentRecord = agentsRepo.getAll().find((a: any) => {
+        const inst = a.instanceId ? instancesRepo.getById(a.instanceId) : undefined;
+        return inst?.name === instanceName;
+      });
+      const instance = agentRecord?.instanceId ? instancesRepo.getById(agentRecord.instanceId) : undefined;
+      if (!instance?.nodeId) continue;
+
+      const wsNode = getNodeClient(instance.nodeId);
+      const result = await wsNode.cleanupWorkspaces(instanceName, runId);
+      console.log(`[workflow-dispatcher] Cleaned up ${result.cleaned} worktree(s) for run ${runId.slice(0, 8)} on instance ${instanceName}`);
+    } catch (err: any) {
+      console.warn(`[workflow-dispatcher] Workspace cleanup failed for run ${runId.slice(0, 8)} on instance ${instanceName}: ${err.message}`);
+    }
+  }
 }
 
 /**

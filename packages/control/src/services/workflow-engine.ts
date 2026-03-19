@@ -234,6 +234,7 @@ interface NotifyOptions {
 
 let _dispatchFn: DispatchFn | null = null;
 let _notifyFn: ((opts: NotifyOptions) => void) | null = null;
+let _cleanupWorkspacesFn: ((run: { id: string }) => Promise<void>) | null = null;
 
 export function setWorkflowDispatcher(fn: DispatchFn) {
   _dispatchFn = fn;
@@ -241,6 +242,14 @@ export function setWorkflowDispatcher(fn: DispatchFn) {
 
 export function setWorkflowNotifier(fn: (opts: NotifyOptions) => void) {
   _notifyFn = fn;
+}
+
+/**
+ * Register a callback to clean up workspace worktrees when a run finishes.
+ * Called fire-and-forget after a run transitions to completed/failed/cancelled.
+ */
+export function setWorkspaceCleanupFn(fn: (run: { id: string }) => Promise<void>) {
+  _cleanupWorkspacesFn = fn;
 }
 
 // ── Start a workflow run ────────────────────────────────────────────
@@ -414,6 +423,16 @@ async function advanceRun(
     getDrizzle().run(sql`
       UPDATE workflow_runs SET status = ${finalStatus}, completed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ${run.id}
     `);
+
+    // ── Clean up workspace worktrees for this run ──────────────────────
+    if (_cleanupWorkspacesFn) {
+      const completedRun = getRunById(run.id);
+      if (completedRun) {
+        _cleanupWorkspacesFn(completedRun).catch((err: Error) => {
+          console.error(`[workflow-engine] Workspace cleanup failed for run ${run.id}: ${err.message}`);
+        });
+      }
+    }
 
     // ── Auto-close GitHub issue on workflow completion ──────────────────
     if (finalStatus === 'completed' && run.triggerRef) {
@@ -1201,6 +1220,16 @@ export async function cancelRun(runId: string): Promise<void> {
   db.run(sql`UPDATE workflow_runs SET status = 'cancelled', completed_at = ${now} WHERE id = ${runId}`);
   db.run(sql`UPDATE workflow_step_runs SET status = 'cancelled', completed_at = ${now} WHERE run_id = ${runId} AND status = 'running'`);
   db.run(sql`UPDATE workflow_step_runs SET status = 'skipped' WHERE run_id = ${runId} AND status IN ('pending', 'waiting_gate', 'waiting_for_rework')`);
+
+  // Clean up workspace worktrees for this run
+  if (_cleanupWorkspacesFn) {
+    const cancelledRun = getRunById(runId);
+    if (cancelledRun) {
+      _cleanupWorkspacesFn(cancelledRun).catch((err: Error) => {
+        console.error(`[workflow-engine] Workspace cleanup failed for cancelled run ${runId}: ${err.message}`);
+      });
+    }
+  }
 
   // Fire-and-forget abort requests to running agents
   for (const stepRun of runningSteps) {

@@ -428,6 +428,49 @@ export class WsNodeClient {
   }
 
   /**
+   * Provision a git worktree for a workflow step inside an instance container.
+   * Uses a persistent base repo at /data/repos/{org}/{repoName} (clones once, fetches on reuse).
+   * Creates an isolated worktree at /data/worktrees/{runId[0:8]}/{stepId}.
+   * Automatically runs `npm ci` or armada.json install after checkout.
+   *
+   * @param instanceName  Instance name (without the armada-instance- prefix)
+   * @param opts.repo     GitHub repo in "owner/repo" format or full https/git URL
+   * @param opts.branch   Branch name to create in the worktree
+   * @param opts.stepId   Step ID (used as the worktree subdirectory name)
+   * @param opts.runId    Run ID (first 8 chars used as the run directory name)
+   * @param opts.installCmd  Optional custom install command (overrides auto-detection)
+   */
+  async provisionWorkspace(
+    instanceName: string,
+    opts: {
+      repo: string;
+      branch: string;
+      stepId: string;
+      runId: string;
+      installCmd?: string;
+    },
+  ): Promise<{ path: string; branch: string; status: string }> {
+    const containerName = `armada-instance-${instanceName}`;
+    return this.send('workspace.provision', { instanceId: containerName, ...opts }, 300_000) as Promise<{
+      path: string;
+      branch: string;
+      status: string;
+    }>;
+  }
+
+  /**
+   * Clean up all worktrees created for a workflow run.
+   * Removes all worktrees under /data/worktrees/{runId[0:8]}/ inside the container.
+   *
+   * @param instanceName  Instance name (without the armada-instance- prefix)
+   * @param runId         Run ID (first 8 chars used to locate worktrees)
+   */
+  async cleanupWorkspaces(instanceName: string, runId: string): Promise<{ cleaned: number }> {
+    const containerName = `armada-instance-${instanceName}`;
+    return this.send('workspace.cleanup', { instanceId: containerName, runId }, 60_000) as Promise<{ cleaned: number }>;
+  }
+
+  /**
    * Discover workspace stacks and armada.json config inside a container.
    * Walks up to 2 levels deep detecting Node, Go, Python, Rust, Terraform, Java, etc.
    *
