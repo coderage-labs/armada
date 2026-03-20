@@ -732,7 +732,7 @@ export default function register(api: any) {
   if (getApiBaseUrl()) {
     api.registerTool({
       name: 'armada_find_tools',
-      description: 'Search and load Armada tools on demand. Call with a search query (e.g. "create issue", "manage workflows") or a category name (instances, projects, issues, workflows, git, changesets, integrations, notifications, system, hierarchy, plugins, admin, tasks, tools). Matching tools are registered and available on your NEXT turn. Call armada_find_tools("all") to load everything.',
+      description: 'Search and load Armada tools on demand. Call with a search query (e.g. "create issue", "manage workflows") or a category name (instances, projects, issues, workflows, git, changesets, integrations, notifications, system, hierarchy, plugins, admin, tasks, tools, codebase). Matching tools are registered and available on your NEXT turn. Call armada_find_tools("all") to load everything.',
       parameters: {
         type: 'object',
         properties: {
