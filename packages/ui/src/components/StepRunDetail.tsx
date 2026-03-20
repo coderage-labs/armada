@@ -7,6 +7,10 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from './ui/button';
 import {
+  AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction,
+} from './ui/alert-dialog';
+import {
   CheckCircle2, XCircle, RotateCcw, ChevronDown, ChevronRight,
   ExternalLink, Send, User,
 } from 'lucide-react';
@@ -138,15 +142,18 @@ export default function StepRunDetail({ step, onAction, showPrompt }: Props) {
     }
   }
 
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+
   async function handleReject() {
-    const reason = window.prompt('Rejection reason (optional):');
-    if (reason === null) return;
     setActing(true);
     try {
       await apiFetch(`/api/workflows/runs/${step.runId}/reject/${step.stepId}`, {
         method: 'POST',
-        body: JSON.stringify({ reason: reason || 'Rejected via UI' }),
+        body: JSON.stringify({ reason: rejectReason || 'Rejected via UI' }),
       });
+      setRejectOpen(false);
+      setRejectReason('');
       onAction();
     } catch (err) {
       console.error('Reject failed:', err);
@@ -342,14 +349,40 @@ export default function StepRunDetail({ step, onAction, showPrompt }: Props) {
               Approve
             </Button>
             <Button
-             variant="destructive"
+              variant="destructive"
               size="sm"
-              onClick={handleReject}
+              onClick={() => setRejectOpen(true)}
               disabled={acting}
             >
               <XCircle className="w-3.5 h-3.5" />
               Reject
             </Button>
+            <AlertDialog open={rejectOpen} onOpenChange={setRejectOpen}>
+              <AlertDialogContent className="bg-zinc-900 border-zinc-700">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="text-zinc-100">Reject this gate?</AlertDialogTitle>
+                  <AlertDialogDescription className="text-zinc-400">
+                    This will fail the workflow run. You can optionally provide a reason.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <Input
+                  placeholder="Reason (optional)"
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  className="bg-zinc-800 border-zinc-700 text-zinc-200"
+                />
+                <AlertDialogFooter>
+                  <AlertDialogCancel className="bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700">Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleReject}
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                    disabled={acting}
+                  >
+                    {acting ? 'Rejecting...' : 'Reject'}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </>
         )}
         {(step.status === 'completed' || step.status === 'failed') && step.gate !== 'manual' && (
