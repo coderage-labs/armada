@@ -106,6 +106,14 @@ interface FileContextResponse {
 
 /* ── Helpers ───────────────────────────────────────── */
 
+/** Normalise language variants into display names */
+function normaliseLanguage(lang: string): string {
+  const l = lang.toLowerCase();
+  if (l === 'tsx' || l === 'typescript') return 'TypeScript';
+  if (l === 'jsx' || l === 'javascript') return 'JavaScript';
+  return lang.charAt(0).toUpperCase() + lang.slice(1);
+}
+
 function getLanguageColor(language: string): string {
   const lang = language.toLowerCase();
   if (lang.includes('typescript') || lang === 'tsx') return '#3178c6';
@@ -220,6 +228,7 @@ function GraphView({ repo, onFileSelect }: GraphViewProps) {
             position: { x, y },
             data: {
               label: `${item.id.split('/').pop()} (${item.symbolCount})`,
+              language: normaliseLanguage(item.language),
             },
             style: {
               background: getLanguageColor(item.language),
@@ -247,8 +256,8 @@ function GraphView({ repo, onFileSelect }: GraphViewProps) {
           animated: false,
         }));
 
-      // Track unique languages
-      const langs = [...new Set(graph.nodes.map(n => n.language))].sort();
+      // Track unique languages (normalised)
+      const langs = [...new Set(graph.nodes.map(n => normaliseLanguage(n.language)))].sort();
       setAllLanguages(langs);
       setHiddenLanguages(new Set());
 
@@ -265,17 +274,14 @@ function GraphView({ repo, onFileSelect }: GraphViewProps) {
   const filteredNodes = useMemo(() => {
     if (hiddenLanguages.size === 0) return nodes;
     return nodes.map(n => {
-      // Find the language from allLanguages by checking node style color
-      const isHidden = allLanguages.some(lang =>
-        hiddenLanguages.has(lang) && n.style?.background === getLanguageColor(lang)
-      );
+      const isHidden = hiddenLanguages.has((n.data as any)?.language || '');
       return {
         ...n,
         hidden: isHidden,
         style: isHidden ? { ...n.style, opacity: 0.1 } : n.style,
       };
     });
-  }, [nodes, hiddenLanguages, allLanguages]);
+  }, [nodes, hiddenLanguages]);
 
   const filteredEdges = useMemo(() => {
     if (hiddenLanguages.size === 0) return edges;
