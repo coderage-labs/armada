@@ -244,15 +244,22 @@ function GraphView({ repo, onFileSelect }: GraphViewProps) {
         .map(e => ({ source: nodeIdxMap.get(e.source)!, target: nodeIdxMap.get(e.target)! }));
 
       // Run force simulation
+      // Scale forces based on node count — more nodes need more space
+      const nodeCount = simNodes.length;
+      const repulsion = nodeCount > 100 ? -800 : nodeCount > 50 ? -500 : -300;
+      const linkDist = nodeCount > 100 ? 250 : nodeCount > 50 ? 180 : 120;
+      const collideRadius = nodeCount > 100 ? 70 : 50;
+
       const sim = forceSimulation<SimNode>(simNodes)
-        .force('link', forceLink<SimNode, SimulationLinkDatum<SimNode>>(simLinks).distance(120).strength(0.3))
-        .force('charge', forceManyBody<SimNode>().strength(-200))
-        .force('center', forceCenter(600, 400))
-        .force('collide', forceCollide<SimNode>().radius(40))
+        .force('link', forceLink<SimNode, SimulationLinkDatum<SimNode>>(simLinks).distance(linkDist).strength(0.2))
+        .force('charge', forceManyBody<SimNode>().strength(repulsion))
+        .force('center', forceCenter(800, 600))
+        .force('collide', forceCollide<SimNode>().radius(collideRadius).strength(0.8))
         .stop();
 
-      // Run simulation synchronously (300 ticks)
-      for (let i = 0; i < 300; i++) sim.tick();
+      // More ticks for larger graphs to settle properly
+      const ticks = nodeCount > 100 ? 500 : 300;
+      for (let i = 0; i < ticks; i++) sim.tick();
 
       // Convert to ReactFlow nodes
       const newNodes: Node[] = simNodes.map(sn => {
