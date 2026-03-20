@@ -169,6 +169,17 @@ function GraphView({ repo, onFileSelect }: GraphViewProps) {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [loading, setLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [allLanguages, setAllLanguages] = useState<string[]>([]);
+  const [hiddenLanguages, setHiddenLanguages] = useState<Set<string>>(new Set());
+
+  function toggleLanguage(lang: string) {
+    setHiddenLanguages(prev => {
+      const next = new Set(prev);
+      if (next.has(lang)) next.delete(lang);
+      else next.add(lang);
+      return next;
+    });
+  }
 
   useEffect(() => {
     loadGraph();
@@ -236,6 +247,11 @@ function GraphView({ repo, onFileSelect }: GraphViewProps) {
           animated: false,
         }));
 
+      // Track unique languages
+      const langs = [...new Set(graph.nodes.map(n => n.language))].sort();
+      setAllLanguages(langs);
+      setHiddenLanguages(new Set());
+
       setNodes(newNodes);
       setEdges(newEdges);
     } catch (err: any) {
@@ -244,6 +260,34 @@ function GraphView({ repo, onFileSelect }: GraphViewProps) {
       setLoading(false);
     }
   }
+
+  // Filter nodes/edges when hiddenLanguages changes
+  const filteredNodes = useMemo(() => {
+    if (hiddenLanguages.size === 0) return nodes;
+    return nodes.map(n => {
+      // Find the language from allLanguages by checking node style color
+      const isHidden = allLanguages.some(lang =>
+        hiddenLanguages.has(lang) && n.style?.background === getLanguageColor(lang)
+      );
+      return {
+        ...n,
+        hidden: isHidden,
+        style: isHidden ? { ...n.style, opacity: 0.1 } : n.style,
+      };
+    });
+  }, [nodes, hiddenLanguages, allLanguages]);
+
+  const filteredEdges = useMemo(() => {
+    if (hiddenLanguages.size === 0) return edges;
+    const visibleNodeIds = new Set(filteredNodes.filter(n => !n.hidden).map(n => n.id));
+    return edges.map(e => ({
+      ...e,
+      hidden: !visibleNodeIds.has(e.source) || !visibleNodeIds.has(e.target),
+      style: (!visibleNodeIds.has(e.source) || !visibleNodeIds.has(e.target))
+        ? { ...e.style, opacity: 0.05 }
+        : e.style,
+    }));
+  }, [edges, filteredNodes, hiddenLanguages]);
 
   function handleNodeClick(event: React.MouseEvent, node: Node) {
     setSelectedFile(node.id);
@@ -262,8 +306,8 @@ function GraphView({ repo, onFileSelect }: GraphViewProps) {
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 overflow-hidden" style={{ height: '600px' }}>
       <ReactFlow
-        nodes={nodes}
-        edges={edges}
+        nodes={filteredNodes}
+        edges={filteredEdges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={handleNodeClick}
@@ -277,30 +321,31 @@ function GraphView({ repo, onFileSelect }: GraphViewProps) {
         <MiniMap className="bg-zinc-900 border border-zinc-700" nodeColor={(n) => n.style?.background as string || '#6b7280'} />
         <Panel position="top-left" className="bg-zinc-800/90 backdrop-blur border border-zinc-700 rounded-lg p-3 text-xs text-zinc-300">
           <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full" style={{ background: getLanguageColor('typescript') }} />
-              <span>TypeScript</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full" style={{ background: getLanguageColor('javascript') }} />
-              <span>JavaScript</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full" style={{ background: getLanguageColor('python') }} />
-              <span>Python</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full" style={{ background: getLanguageColor('go') }} />
-              <span>Go</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full" style={{ background: getLanguageColor('json') }} />
-              <span>JSON</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full" style={{ background: getLanguageColor('other') }} />
-              <span>Other</span>
-            </div>
+            <span className="text-[10px] uppercase text-zinc-500 tracking-wider mb-1">Languages (click to filter)</span>
+            {allLanguages.map(lang => {
+              const isHidden = hiddenLanguages.has(lang);
+              return (
+                <button
+                  key={lang}
+                  onClick={() => toggleLanguage(lang)}
+                  className={`flex items-center gap-2 hover:text-white transition-colors text-left ${isHidden ? 'opacity-40 line-through' : ''}`}
+                >
+                  <span
+                    className="w-3 h-3 rounded-full shrink-0"
+                    style={{ background: isHidden ? '#52525b' : getLanguageColor(lang) }}
+                  />
+                  <span>{lang}</span>
+                </button>
+              );
+            })}
+            {hiddenLanguages.size > 0 && (
+              <button
+                onClick={() => setHiddenLanguages(new Set())}
+                className="text-violet-400 hover:text-violet-300 mt-1 text-left"
+              >
+                Show all
+              </button>
+            )}
           </div>
         </Panel>
       </ReactFlow>
