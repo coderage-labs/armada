@@ -185,6 +185,9 @@ function GraphView({ repo, onFileSelect }: GraphViewProps) {
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [allLanguages, setAllLanguages] = useState<string[]>([]);
   const [hiddenLanguages, setHiddenLanguages] = useState<Set<string>>(new Set());
+  const [highlightedNode, setHighlightedNode] = useState<string | null>(null);
+  // Pre-computed adjacency for fast highlight lookup
+  const [adjacency, setAdjacency] = useState<Map<string, Set<string>>>(new Map());
 
   function toggleLanguage(lang: string) {
     setHiddenLanguages(prev => {
@@ -293,6 +296,16 @@ function GraphView({ repo, onFileSelect }: GraphViewProps) {
       setAllLanguages(langs);
       setHiddenLanguages(new Set());
 
+      // Build adjacency map for highlight lookups
+      const adj = new Map<string, Set<string>>();
+      for (const e of validEdges) {
+        if (!adj.has(e.source)) adj.set(e.source, new Set());
+        if (!adj.has(e.target)) adj.set(e.target, new Set());
+        adj.get(e.source)!.add(e.target);
+        adj.get(e.target)!.add(e.source);
+      }
+      setAdjacency(adj);
+
       setNodes(newNodes);
       setEdges(newEdges);
     } catch (err: any) {
@@ -303,33 +316,73 @@ function GraphView({ repo, onFileSelect }: GraphViewProps) {
   }
 
   // Filter nodes/edges when hiddenLanguages changes
+  // Connected nodes for current highlight
+  const highlightSet = useMemo(() => {
+    if (!highlightedNode) return null;
+    const connected = new Set<string>([highlightedNode]);
+    const neighbours = adjacency.get(highlightedNode);
+    if (neighbours) neighbours.forEach(n => connected.add(n));
+    return connected;
+  }, [highlightedNode, adjacency]);
+
   const filteredNodes = useMemo(() => {
-    if (hiddenLanguages.size === 0) return nodes;
     return nodes.map(n => {
-      const isHidden = hiddenLanguages.has((n.data as any)?.language || '');
+      const lang = (n.data as any)?.language || '';
+      const langDimmed = hiddenLanguages.size > 0 && hiddenLanguages.has(lang);
+      const highlightDimmed = highlightSet && !highlightSet.has(n.id);
+      const dimmed = langDimmed || highlightDimmed;
+
       return {
         ...n,
-        hidden: isHidden,
-        style: isHidden ? { ...n.style, opacity: 0.1 } : n.style,
+        style: {
+          ...n.style,
+          opacity: dimmed ? 0.12 : 1,
+          transition: 'opacity 0.2s ease',
+        },
       };
     });
-  }, [nodes, hiddenLanguages]);
+  }, [nodes, hiddenLanguages, highlightSet]);
 
   const filteredEdges = useMemo(() => {
-    if (hiddenLanguages.size === 0) return edges;
-    const visibleNodeIds = new Set(filteredNodes.filter(n => !n.hidden).map(n => n.id));
-    return edges.map(e => ({
-      ...e,
-      hidden: !visibleNodeIds.has(e.source) || !visibleNodeIds.has(e.target),
-      style: (!visibleNodeIds.has(e.source) || !visibleNodeIds.has(e.target))
-        ? { ...e.style, opacity: 0.05 }
-        : e.style,
-    }));
-  }, [edges, filteredNodes, hiddenLanguages]);
+    return edges.map(e => {
+      // Highlight: only show edges connected to the highlighted node
+      const edgeHighlighted = highlightSet
+        ? highlightSet.has(e.source) && highlightSet.has(e.target)
+        : true;
+      // Language filter: dim if either endpoint is language-dimmed
+      const sourceLang = nodes.find(n => n.id === e.source);
+      const targetLang = nodes.find(n => n.id === e.target);
+      const langDimmed = hiddenLanguages.size > 0 && (
+        hiddenLanguages.has((sourceLang?.data as any)?.language || '') ||
+        hiddenLanguages.has((targetLang?.data as any)?.language || '')
+      );
+
+      const dimmed = langDimmed || !edgeHighlighted;
+
+      return {
+        ...e,
+        style: {
+          ...e.style,
+          stroke: edgeHighlighted && highlightSet ? '#a78bfa' : '#52525b',
+          strokeWidth: edgeHighlighted && highlightSet ? 2.5 : 1.5,
+          opacity: dimmed ? 0.06 : 1,
+          transition: 'all 0.2s ease',
+        },
+        animated: edgeHighlighted && !!highlightSet,
+      };
+    });
+  }, [edges, nodes, hiddenLanguages, highlightSet]);
 
   function handleNodeClick(event: React.MouseEvent, node: Node) {
+    // Toggle highlight: click same node to deselect
+    setHighlightedNode(prev => prev === node.id ? null : node.id);
     setSelectedFile(node.id);
     onFileSelect(node.id);
+  }
+
+  function handlePaneClick() {
+    // Click empty space to clear highlight
+    setHighlightedNode(null);
   }
 
   if (loading) {
@@ -349,6 +402,7 @@ function GraphView({ repo, onFileSelect }: GraphViewProps) {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={handleNodeClick}
+        onPaneClick={handlePaneClick}
         fitView
         minZoom={0.05}
         maxZoom={2}
