@@ -206,6 +206,15 @@ router.post('/', requireScope('projects:write'), (req, res) => {
   });
 
   res.status(201).json(repo);
+
+  // Trigger codebase indexing in the background
+  try {
+    const { codebaseRouter } = require('./codebase.js');
+    // Fire and forget — don't block the response
+    import('./codebase.js').then(({ triggerIndex }) => {
+      triggerIndex(fullName, integration.authConfig?.token as string).catch(() => {});
+    }).catch(() => {});
+  } catch { /* codebase module not loaded */ }
 });
 
 // DELETE /api/projects/:id/repos2/:repoId — unlink a repo

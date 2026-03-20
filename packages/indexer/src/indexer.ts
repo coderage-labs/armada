@@ -229,8 +229,48 @@ async function parseSource(
  * './utils' from 'src/index.ts' → 'repoId:src/utils.ts' (or .js, .tsx, etc.)
  */
 function resolveImportPath(repoId: string, fromPath: string, importPath: string, store: GraphStore): string {
-  // Skip external packages
-  if (!importPath.startsWith('.') && !importPath.startsWith('/')) return '';
+  // Skip obvious external packages (no-scope npm packages, node builtins)
+  if (!importPath.startsWith('.') && !importPath.startsWith('/') && !importPath.startsWith('@/') && !importPath.startsWith('~/')) {
+    // Could be a monorepo package alias — try common patterns
+    // Check if it resolves to any indexed file (e.g. @package/shared → packages/shared/src/index.ts)
+    return '';
+  }
+
+  // Handle path aliases: @/ → try common src dirs
+  let effectivePath = importPath;
+  if (importPath.startsWith('@/') || importPath.startsWith('~/')) {
+    const stripped = importPath.slice(2); // remove @/ or ~/
+    // Determine the app root from the importing file's path
+    // e.g. apps/web/src/app/page.tsx → apps/web/src/
+    // e.g. apps/api/src/routes/auth.ts → apps/api/src/
+    const srcMatch = fromPath.match(/^(.*?\/src)\//);
+    const appRoot = srcMatch ? srcMatch[1] : '';
+    if (appRoot) {
+      effectivePath = `./${appRoot}/${stripped}`;
+    } else {
+      // Fallback: try src/ at repo root
+      effectivePath = `./src/${stripped}`;
+    }
+    // Resolve as relative from repo root
+    const candidates = [
+      `${appRoot}/${stripped}`,
+      `${appRoot}/${stripped}.ts`,
+      `${appRoot}/${stripped}.tsx`,
+      `${appRoot}/${stripped}.js`,
+      `${appRoot}/${stripped}/index.ts`,
+      `${appRoot}/${stripped}/index.tsx`,
+      `src/${stripped}`,
+      `src/${stripped}.ts`,
+      `src/${stripped}.tsx`,
+      `src/${stripped}/index.ts`,
+      `src/${stripped}/index.tsx`,
+    ];
+    for (const c of candidates) {
+      const fileId = `${repoId}:${c}`;
+      if (store.getFile(fileId)) return fileId;
+    }
+    return '';
+  }
 
   const fromDir = fromPath.substring(0, fromPath.lastIndexOf('/'));
   const parts = importPath.split('/');

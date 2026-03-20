@@ -91,6 +91,22 @@ function ensureRepoClone(repoFullName: string, token?: string): string {
 
 export const codebaseRouter = Router();
 
+/** Trigger indexing from outside the router (e.g. on repo link) */
+export async function triggerIndex(repoFullName: string, token?: string): Promise<void> {
+  try {
+    const repoDir = ensureRepoClone(repoFullName, token || resolveTokenForRepo(repoFullName));
+    const store = getStore();
+    await indexRepository({
+      repoId: repoFullName, repoFullName, repoPath: repoDir, store,
+      incremental: false,
+      onProgress: (msg: string) => console.log(`[codebase] ${msg}`),
+    });
+    console.log(`[codebase] Auto-indexed ${repoFullName} on link`);
+  } catch (err: any) {
+    console.warn(`[codebase] Auto-index failed for ${repoFullName}: ${err.message}`);
+  }
+}
+
 // Register tool definitions
 for (const tool of CODEBASE_TOOLS) {
   registerToolDef(tool as any);
