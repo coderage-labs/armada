@@ -120,11 +120,12 @@ function normaliseLanguage(lang: string): string {
  * Assigns colours from a palette in order of first appearance,
  * guaranteeing no collisions for up to palette.length languages.
  */
+// Dark palette — all colours chosen to be readable with white text
 const COLOR_PALETTE = [
-  '#e6194b', '#3cb44b', '#4363d8', '#f58231', '#911eb4',
-  '#42d4f4', '#f032e6', '#469990', '#9A6324', '#800000',
-  '#aaffc3', '#808000', '#000075', '#e6beff', '#dcbeff',
-  '#bfef45', '#fabed4', '#ffd8b1', '#fffac8', '#a9a9a9',
+  '#b91c1c', '#15803d', '#1d4ed8', '#b45309', '#7e22ce',
+  '#0e7490', '#a21caf', '#166534', '#92400e', '#7f1d1d',
+  '#4338ca', '#854d0e', '#075985', '#6b21a8', '#3f6212',
+  '#9f1239', '#1e3a5f', '#065f46', '#7c2d12', '#4a044e',
 ];
 
 const _langColorCache = new Map<string, string>();
