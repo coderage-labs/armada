@@ -790,8 +790,33 @@ function FileDetail({ file, repo, onClose }: FileDetailProps) {
 
 /* ── Main Page ─────────────────────────────────────── */
 
+interface RepoInfo {
+  repoId: string;
+  fullName: string;
+  lastIndexedAt: string;
+  fileCount: number;
+  symbolCount: number;
+  importCount: number;
+}
+
 export default function Codebase() {
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [repos, setRepos] = useState<RepoInfo[]>([]);
+  const [selectedRepo, setSelectedRepo] = useState<string>('');
+  const [loadingRepos, setLoadingRepos] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await apiFetch<RepoInfo[]>('/api/codebase/repos');
+        setRepos(data);
+        if (data.length > 0 && !selectedRepo) {
+          setSelectedRepo(data[0].fullName);
+        }
+      } catch { /* ignore */ }
+      setLoadingRepos(false);
+    })();
+  }, []);
 
   return (
     <div className="space-y-6 max-w-7xl">
@@ -801,39 +826,65 @@ export default function Codebase() {
         subtitle="Interactive codebase visualization and exploration"
       />
 
-      {/* Index status at top */}
-      <IndexStatus onReindex={() => {}} />
+      {/* Repo selector */}
+      <div className="flex items-center gap-4">
+        <label className="text-sm text-zinc-400">Repository:</label>
+        {loadingRepos ? (
+          <span className="text-sm text-zinc-500">Loading repos...</span>
+        ) : repos.length === 0 ? (
+          <span className="text-sm text-zinc-500">No indexed repos. Index a repo first via the API.</span>
+        ) : (
+          <select
+            value={selectedRepo}
+            onChange={(e) => setSelectedRepo(e.target.value)}
+            className="bg-zinc-900 border border-zinc-700 rounded-md px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-violet-500"
+          >
+            {repos.map((r) => (
+              <option key={r.fullName} value={r.fullName}>
+                {r.fullName} ({r.fileCount} files, {r.symbolCount} symbols)
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
 
-      {/* Tabs */}
-      <Tabs defaultValue="graph">
-        <TabsList>
-          <TabsTrigger value="graph" className="flex items-center gap-2">
-            <GitBranch className="w-4 h-4" /> Dependency Graph
-          </TabsTrigger>
-          <TabsTrigger value="overview" className="flex items-center gap-2">
-            <Database className="w-4 h-4" /> Architecture
-          </TabsTrigger>
-          <TabsTrigger value="search" className="flex items-center gap-2">
-            <Search className="w-4 h-4" /> Symbol Search
-          </TabsTrigger>
-        </TabsList>
+      {selectedRepo && (
+        <>
+          {/* Index status */}
+          <IndexStatus repo={selectedRepo} onReindex={() => {}} />
 
-        <TabsContent value="graph">
-          <GraphView onFileSelect={setSelectedFile} />
-        </TabsContent>
+          {/* Tabs */}
+          <Tabs defaultValue="graph">
+            <TabsList>
+              <TabsTrigger value="graph" className="flex items-center gap-2">
+                <GitBranch className="w-4 h-4" /> Dependency Graph
+              </TabsTrigger>
+              <TabsTrigger value="overview" className="flex items-center gap-2">
+                <Database className="w-4 h-4" /> Architecture
+              </TabsTrigger>
+              <TabsTrigger value="search" className="flex items-center gap-2">
+                <Search className="w-4 h-4" /> Symbol Search
+              </TabsTrigger>
+            </TabsList>
 
-        <TabsContent value="overview">
-          <ArchitectureOverview />
-        </TabsContent>
+            <TabsContent value="graph">
+              <GraphView repo={selectedRepo} onFileSelect={setSelectedFile} />
+            </TabsContent>
 
-        <TabsContent value="search">
-          <SymbolSearch onFileSelect={setSelectedFile} />
-        </TabsContent>
-      </Tabs>
+            <TabsContent value="overview">
+              <ArchitectureOverview repo={selectedRepo} />
+            </TabsContent>
 
-      {/* File detail sidebar */}
-      {selectedFile && (
-        <FileDetail file={selectedFile} onClose={() => setSelectedFile(null)} />
+            <TabsContent value="search">
+              <SymbolSearch repo={selectedRepo} onFileSelect={setSelectedFile} />
+            </TabsContent>
+          </Tabs>
+
+          {/* File detail sidebar */}
+          {selectedFile && (
+            <FileDetail file={selectedFile} repo={selectedRepo} onClose={() => setSelectedFile(null)} />
+          )}
+        </>
       )}
     </div>
   );

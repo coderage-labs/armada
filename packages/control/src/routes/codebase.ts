@@ -96,6 +96,13 @@ for (const tool of CODEBASE_TOOLS) {
   registerToolDef(tool as any);
 }
 
+// GET /api/codebase/repos — list all indexed repos
+codebaseRouter.get('/repos', requireScope('projects:read'), (_req, res) => {
+  const store = getStore();
+  const repos = store.getAllRepoIndexes();
+  res.json(repos);
+});
+
 codebaseRouter.post('/search', requireScope('projects:read'), (req, res) => {
   const { query, repo, kind } = req.body;
   if (!query) return res.status(400).json({ error: 'query is required' });

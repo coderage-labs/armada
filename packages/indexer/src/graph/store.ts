@@ -112,6 +112,21 @@ export class GraphStore {
     );
   }
 
+  getAllRepoIndexes(): RepoIndex[] {
+    const rows = this.db.prepare('SELECT * FROM repo_index ORDER BY full_name').all() as any[];
+    return rows.map(row => ({
+      repoId: row.repo_id,
+      fullName: row.full_name,
+      lastIndexedAt: row.last_indexed_at,
+      lastCommitHash: row.last_commit_hash,
+      fileCount: row.file_count,
+      symbolCount: row.symbol_count,
+      importCount: row.import_count,
+      languages: JSON.parse(row.languages_json || '{}'),
+      indexDurationMs: row.index_duration_ms,
+    }));
+  }
+
   getRepoIndex(repoId: string): RepoIndex | null {
     const row = this.db.prepare('SELECT * FROM repo_index WHERE repo_id = ?').get(repoId) as any;
     if (!row) return null;
