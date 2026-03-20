@@ -319,7 +319,7 @@ function GraphView({ repo, onFileSelect }: GraphViewProps) {
         <Background color="#27272a" gap={16} />
         <Controls className="!bg-zinc-800 !border-zinc-700 !shadow-lg [&>button]:!bg-zinc-800 [&>button]:!border-zinc-700 [&>button]:!text-zinc-300 [&>button:hover]:!bg-zinc-700 [&>button>svg]:!fill-zinc-300" />
         <MiniMap className="bg-zinc-900 border border-zinc-700" nodeColor={(n) => n.style?.background as string || '#6b7280'} />
-        <Panel position="top-left" className="bg-zinc-800/90 backdrop-blur border border-zinc-700 rounded-lg p-3 text-xs text-zinc-300">
+        {allLanguages.length > 1 && <Panel position="top-left" className="bg-zinc-800/90 backdrop-blur border border-zinc-700 rounded-lg p-3 text-xs text-zinc-300">
           <div className="flex flex-col gap-1">
             <span className="text-[10px] uppercase text-zinc-500 tracking-wider mb-1">Languages (click to filter)</span>
             {allLanguages.map(lang => {
@@ -347,7 +347,7 @@ function GraphView({ repo, onFileSelect }: GraphViewProps) {
               </button>
             )}
           </div>
-        </Panel>
+        </Panel>}
       </ReactFlow>
     </div>
   );
