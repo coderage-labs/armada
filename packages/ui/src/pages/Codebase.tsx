@@ -114,25 +114,38 @@ function normaliseLanguage(lang: string): string {
   return lang.charAt(0).toUpperCase() + lang.slice(1);
 }
 
+// Well-known language colours (official branding), everything else hashed from palette
+const KNOWN_LANGUAGE_COLORS: Record<string, string> = {
+  typescript: '#3178c6',
+  javascript: '#b8860b',
+  python: '#306998',
+  go: '#00add8',
+  rust: '#ce422b',
+  java: '#e76f00',
+};
+
+// Deterministic palette — visually distinct, readable with white text
+const COLOR_PALETTE = [
+  '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899',
+  '#f43f5e', '#ef4444', '#f97316', '#eab308', '#84cc16',
+  '#22c55e', '#14b8a6', '#06b6d4', '#3b82f6', '#6d28d9',
+  '#be185d', '#b45309', '#047857', '#1d4ed8', '#7c3aed',
+  '#c026d3', '#db2777', '#ea580c', '#65a30d', '#0891b2',
+  '#4f46e5', '#9333ea', '#e11d48', '#ca8a04', '#059669',
+];
+
+function hashString(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash);
+}
+
 function getLanguageColor(language: string): string {
-  const lang = language.toLowerCase();
-  if (lang.includes('typescript') || lang === 'tsx') return '#3178c6';
-  if (lang.includes('javascript') || lang === 'jsx') return '#b8860b'; // darker gold, readable with white text
-  if (lang.includes('python')) return '#22c55e';
-  if (lang.includes('go')) return '#00add8';
-  if (lang.includes('rust')) return '#ce422b';
-  if (lang.includes('java') && !lang.includes('javascript')) return '#e76f00';
-  if (lang.includes('json')) return '#8b6914'; // darker gold
-  if (lang.includes('yaml') || lang.includes('yml')) return '#cb171e';
-  if (lang.includes('terraform') || lang.includes('hcl') || lang.includes('tf')) return '#7b42bc';
-  if (lang.includes('markdown') || lang.includes('md')) return '#a855f7';
-  if (lang.includes('docker')) return '#2496ed';
-  if (lang.includes('shell') || lang.includes('bash') || lang.includes('sh')) return '#4eaa25';
-  if (lang.includes('css') || lang.includes('scss')) return '#264de4';
-  if (lang.includes('html')) return '#e34c26';
-  if (lang.includes('sql')) return '#336791';
-  if (lang.includes('toml')) return '#9c4221';
-  return '#6b7280';
+  const normalised = normaliseLanguage(language).toLowerCase();
+  if (KNOWN_LANGUAGE_COLORS[normalised]) return KNOWN_LANGUAGE_COLORS[normalised];
+  return COLOR_PALETTE[hashString(normalised) % COLOR_PALETTE.length];
 }
 
 function getKindBadgeColor(kind: string): string {
