@@ -268,10 +268,12 @@ function GraphView({ repo, onFileSelect }: GraphViewProps) {
         onEdgesChange={onEdgesChange}
         onNodeClick={handleNodeClick}
         fitView
+        minZoom={0.05}
+        maxZoom={2}
         className="bg-zinc-950"
       >
         <Background color="#27272a" gap={16} />
-        <Controls className="bg-zinc-800 border border-zinc-700" />
+        <Controls className="!bg-zinc-800 !border-zinc-700 !shadow-lg [&>button]:!bg-zinc-800 [&>button]:!border-zinc-700 [&>button]:!text-zinc-300 [&>button:hover]:!bg-zinc-700 [&>button>svg]:!fill-zinc-300" />
         <MiniMap className="bg-zinc-900 border border-zinc-700" nodeColor={(n) => n.style?.background as string || '#6b7280'} />
         <Panel position="top-left" className="bg-zinc-800/90 backdrop-blur border border-zinc-700 rounded-lg p-3 text-xs text-zinc-300">
           <div className="flex flex-col gap-1">
