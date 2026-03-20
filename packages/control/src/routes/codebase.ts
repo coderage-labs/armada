@@ -103,6 +103,53 @@ codebaseRouter.get('/repos', requireScope('projects:read'), (_req, res) => {
   res.json(repos);
 });
 
+// POST /api/codebase/graph — full dependency graph for visualisation
+codebaseRouter.post('/graph', requireScope('projects:read'), (req, res) => {
+  const { repo } = req.body;
+  if (!repo) return res.status(400).json({ error: 'repo is required' });
+  const store = getStore();
+  const files = store.getFilesByRepo(repo);
+  const allImports = store.getImportsByRepo(repo);
+
+  // Build nodes from source files (skip non-parseable like markdown, json)
+  const sourceFiles = files.filter(f =>
+    ['typescript', 'javascript', 'tsx', 'jsx', 'python', 'go', 'rust', 'java'].includes(f.language)
+  );
+
+  const nodes = sourceFiles.map(f => ({
+    id: f.path,
+    language: f.language,
+    size: f.size,
+    lineCount: f.lineCount,
+    symbolCount: store.getSymbolsByFile(f.id).length,
+  }));
+
+  // Build edges from resolved imports (only internal, both files must exist)
+  const fileIdSet = new Set(files.map(f => f.id));
+  const edges = allImports
+    .filter(imp => imp.toFileId && fileIdSet.has(imp.toFileId))
+    .map(imp => {
+      const fromFile = files.find(f => f.id === imp.fromFileId);
+      const toFile = files.find(f => f.id === imp.toFileId);
+      return fromFile && toFile ? {
+        source: fromFile.path,
+        target: toFile.path,
+        symbols: imp.symbols,
+      } : null;
+    })
+    .filter(Boolean);
+
+  // Deduplicate edges
+  const edgeMap = new Map<string, any>();
+  for (const e of edges) {
+    if (!e) continue;
+    const key = `${e.source}→${e.target}`;
+    if (!edgeMap.has(key)) edgeMap.set(key, e);
+  }
+
+  res.json({ nodes, edges: [...edgeMap.values()] });
+});
+
 codebaseRouter.post('/search', requireScope('projects:read'), (req, res) => {
   const { query, repo, kind } = req.body;
   if (!query) return res.status(400).json({ error: 'query is required' });

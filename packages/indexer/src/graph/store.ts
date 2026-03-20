@@ -164,6 +164,23 @@ export class GraphStore {
     return (this.db.prepare('SELECT * FROM files WHERE repo_id = ? ORDER BY path').all(repoId) as any[]).map(r => this.rowToFile(r));
   }
 
+  getImportsByRepo(repoId: string): ImportEdge[] {
+    return (this.db.prepare(`
+      SELECT i.* FROM imports i
+      JOIN files f ON i.from_file_id = f.id
+      WHERE f.repo_id = ?
+    `).all(repoId) as any[]).map(r => ({
+      id: r.id,
+      fromFileId: r.from_file_id,
+      toFileId: r.to_file_id,
+      toModule: r.to_module,
+      symbols: JSON.parse(r.symbols_json || '[]'),
+      isDefault: !!r.is_default,
+      isNamespace: !!r.is_namespace,
+      line: r.line,
+    }));
+  }
+
   deleteFilesByRepo(repoId: string): void {
     this.db.prepare('DELETE FROM files WHERE repo_id = ?').run(repoId);
   }
@@ -390,7 +407,7 @@ export class GraphStore {
     const importCounts = (this.db.prepare(`
       SELECT to_file_id, COUNT(*) as cnt FROM imports
       WHERE to_file_id IN (SELECT id FROM files WHERE repo_id = ?)
-      GROUP BY to_file_id ORDER BY cnt DESC LIMIT 10
+      GROUP BY to_file_id ORDER BY cnt DESC LIMIT 50
     `).all(repoId) as any[]);
     const mostImported = importCounts.map(r => {
       const file = this.getFile(r.to_file_id);
@@ -401,7 +418,7 @@ export class GraphStore {
     const exportCounts = (this.db.prepare(`
       SELECT file_id, COUNT(*) as cnt FROM symbols
       WHERE exported = 1 AND file_id IN (SELECT id FROM files WHERE repo_id = ?)
-      GROUP BY file_id ORDER BY cnt DESC LIMIT 10
+      GROUP BY file_id ORDER BY cnt DESC LIMIT 50
     `).all(repoId) as any[]);
     const mostExported = exportCounts.map(r => {
       const file = this.getFile(r.file_id);

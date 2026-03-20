@@ -177,85 +177,64 @@ function GraphView({ repo, onFileSelect }: GraphViewProps) {
   async function loadGraph() {
     setLoading(true);
     try {
-      const arch = await apiFetch<ArchitectureResponse>('/api/codebase/architecture', {
+      const graph = await apiFetch<{
+        nodes: Array<{ id: string; language: string; size: number; lineCount: number; symbolCount: number }>;
+        edges: Array<{ source: string; target: string; symbols: string[] }>;
+      }>('/api/codebase/graph', {
         method: 'POST',
-        body: JSON.stringify({ repo: repo || undefined }),
+        body: JSON.stringify({ repo }),
       });
 
-      // Use mostImported files as nodes
-      const topFiles = arch.mostImported.slice(0, 50); // Limit to 50 nodes for performance
-
-      const nodeMap = new Map<string, { x: number; y: number; language: string }>();
-      const newNodes: Node[] = [];
-      const newEdges: Edge[] = [];
-
-      // Create nodes in a circular layout
-      const radius = 300;
-      const angleStep = (2 * Math.PI) / topFiles.length;
-
-      topFiles.forEach((item, idx) => {
-        const angle = idx * angleStep;
-        const x = 500 + radius * Math.cos(angle);
-        const y = 400 + radius * Math.sin(angle);
-
-        // Infer language from file extension
-        const ext = item.path.split('.').pop() || '';
-        let language = 'other';
-        if (['ts', 'tsx'].includes(ext)) language = 'typescript';
-        else if (['js', 'jsx'].includes(ext)) language = 'javascript';
-        else if (ext === 'py') language = 'python';
-        else if (ext === 'go') language = 'go';
-        else if (ext === 'json') language = 'json';
-        else if (ext === 'md') language = 'markdown';
-
-        nodeMap.set(item.path, { x, y, language });
-
-        newNodes.push({
-          id: item.path,
-          type: 'default',
-          position: { x, y },
-          data: {
-            label: item.path.split('/').pop() || item.path,
-          },
-          style: {
-            background: getLanguageColor(language),
-            color: '#fff',
-            border: '2px solid #fff',
-            fontSize: 11,
-            padding: '6px 10px',
-            borderRadius: 8,
-          },
-        });
-      });
-
-      // Fetch dependencies for each file and create edges
-      for (const item of topFiles) {
-        try {
-          const deps = await apiFetch<DependencyResponse>('/api/codebase/dependencies', {
-            method: 'POST',
-            body: JSON.stringify({ file: item.path, repo: repo || undefined }),
-          });
-
-          deps.imports.forEach((imp) => {
-            const targetPath = imp.resolvedFile?.path;
-            if (targetPath && nodeMap.has(targetPath)) {
-              const edgeId = `${item.path}-${targetPath}`;
-              if (!newEdges.some(e => e.id === edgeId)) {
-                newEdges.push({
-                  id: edgeId,
-                  source: item.path,
-                  target: targetPath,
-                  type: ConnectionLineType.Bezier,
-                  style: { stroke: '#6b7280', strokeWidth: 1 },
-                  animated: false,
-                });
-              }
-            }
-          });
-        } catch {
-          // Skip files with no dependencies
-        }
+      // Layout: force-directed simulation via simple grid with grouping by directory
+      const dirGroups = new Map<string, typeof graph.nodes>();
+      for (const node of graph.nodes) {
+        const dir = node.id.substring(0, node.id.lastIndexOf('/')) || '.';
+        if (!dirGroups.has(dir)) dirGroups.set(dir, []);
+        dirGroups.get(dir)!.push(node);
       }
+
+      const newNodes: Node[] = [];
+      const nodeSet = new Set<string>();
+      let groupY = 0;
+
+      for (const [dir, files] of dirGroups) {
+        files.forEach((item, idx) => {
+          const x = 150 + (idx % 5) * 200;
+          const y = groupY + Math.floor(idx / 5) * 80;
+          nodeSet.add(item.id);
+
+          newNodes.push({
+            id: item.id,
+            type: 'default',
+            position: { x, y },
+            data: {
+              label: `${item.id.split('/').pop()} (${item.symbolCount})`,
+            },
+            style: {
+              background: getLanguageColor(item.language),
+              color: '#fff',
+              border: '2px solid rgba(255,255,255,0.3)',
+              fontSize: 11,
+              padding: '6px 10px',
+              borderRadius: 8,
+              minWidth: 80,
+            },
+          });
+        });
+        groupY += Math.ceil(files.length / 5) * 80 + 60;
+      }
+
+      // Build edges from pre-computed graph data
+      const newEdges: Edge[] = graph.edges
+        .filter(e => nodeSet.has(e.source) && nodeSet.has(e.target))
+        .map(e => ({
+          id: `${e.source}→${e.target}`,
+          source: e.source,
+          target: e.target,
+          type: ConnectionLineType.Bezier,
+          style: { stroke: '#6b7280', strokeWidth: 1 },
+          animated: false,
+        }));
 
       setNodes(newNodes);
       setEdges(newEdges);
