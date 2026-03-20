@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { ModelRegistryEntryWithUsage, ModelProvider } from '@coderage-labs/armada-shared';
 import { apiFetch } from '../hooks/useApi';
+import { toast } from 'sonner';
 import { useAuth } from '../hooks/useAuth';
 import { useModels } from '../hooks/queries/useModels';
 import { useModelUsage } from '../hooks/queries/useModelUsage';
@@ -446,7 +447,7 @@ export default function Models() {
           await apiFetch(`/api/models/${m.id}`, { method: 'DELETE' });
           queryClient.invalidateQueries();
         } catch (e: any) {
-          alert(e.message);
+          toast.error(e.message);
         }
       },
     });
