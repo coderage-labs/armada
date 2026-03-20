@@ -229,10 +229,37 @@ async function parseSource(
  * './utils' from 'src/index.ts' → 'repoId:src/utils.ts' (or .js, .tsx, etc.)
  */
 function resolveImportPath(repoId: string, fromPath: string, importPath: string, store: GraphStore): string {
+  // Handle monorepo package imports (e.g. @fixli/shared, @coderage-labs/armada-shared)
+  if (importPath.startsWith('@') && !importPath.startsWith('@/')) {
+    // Try to resolve as a monorepo package → packages/*/src/index.ts
+    const parts = importPath.split('/');
+    const scope = parts[0]; // @fixli
+    const pkgName = parts[1]; // shared
+    const subPath = parts.slice(2).join('/'); // optional sub-path
+
+    if (scope && pkgName) {
+      // Try common monorepo layouts
+      const basePaths = [
+        `packages/${pkgName}/src`,
+        `packages/${pkgName}`,
+        `libs/${pkgName}/src`,
+        `libs/${pkgName}`,
+      ];
+      for (const base of basePaths) {
+        const candidates = subPath
+          ? [`${base}/${subPath}`, `${base}/${subPath}.ts`, `${base}/${subPath}.tsx`, `${base}/${subPath}/index.ts`]
+          : [`${base}/index.ts`, `${base}/index.tsx`, `${base}/index.js`];
+        for (const c of candidates) {
+          const fileId = `${repoId}:${c}`;
+          if (store.getFile(fileId)) return fileId;
+        }
+      }
+    }
+    return '';
+  }
+
   // Skip obvious external packages (no-scope npm packages, node builtins)
   if (!importPath.startsWith('.') && !importPath.startsWith('/') && !importPath.startsWith('@/') && !importPath.startsWith('~/')) {
-    // Could be a monorepo package alias — try common patterns
-    // Check if it resolves to any indexed file (e.g. @package/shared → packages/shared/src/index.ts)
     return '';
   }
 
