@@ -16,6 +16,7 @@ const EXTENSION_MAP: Record<string, Language> = {
   '.rs': 'rust',
   '.java': 'java',
   '.tf': 'terraform',
+  '.tfvars': 'terraform',
   '.hcl': 'terraform',
   '.sql': 'sql',
   '.css': 'css',
@@ -67,6 +68,15 @@ export function detectLanguage(filePath: string): Language {
   // Check filename prefix matches (e.g. Dockerfile.backend, .env.example)
   for (const [prefix, lang] of FILENAME_PREFIX_MAP) {
     if (filename.startsWith(prefix)) return lang;
+  }
+
+  // Check if filename contains known patterns
+  if (filename.includes('.env')) return 'env' as Language;
+  if (filename.endsWith('.example') || filename.endsWith('.sample')) {
+    // Try stripping .example/.sample and re-detecting
+    const stripped = filename.replace(/\.(example|sample)$/, '');
+    const strippedExt = stripped.slice(stripped.lastIndexOf('.'));
+    if (EXTENSION_MAP[strippedExt]) return EXTENSION_MAP[strippedExt];
   }
 
   // Additional extensions
