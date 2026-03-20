@@ -127,10 +127,18 @@ codebaseRouter.post('/graph', requireScope('projects:read'), (req, res) => {
   const files = store.getFilesByRepo(repo);
   const allImports = store.getImportsByRepo(repo);
 
-  // Build nodes from source files (skip non-parseable like markdown, json)
-  const sourceFiles = files.filter(f =>
-    ['typescript', 'javascript', 'tsx', 'jsx', 'python', 'go', 'rust', 'java'].includes(f.language)
-  );
+  // Build nodes from source files — skip non-parseable, tests, and pure type files
+  const sourceFiles = files.filter(f => {
+    if (!['typescript', 'javascript', 'tsx', 'jsx', 'python', 'go', 'rust', 'java'].includes(f.language)) return false;
+    const name = f.path.split('/').pop() || '';
+    // Exclude test files
+    if (name.includes('.test.') || name.includes('.spec.') || name.includes('__test__')) return false;
+    // Exclude pure type definition files (not .d.ts — those are already filtered by indexer)
+    if (name.endsWith('.types.ts') || name.endsWith('.type.ts')) return false;
+    // Exclude test directories
+    if (f.path.includes('/__tests__/') || f.path.includes('/test/') || f.path.includes('/tests/')) return false;
+    return true;
+  });
 
   const nodes = sourceFiles.map(f => ({
     id: f.path,
