@@ -115,40 +115,28 @@ function normaliseLanguage(lang: string): string {
   return map[lang.toLowerCase()] || lang.charAt(0).toUpperCase() + lang.slice(1);
 }
 
-// Well-known language colours (official branding), everything else hashed from palette
-const KNOWN_LANGUAGE_COLORS: Record<string, string> = {
-  typescript: '#3178c6',
-  tsx: '#2563eb',
-  javascript: '#b8860b',
-  jsx: '#d97706',
-  python: '#306998',
-  go: '#00add8',
-  rust: '#ce422b',
-  java: '#e76f00',
-};
-
-// Deterministic palette — visually distinct, readable with white text
+/**
+ * Deterministic language→colour assignment.
+ * Assigns colours from a palette in order of first appearance,
+ * guaranteeing no collisions for up to palette.length languages.
+ */
 const COLOR_PALETTE = [
-  '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899',
-  '#f43f5e', '#ef4444', '#f97316', '#eab308', '#84cc16',
-  '#22c55e', '#14b8a6', '#06b6d4', '#3b82f6', '#6d28d9',
-  '#be185d', '#b45309', '#047857', '#1d4ed8', '#7c3aed',
-  '#c026d3', '#db2777', '#ea580c', '#65a30d', '#0891b2',
-  '#4f46e5', '#9333ea', '#e11d48', '#ca8a04', '#059669',
+  '#e6194b', '#3cb44b', '#4363d8', '#f58231', '#911eb4',
+  '#42d4f4', '#f032e6', '#469990', '#9A6324', '#800000',
+  '#aaffc3', '#808000', '#000075', '#e6beff', '#dcbeff',
+  '#bfef45', '#fabed4', '#ffd8b1', '#fffac8', '#a9a9a9',
 ];
 
-function hashString(str: string): number {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0;
-  }
-  return Math.abs(hash);
-}
+const _langColorCache = new Map<string, string>();
+let _nextColorIdx = 0;
 
 function getLanguageColor(language: string): string {
-  const normalised = normaliseLanguage(language).toLowerCase();
-  if (KNOWN_LANGUAGE_COLORS[normalised]) return KNOWN_LANGUAGE_COLORS[normalised];
-  return COLOR_PALETTE[hashString(normalised) % COLOR_PALETTE.length];
+  const key = normaliseLanguage(language);
+  if (_langColorCache.has(key)) return _langColorCache.get(key)!;
+  const color = COLOR_PALETTE[_nextColorIdx % COLOR_PALETTE.length];
+  _nextColorIdx++;
+  _langColorCache.set(key, color);
+  return color;
 }
 
 function getKindBadgeColor(kind: string): string {
