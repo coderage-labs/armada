@@ -8,6 +8,9 @@ import { join, relative } from 'node:path';
 import { GraphStore } from './graph/store.js';
 import type { FileNode, SymbolNode, ImportEdge, Language, RepoIndex } from './graph/schema.js';
 import { detectLanguage, isParseable, shouldIgnorePath } from './parsers/detect.js';
+import { treeSitterParse } from './parsers/tree-sitter-parser.js';
+import { ensureInit } from './parsers/tree-sitter-init.js';
+// Regex parsers kept as fallback
 import { parseTypeScript } from './parsers/typescript-parser.js';
 import { parsePython } from './parsers/python-parser.js';
 import { parseGo } from './parsers/go-parser.js';
@@ -44,6 +47,11 @@ export async function indexRepository(opts: IndexOptions): Promise<IndexResult> 
   let symbolCount = 0;
   let importCount = 0;
 
+  // Initialise tree-sitter WASM once before parsing
+  await ensureInit().catch(err => {
+    onProgress?.(`Tree-sitter init failed, falling back to regex: ${err.message}`);
+  });
+
   onProgress?.(`Indexing ${repoFullName} from ${repoPath}`);
 
   // Walk the directory tree
@@ -73,7 +81,7 @@ export async function indexRepository(opts: IndexOptions): Promise<IndexResult> 
       // Skip if unchanged (incremental)
       if (incremental && existingFiles.get(relPath) === hash) continue;
 
-      const result = indexFile({
+      const result = await indexFile({
         repoId, filePath: relPath, content, language, hash, store,
       });
 
@@ -121,14 +129,14 @@ export async function indexRepository(opts: IndexOptions): Promise<IndexResult> 
 /**
  * Index a single file — parse and store its symbols + imports.
  */
-export function indexFile(opts: {
+export async function indexFile(opts: {
   repoId: string;
   filePath: string;
   content: string;
   language: Language;
   hash: string;
   store: GraphStore;
-}): { symbols: number; imports: number } {
+}): Promise<{ symbols: number; imports: number }> {
   const { repoId, filePath, content, language, hash, store } = opts;
   const fileId = `${repoId}:${filePath}`;
   const now = new Date().toISOString();
@@ -154,7 +162,7 @@ export function indexFile(opts: {
   // Parse if supported language
   if (!isParseable(language)) return { symbols: 0, imports: 0 };
 
-  const parsed = parseSource(content, language, filePath);
+  const parsed = await parseSource(content, language, filePath);
   let symbolCount = 0;
   let importCount = 0;
 
@@ -189,11 +197,18 @@ export function indexFile(opts: {
 
 // ── Internal helpers ────────────────────────────────────────────────
 
-function parseSource(
+async function parseSource(
   content: string,
   language: Language,
   filePath: string,
-): { symbols: Omit<SymbolNode, 'id' | 'fileId'>[]; imports: Omit<ImportEdge, 'id' | 'fromFileId' | 'toFileId'>[] } {
+): Promise<{ symbols: Omit<SymbolNode, 'id' | 'fileId'>[]; imports: Omit<ImportEdge, 'id' | 'fromFileId' | 'toFileId'>[] }> {
+  // Try tree-sitter first (accurate AST), fall back to regex
+  try {
+    const result = await treeSitterParse(content, language, filePath);
+    if (result.symbols.length > 0 || result.imports.length > 0) return result;
+  } catch { /* tree-sitter failed, fall back */ }
+
+  // Regex fallback
   switch (language) {
     case 'typescript':
     case 'javascript':
