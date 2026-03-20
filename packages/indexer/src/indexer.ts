@@ -181,7 +181,7 @@ export async function indexFile(opts: {
   // Store imports
   for (const imp of parsed.imports) {
     const importId = `${fileId}:import:${imp.line}`;
-    const resolvedFileId = resolveImportPath(repoId, filePath, imp.toModule);
+    const resolvedFileId = resolveImportPath(repoId, filePath, imp.toModule, store);
     const importEdge: ImportEdge = {
       id: importId,
       fromFileId: fileId,
@@ -228,7 +228,7 @@ async function parseSource(
  * Resolve a relative import path to a file ID.
  * './utils' from 'src/index.ts' → 'repoId:src/utils.ts' (or .js, .tsx, etc.)
  */
-function resolveImportPath(repoId: string, fromPath: string, importPath: string): string {
+function resolveImportPath(repoId: string, fromPath: string, importPath: string, store: GraphStore): string {
   // Skip external packages
   if (!importPath.startsWith('.') && !importPath.startsWith('/')) return '';
 
@@ -245,13 +245,29 @@ function resolveImportPath(repoId: string, fromPath: string, importPath: string)
     }
   }
 
-  // Try common extensions
-  const extensions = ['.ts', '.tsx', '.js', '.jsx', '.py', '.go'];
-  for (const ext of extensions) {
-    const candidate = `${repoId}:${resolved}${ext}`;
-    return candidate; // Return first candidate — store will resolve
+  // Strip .js/.jsx extension (TS projects import as .js but files are .ts)
+  const stripped = resolved.replace(/\.(js|jsx)$/, '');
+
+  // Try to resolve against known files in the store
+  const candidates = [
+    stripped,           // exact match (extensionless)
+    `${stripped}.ts`,
+    `${stripped}.tsx`,
+    `${stripped}.js`,
+    `${stripped}.jsx`,
+    `${stripped}/index.ts`,
+    `${stripped}/index.tsx`,
+    `${stripped}/index.js`,
+    resolved,           // original (with .js if present)
+  ];
+
+  for (const candidate of candidates) {
+    const fileId = `${repoId}:${candidate}`;
+    if (store.getFile(fileId)) return fileId;
   }
-  return `${repoId}:${resolved}`;
+
+  // Best guess: first candidate
+  return `${repoId}:${candidates[0]}`;
 }
 
 /**

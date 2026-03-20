@@ -64,7 +64,7 @@ interface ArchitectureResponse {
   imports: number;
   languages: Record<string, number>;
   topLevelDirs: string[];
-  mostImported: Array<{ file: string; count: number }>;
+  mostImported: Array<{ path: string; importerCount: number }>;
 }
 
 interface IndexStatusResponse {
@@ -178,7 +178,7 @@ function GraphView({ repo, onFileSelect }: GraphViewProps) {
         const y = 400 + radius * Math.sin(angle);
 
         // Infer language from file extension
-        const ext = item.file.split('.').pop() || '';
+        const ext = item.path.split('.').pop() || '';
         let language = 'other';
         if (['ts', 'tsx'].includes(ext)) language = 'typescript';
         else if (['js', 'jsx'].includes(ext)) language = 'javascript';
@@ -187,14 +187,14 @@ function GraphView({ repo, onFileSelect }: GraphViewProps) {
         else if (ext === 'json') language = 'json';
         else if (ext === 'md') language = 'markdown';
 
-        nodeMap.set(item.file, { x, y, language });
+        nodeMap.set(item.path, { x, y, language });
 
         newNodes.push({
-          id: item.file,
+          id: item.path,
           type: 'default',
           position: { x, y },
           data: {
-            label: item.file.split('/').pop() || item.file,
+            label: item.path.split('/').pop() || item.path,
           },
           style: {
             background: getLanguageColor(language),
@@ -212,14 +212,14 @@ function GraphView({ repo, onFileSelect }: GraphViewProps) {
         try {
           const deps = await apiFetch<DependencyResponse>('/api/codebase/dependencies', {
             method: 'POST',
-            body: JSON.stringify({ file: item.file, repo: repo || undefined }),
+            body: JSON.stringify({ file: item.path, repo: repo || undefined }),
           });
 
           deps.imports.forEach((imp) => {
             if (nodeMap.has(imp)) {
               newEdges.push({
-                id: `${item.file}-${imp}`,
-                source: item.file,
+                id: `${item.path}-${imp}`,
+                source: item.path,
                 target: imp,
                 type: ConnectionLineType.Bezier,
                 style: { stroke: '#6b7280', strokeWidth: 1 },
@@ -408,10 +408,10 @@ function ArchitectureOverview({ repo }: ArchitectureOverviewProps) {
           ) : (
             <div className="space-y-2">
               {arch.mostImported.slice(0, 10).map((item, idx) => (
-                <div key={item.file} className="flex items-center justify-between py-2 px-3 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 transition-colors">
-                  <span className="text-xs text-zinc-300 truncate flex-1 font-mono">{item.file.split('/').pop()}</span>
+                <div key={item.path} className="flex items-center justify-between py-2 px-3 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 transition-colors">
+                  <span className="text-xs text-zinc-300 truncate flex-1 font-mono">{item.path.split('/').pop()}</span>
                   <Badge variant="secondary" className="ml-2 shrink-0 bg-violet-500/20 text-violet-300 text-[10px]">
-                    {item.count}
+                    {item.importerCount}
                   </Badge>
                 </div>
               ))}
