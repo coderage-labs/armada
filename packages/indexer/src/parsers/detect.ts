@@ -100,6 +100,7 @@ export function shouldIgnorePath(path: string): boolean {
   // Check filename
   const filename = parts[parts.length - 1];
   if (IGNORE_FILES.has(filename)) return true;
+  if (filename.endsWith('.d.ts') || filename.endsWith('.d.mts') || filename.endsWith('.d.cts')) return true;
   if (filename.startsWith('.')) return true;
   return false;
 }
