@@ -16,6 +16,7 @@ jobs:
           node-version: 22
       - run: npm ci
       - run: npm run build -w packages/shared
+      - run: npm run build -w packages/indexer
       - run: npm run build -w packages/control
       - name: Unit Tests
         run: npm run test:unit -w packages/control

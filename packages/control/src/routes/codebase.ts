@@ -162,7 +162,7 @@ codebaseRouter.post('/index', requireScope('projects:write'), async (req, res) =
     const result = await indexRepository({
       repoId: repo, repoFullName: repo, repoPath: repoDir, store,
       incremental: force !== 'true' && force !== true,
-      onProgress: (msg) => console.log(`[codebase] ${msg}`),
+      onProgress: (msg: string) => console.log(`[codebase] ${msg}`),
     });
     res.json(result);
   } catch (err: any) {
