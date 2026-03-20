@@ -106,18 +106,21 @@ interface FileContextResponse {
 
 /* ── Helpers ───────────────────────────────────────── */
 
-/** Normalise language variants into display names */
+/** Capitalise language name for display */
 function normaliseLanguage(lang: string): string {
-  const l = lang.toLowerCase();
-  if (l === 'tsx' || l === 'typescript') return 'TypeScript';
-  if (l === 'jsx' || l === 'javascript') return 'JavaScript';
-  return lang.charAt(0).toUpperCase() + lang.slice(1);
+  const map: Record<string, string> = {
+    typescript: 'TypeScript', tsx: 'TSX',
+    javascript: 'JavaScript', jsx: 'JSX',
+  };
+  return map[lang.toLowerCase()] || lang.charAt(0).toUpperCase() + lang.slice(1);
 }
 
 // Well-known language colours (official branding), everything else hashed from palette
 const KNOWN_LANGUAGE_COLORS: Record<string, string> = {
   typescript: '#3178c6',
+  tsx: '#2563eb',
   javascript: '#b8860b',
+  jsx: '#d97706',
   python: '#306998',
   go: '#00add8',
   rust: '#ce422b',
