@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState, useMemo } from 'react';
+import { useCallback, useEffect, useState, useMemo, useRef } from 'react';
+import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide, type SimulationNodeDatum, type SimulationLinkDatum } from 'd3-force';
 import { Search, RefreshCw, Database, Loader2, AlertCircle, Code2, FileCode, GitBranch } from 'lucide-react';
 import { apiFetch } from '../hooks/useApi';
 import { PageHeader } from '../components/PageHeader';
@@ -209,59 +210,85 @@ function GraphView({ repo, onFileSelect }: GraphViewProps) {
         body: JSON.stringify({ repo }),
       });
 
-      // Layout: force-directed simulation via simple grid with grouping by directory
-      const dirGroups = new Map<string, typeof graph.nodes>();
-      for (const node of graph.nodes) {
-        const dir = node.id.substring(0, node.id.lastIndexOf('/')) || '.';
-        if (!dirGroups.has(dir)) dirGroups.set(dir, []);
-        dirGroups.get(dir)!.push(node);
+      const nodeSet = new Set(graph.nodes.map(n => n.id));
+
+      // Build link data for d3-force
+      const validEdges = graph.edges.filter(e => nodeSet.has(e.source) && nodeSet.has(e.target));
+
+      // Count inbound edges per node for sizing
+      const inboundCount = new Map<string, number>();
+      for (const e of validEdges) {
+        inboundCount.set(e.target, (inboundCount.get(e.target) || 0) + 1);
       }
 
-      const newNodes: Node[] = [];
-      const nodeSet = new Set<string>();
-      let groupY = 0;
-
-      for (const [dir, files] of dirGroups) {
-        files.forEach((item, idx) => {
-          const x = 150 + (idx % 5) * 200;
-          const y = groupY + Math.floor(idx / 5) * 80;
-          nodeSet.add(item.id);
-
-          newNodes.push({
-            id: item.id,
-            type: 'default',
-            position: { x, y },
-            data: {
-              label: `${item.id.split('/').pop()} (${item.symbolCount})`,
-              language: normaliseLanguage(item.language),
-            },
-            style: {
-              background: getLanguageColor(item.language),
-              color: '#fff',
-              border: '2px solid rgba(255,255,255,0.3)',
-              fontSize: 11,
-              padding: '6px 10px',
-              borderRadius: 8,
-              minWidth: 80,
-            },
-          });
-        });
-        groupY += Math.ceil(files.length / 5) * 80 + 60;
+      // Create d3 simulation nodes
+      interface SimNode extends SimulationNodeDatum {
+        nodeId: string;
+        language: string;
+        symbolCount: number;
+        importerCount: number;
       }
+      const simNodes: SimNode[] = graph.nodes.map(n => ({
+        nodeId: n.id,
+        language: n.language,
+        symbolCount: n.symbolCount,
+        importerCount: inboundCount.get(n.id) || 0,
+      }));
+      const nodeIdxMap = new Map(simNodes.map((n, i) => [n.nodeId, i]));
 
-      // Build edges from pre-computed graph data
-      const newEdges: Edge[] = graph.edges
-        .filter(e => nodeSet.has(e.source) && nodeSet.has(e.target))
-        .map(e => ({
-          id: `${e.source}→${e.target}`,
-          source: e.source,
-          target: e.target,
-          type: ConnectionLineType.Bezier,
-          style: { stroke: '#6b7280', strokeWidth: 1 },
-          animated: false,
-        }));
+      const simLinks: SimulationLinkDatum<SimNode>[] = validEdges
+        .filter(e => nodeIdxMap.has(e.source) && nodeIdxMap.has(e.target))
+        .map(e => ({ source: nodeIdxMap.get(e.source)!, target: nodeIdxMap.get(e.target)! }));
 
-      // Track unique languages (normalised)
+      // Run force simulation
+      const sim = forceSimulation<SimNode>(simNodes)
+        .force('link', forceLink<SimNode, SimulationLinkDatum<SimNode>>(simLinks).distance(120).strength(0.3))
+        .force('charge', forceManyBody<SimNode>().strength(-200))
+        .force('center', forceCenter(600, 400))
+        .force('collide', forceCollide<SimNode>().radius(40))
+        .stop();
+
+      // Run simulation synchronously (300 ticks)
+      for (let i = 0; i < 300; i++) sim.tick();
+
+      // Convert to ReactFlow nodes
+      const newNodes: Node[] = simNodes.map(sn => {
+        const importance = sn.importerCount;
+        const nodeSize = Math.max(11, Math.min(14, 11 + importance));
+        const padding = importance > 5 ? '8px 14px' : '6px 10px';
+
+        return {
+          id: sn.nodeId,
+          type: 'default',
+          position: { x: sn.x || 0, y: sn.y || 0 },
+          data: {
+            label: `${sn.nodeId.split('/').pop()}${sn.symbolCount ? ` (${sn.symbolCount})` : ''}`,
+            language: normaliseLanguage(sn.language),
+          },
+          style: {
+            background: getLanguageColor(sn.language),
+            color: '#fff',
+            border: importance > 3 ? '3px solid rgba(255,255,255,0.6)' : '2px solid rgba(255,255,255,0.2)',
+            fontSize: nodeSize,
+            padding,
+            borderRadius: 8,
+            minWidth: 60,
+            fontWeight: importance > 5 ? 700 : 400,
+          },
+        };
+      });
+
+      // Convert to ReactFlow edges
+      const newEdges: Edge[] = validEdges.map(e => ({
+        id: `${e.source}→${e.target}`,
+        source: e.source,
+        target: e.target,
+        type: ConnectionLineType.Bezier,
+        style: { stroke: '#52525b', strokeWidth: 1.5 },
+        animated: false,
+      }));
+
+      // Track unique languages
       const langs = [...new Set(graph.nodes.map(n => normaliseLanguage(n.language)))].sort();
       setAllLanguages(langs);
       setHiddenLanguages(new Set());
