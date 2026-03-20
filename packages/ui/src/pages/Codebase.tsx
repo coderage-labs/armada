@@ -36,15 +36,21 @@ import {
 /* ── Types ─────────────────────────────────────────── */
 
 interface SymbolResult {
-  file: string;
+  id: string;
+  fileId: string;
   name: string;
-  kind: 'function' | 'class' | 'interface' | 'type' | 'const' | 'let' | 'var' | 'method';
+  kind: string;
   line: number;
+  signature?: string;
+  exported?: boolean;
 }
 
 interface FileResult {
-  file: string;
+  id: string;
+  path: string;
   language: string;
+  size: number;
+  lineCount: number;
 }
 
 interface SearchResponse {
@@ -52,10 +58,16 @@ interface SearchResponse {
   symbols: SymbolResult[];
 }
 
+interface DependencyImport {
+  module: string;
+  symbols: string[];
+  resolvedFile?: { id: string; path: string; language: string };
+}
+
 interface DependencyResponse {
-  file: string;
-  imports: string[];
-  importedBy: string[];
+  file: { id: string; path: string; language: string };
+  imports: DependencyImport[];
+  importedBy: DependencyImport[];
 }
 
 interface ArchitectureResponse {
@@ -86,23 +98,32 @@ interface IndexResponse {
 }
 
 interface FileContextResponse {
-  file: string;
+  file: { id: string; path: string; language: string; size: number; lineCount: number };
   symbols: SymbolResult[];
-  imports: string[];
-  importedBy: string[];
+  imports: DependencyImport[];
+  importedBy: DependencyImport[];
 }
 
 /* ── Helpers ───────────────────────────────────────── */
 
 function getLanguageColor(language: string): string {
   const lang = language.toLowerCase();
-  if (lang.includes('typescript') || lang.includes('ts')) return '#3178c6';
-  if (lang.includes('javascript') || lang.includes('js')) return '#f7df1e';
-  if (lang.includes('python') || lang.includes('py')) return '#22c55e';
+  if (lang.includes('typescript') || lang === 'tsx') return '#3178c6';
+  if (lang.includes('javascript') || lang === 'jsx') return '#b8860b'; // darker gold, readable with white text
+  if (lang.includes('python')) return '#22c55e';
   if (lang.includes('go')) return '#00add8';
   if (lang.includes('rust')) return '#ce422b';
-  if (lang.includes('json')) return '#eab308';
+  if (lang.includes('java') && !lang.includes('javascript')) return '#e76f00';
+  if (lang.includes('json')) return '#8b6914'; // darker gold
+  if (lang.includes('yaml') || lang.includes('yml')) return '#cb171e';
+  if (lang.includes('terraform') || lang.includes('hcl') || lang.includes('tf')) return '#7b42bc';
   if (lang.includes('markdown') || lang.includes('md')) return '#a855f7';
+  if (lang.includes('docker')) return '#2496ed';
+  if (lang.includes('shell') || lang.includes('bash') || lang.includes('sh')) return '#4eaa25';
+  if (lang.includes('css') || lang.includes('scss')) return '#264de4';
+  if (lang.includes('html')) return '#e34c26';
+  if (lang.includes('sql')) return '#336791';
+  if (lang.includes('toml')) return '#9c4221';
   return '#6b7280';
 }
 
@@ -216,15 +237,19 @@ function GraphView({ repo, onFileSelect }: GraphViewProps) {
           });
 
           deps.imports.forEach((imp) => {
-            if (nodeMap.has(imp)) {
-              newEdges.push({
-                id: `${item.path}-${imp}`,
-                source: item.path,
-                target: imp,
-                type: ConnectionLineType.Bezier,
-                style: { stroke: '#6b7280', strokeWidth: 1 },
-                animated: false,
-              });
+            const targetPath = imp.resolvedFile?.path;
+            if (targetPath && nodeMap.has(targetPath)) {
+              const edgeId = `${item.path}-${targetPath}`;
+              if (!newEdges.some(e => e.id === edgeId)) {
+                newEdges.push({
+                  id: edgeId,
+                  source: item.path,
+                  target: targetPath,
+                  type: ConnectionLineType.Bezier,
+                  style: { stroke: '#6b7280', strokeWidth: 1 },
+                  animated: false,
+                });
+              }
             }
           });
         } catch {
@@ -488,7 +513,7 @@ function SymbolSearch({ repo, onFileSelect }: SymbolSearchProps) {
                   <div
                     key={idx}
                     className="flex items-center justify-between py-2 px-3 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 transition-colors cursor-pointer"
-                    onClick={() => onFileSelect(sym.file)}
+                    onClick={() => onFileSelect(sym.fileId)}
                   >
                     <div className="flex items-center gap-2">
                       <Badge variant="secondary" className={`text-[10px] px-2 py-0.5 ${getKindBadgeColor(sym.kind)}`}>
@@ -497,7 +522,7 @@ function SymbolSearch({ repo, onFileSelect }: SymbolSearchProps) {
                       <span className="text-sm font-medium text-zinc-200">{sym.name}</span>
                       <span className="text-xs text-zinc-600">@{sym.line}</span>
                     </div>
-                    <span className="text-xs text-zinc-500 font-mono truncate max-w-md">{sym.file}</span>
+                    <span className="text-xs text-zinc-500 font-mono truncate max-w-md">{sym.fileId}</span>
                   </div>
                 ))}
               </div>
@@ -515,9 +540,9 @@ function SymbolSearch({ repo, onFileSelect }: SymbolSearchProps) {
                   <div
                     key={idx}
                     className="flex items-center justify-between py-2 px-3 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 transition-colors cursor-pointer"
-                    onClick={() => onFileSelect(file.file)}
+                    onClick={() => onFileSelect(file.path)}
                   >
-                    <span className="text-sm text-zinc-300 font-mono truncate flex-1">{file.file}</span>
+                    <span className="text-sm text-zinc-300 font-mono truncate flex-1">{file.path}</span>
                     <Badge variant="secondary" className="ml-2 shrink-0 text-[10px]" style={{ backgroundColor: getLanguageColor(file.language) }}>
                       {file.language}
                     </Badge>
@@ -763,7 +788,10 @@ function FileDetail({ file, repo, onClose }: FileDetailProps) {
             <div className="space-y-1">
               {context.imports.map((imp, idx) => (
                 <div key={idx} className="py-1.5 px-2 rounded-lg bg-zinc-800/50 text-xs text-zinc-400 font-mono truncate">
-                  {imp}
+                  <span className="text-zinc-300">{imp.module}</span>
+                  {imp.symbols.length > 0 && (
+                    <span className="text-zinc-600 ml-1">{'{'}{imp.symbols.join(', ')}{'}'}</span>
+                  )}
                 </div>
               ))}
             </div>
@@ -777,7 +805,10 @@ function FileDetail({ file, repo, onClose }: FileDetailProps) {
             <div className="space-y-1">
               {context.importedBy.map((imp, idx) => (
                 <div key={idx} className="py-1.5 px-2 rounded-lg bg-zinc-800/50 text-xs text-zinc-400 font-mono truncate">
-                  {imp}
+                  <span className="text-zinc-300">{imp.resolvedFile?.path || imp.module}</span>
+                  {imp.symbols.length > 0 && (
+                    <span className="text-zinc-600 ml-1">{'{'}{imp.symbols.join(', ')}{'}'}</span>
+                  )}
                 </div>
               ))}
             </div>
@@ -827,7 +858,7 @@ export default function Codebase() {
       />
 
       {/* Repo selector */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 overflow-hidden">
         <label className="text-sm text-zinc-400">Repository:</label>
         {loadingRepos ? (
           <span className="text-sm text-zinc-500">Loading repos...</span>
@@ -837,7 +868,7 @@ export default function Codebase() {
           <select
             value={selectedRepo}
             onChange={(e) => setSelectedRepo(e.target.value)}
-            className="bg-zinc-900 border border-zinc-700 rounded-md px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-violet-500"
+            className="bg-zinc-900 border border-zinc-700 rounded-md px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-violet-500 max-w-full truncate"
           >
             {repos.map((r) => (
               <option key={r.fullName} value={r.fullName}>

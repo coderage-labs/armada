@@ -58,6 +58,7 @@ export type Language =
   | 'python' | 'go' | 'rust' | 'java'
   | 'terraform' | 'sql' | 'css' | 'html'
   | 'json' | 'yaml' | 'markdown'
+  | 'docker' | 'shell' | 'toml' | 'config' | 'env' | 'makefile' | 'groovy'
   | 'unknown';
 
 export type SymbolKind =

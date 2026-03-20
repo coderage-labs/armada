@@ -45,9 +45,36 @@ const IGNORE_FILES = new Set([
   '.DS_Store', 'thumbs.db',
 ]);
 
+const FILENAME_MAP: Record<string, Language> = {
+  'Dockerfile': 'docker',
+  'Makefile': 'makefile',
+  'Jenkinsfile': 'groovy',
+};
+
+const FILENAME_PREFIX_MAP: Array<[string, Language]> = [
+  ['Dockerfile', 'docker'],
+  ['.env', 'env'],
+];
+
 export function detectLanguage(filePath: string): Language {
   const ext = filePath.slice(filePath.lastIndexOf('.'));
-  return EXTENSION_MAP[ext] || 'unknown';
+  if (EXTENSION_MAP[ext]) return EXTENSION_MAP[ext];
+
+  // Check exact filename matches
+  const filename = filePath.split('/').pop() || '';
+  if (FILENAME_MAP[filename]) return FILENAME_MAP[filename];
+
+  // Check filename prefix matches (e.g. Dockerfile.backend, .env.example)
+  for (const [prefix, lang] of FILENAME_PREFIX_MAP) {
+    if (filename.startsWith(prefix)) return lang;
+  }
+
+  // Additional extensions
+  if (ext === '.sh' || ext === '.bash' || ext === '.zsh') return 'shell' as Language;
+  if (ext === '.toml') return 'toml' as Language;
+  if (ext === '.cfg' || ext === '.ini' || ext === '.conf') return 'config' as Language;
+
+  return 'unknown';
 }
 
 export function isParseable(language: Language): boolean {
