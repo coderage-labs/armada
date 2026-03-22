@@ -695,3 +695,53 @@ export const notificationChannels = sqliteTable('notification_channels', {
   createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
   updatedAt: text('updated_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 });
+
+// ── Learning System (#185) ──────────────────────────────────────────
+
+export const reviewRecords = sqliteTable('review_records', {
+  id: text('id').primaryKey(),
+  runId: text('run_id').notNull(),
+  stepId: text('step_id').notNull(),
+  reviewer: text('reviewer'),
+  executor: text('executor'),
+  score: integer('score').notNull(),
+  result: text('result').notNull(), // approved | rejected
+  feedback: text('feedback').default(''),
+  issuesJson: text('issues_json').default('[]'),
+  round: integer('round').default(1),
+  category: text('category'),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+});
+
+export const agentLessons = sqliteTable('agent_lessons', {
+  id: text('id').primaryKey(),
+  agentId: text('agent_id').notNull(),
+  projectId: text('project_id'),
+  lesson: text('lesson').notNull(),
+  source: text('source').default('review'),
+  severity: text('severity').default('medium'),
+  reviewId: text('review_id'),
+  active: integer('active').default(1),
+  timesInjected: integer('times_injected').default(0),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+  resolvedAt: text('resolved_at'),
+});
+
+export const projectConventions = sqliteTable('project_conventions', {
+  id: text('id').primaryKey(),
+  projectId: text('project_id').notNull(),
+  convention: text('convention').notNull(),
+  source: text('source').default('extracted'),
+  evidenceCount: integer('evidence_count').default(1),
+  active: integer('active').default(1),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+});
+
+export const agentScores = sqliteTable('agent_scores', {
+  agentId: text('agent_id').notNull(),
+  category: text('category').notNull().default('overall'),
+  totalScore: integer('total_score').default(0),
+  reviewCount: integer('review_count').default(0),
+  avgScore: real('avg_score').default(0),
+  lastUpdated: text('last_updated').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+});

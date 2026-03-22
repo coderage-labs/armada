@@ -646,12 +646,38 @@ async function dispatchStep(
 
   db.update(workflowRuns).set({ currentStep: step.id }).where(eq(workflowRuns.id, run.id)).run();
 
-  
+  // ── Inject learning context (lessons + conventions) ────────────────
+  let learningContext = '';
+  try {
+    const { agentLessons, projectConventions, agentScores } = await import('../db/drizzle-schema.js');
+    // Find the target agent for this step role
+    // Lessons are per-agent, so we inject what we know
+    const agentScore = db.select().from(agentScores)
+      .where(and(eq(agentScores.category, 'overall'))).all();
+
+    // Get project conventions
+    if (run.projectId) {
+      const conventions = db.select().from(projectConventions)
+        .where(and(eq(projectConventions.projectId, run.projectId), eq(projectConventions.active, 1)))
+        .orderBy(desc(projectConventions.evidenceCount))
+        .limit(10)
+        .all();
+      if (conventions.length > 0) {
+        learningContext += '\n\n[PROJECT CONVENTIONS]\n';
+        for (const c of conventions) {
+          learningContext += `- ${c.convention}\n`;
+        }
+      }
+    }
+
+    // Note: Agent-specific lessons will be injected by the agent plugin when it knows
+    // which specific agent is assigned. Here we only inject project-level conventions.
+  } catch { /* learning system not ready yet */ }
 
   try {
     const result = await _dispatchFn({
       role: step.role,
-      message: prompt,
+      message: prompt + learningContext,
       projectId: run.projectId,
       runId: run.id,
       stepId: step.id,
