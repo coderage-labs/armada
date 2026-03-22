@@ -51,6 +51,7 @@ function AnimatedRoutes() {
             <Route path="/tasks" element={<Tasks />} />
             <Route path="/activity" element={<Activity />} />
             <Route path="/usage" element={<Usage />} />
+            <Route path="/learning" element={<Learning />} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/webhooks" element={<Webhooks />} />
             <Route path="/integrations" element={<Integrations />} />
@@ -106,6 +107,7 @@ import Usage from './pages/Usage';
 import Notifications from './pages/Notifications';
 import Analytics from './pages/Analytics';
 import Codebase from './pages/Codebase';
+import Learning from './pages/Learning';
 import { ChangesetBottomBar } from './components/ChangesetBottomBar';
 import { Toaster } from './components/ui/sonner';
 
