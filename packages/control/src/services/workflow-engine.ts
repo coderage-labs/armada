@@ -696,6 +696,17 @@ function findWorktreePathForActionStep(
     if (contextEntry?.worktreePath) return contextEntry.worktreePath;
   }
   
+  // Last resort: if there's an issueRepo variable, use the base repo path
+  // (agent may have worked directly in the base repo if worktree provisioning failed)
+  const vars = (run.context as any)?._vars || {};
+  const issueRepo = (step as any).repo || vars.issueRepo;
+  if (issueRepo) {
+    const parts = issueRepo.split('/');
+    if (parts.length === 2) {
+      return `/home/node/repos/${parts[0]}/${parts[1]}`;
+    }
+  }
+  
   return null;
 }
 
