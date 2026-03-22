@@ -44,7 +44,7 @@ interface AgentAnalytics {
   avgReviewScore?: number;
   reviewCount: number;
   rank: string | { name: string; title: string; minScore: number };
-  topCategories?: string[];
+  topCategories?: Array<{ category: string; count: number; avgScore?: number } | string>;
 }
 
 interface RecentRun {
@@ -338,11 +338,14 @@ function AgentsTab() {
                   <div className="mt-3 pt-3 border-t border-zinc-800">
                     <p className="text-xs text-zinc-600 mb-1">Top categories:</p>
                     <div className="flex flex-wrap gap-1">
-                      {agent.topCategories.slice(0, 3).map(cat => (
-                        <Badge key={cat} className="bg-violet-500/20 text-violet-400 text-[10px]">
-                          {cat}
-                        </Badge>
-                      ))}
+                      {agent.topCategories.slice(0, 3).map((cat, idx) => {
+                        const label = typeof cat === 'object' ? cat.category : cat;
+                        return (
+                          <Badge key={label || idx} className="bg-violet-500/20 text-violet-400 text-[10px]">
+                            {label}
+                          </Badge>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
