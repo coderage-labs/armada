@@ -31,6 +31,7 @@ interface WorkflowStep {
     notifyOnly?: ('human' | 'operator')[];
     approveOnly?: ('human' | 'operator')[];
   };
+  gateChecks?: Array<'pr_exists' | 'tests_pass' | 'no_conflicts'>;
   retryOnFailure?: boolean;
   maxRetries?: number;
   retryDelayMs?: number;
@@ -223,6 +224,8 @@ interface NotifyOptions {
     notifyOnly?: ('human' | 'operator')[];
     approveOnly?: ('human' | 'operator')[];
   };
+  /** Gate check results to display in notification */
+  checks?: Record<string, boolean>;
   /** For failed notifications: which step failed */
   failedStepId?: string;
   failedStepName?: string;
@@ -457,6 +460,10 @@ async function advanceRun(
       if (_notifyFn && changed) {
         // Get previous step output from context
         const previousOutput = getPreviousStepOutput(run, step);
+        
+        // Run gate checks early to show verification status in notification
+        const checkResult = runGateChecks(step, run, stepRuns);
+        
         _notifyFn({
           type: 'gate',
           workflowName: workflow.name,
@@ -465,6 +472,7 @@ async function advanceRun(
           previousOutput,
           projectId: run.projectId,
           gatePolicy: step.gatePolicy,
+          checks: checkResult.checks,
         });
       }
       
@@ -964,9 +972,68 @@ function detectNeedsRevision(output: string): boolean {
   );
 }
 
+// ── Gate check helpers ──────────────────────────────────────────────
+
+interface GateCheckResult {
+  passed: boolean;
+  checks: Record<string, boolean>;
+  errors: string[];
+}
+
+/**
+ * Run gate checks on dependency steps' outputs.
+ * Currently supports: pr_exists (checks for PR reference in output)
+ */
+function runGateChecks(
+  step: WorkflowStep,
+  run: WorkflowRun,
+  stepRuns: WorkflowStepRun[],
+): GateCheckResult {
+  if (!step.gateChecks || step.gateChecks.length === 0) {
+    return { passed: true, checks: {}, errors: [] };
+  }
+
+  const checks: Record<string, boolean> = {};
+  const errors: string[] = [];
+  const deps = step.waitFor || [];
+
+  for (const checkType of step.gateChecks) {
+    if (checkType === 'pr_exists') {
+      // Check if any dependency step's output contains a PR reference
+      let prFound = false;
+      
+      for (const depId of deps) {
+        const depOutput = run.context[depId]?.output;
+        if (depOutput && typeof depOutput === 'string') {
+          // Match common PR patterns: #123, pull/123, PR #123, /pull/123
+          const prPattern = /(#\d+|pull\/\d+|PR\s*#?\d+|\/pull\/\d+)/i;
+          if (prPattern.test(depOutput)) {
+            prFound = true;
+            break;
+          }
+        }
+      }
+      
+      checks.pr_exists = prFound;
+      if (!prFound) {
+        errors.push('No PR reference found in preceding step outputs');
+      }
+    } else if (checkType === 'tests_pass') {
+      // Future: Check test status from step metadata
+      checks.tests_pass = true; // Placeholder — not implemented yet
+    } else if (checkType === 'no_conflicts') {
+      // Future: Check for merge conflicts
+      checks.no_conflicts = true; // Placeholder — not implemented yet
+    }
+  }
+
+  const passed = errors.length === 0;
+  return { passed, checks, errors };
+}
+
 // ── Approve a manual gate ───────────────────────────────────────────
 
-export async function approveGate(runId: string, stepId: string, resolvedBy?: string): Promise<void> {
+export async function approveGate(runId: string, stepId: string, resolvedBy?: string): Promise<{ approved: boolean; checks?: Record<string, boolean>; error?: string }> {
   const db = getDrizzle();
 
   const stepRun = db.get(sql`
@@ -974,6 +1041,30 @@ export async function approveGate(runId: string, stepId: string, resolvedBy?: st
   `) as any;
 
   if (!stepRun) throw new Error(`No waiting gate found for step ${stepId} in run ${runId}`);
+
+  // Get workflow and run full step data
+  const run = getRunById(runId);
+  if (!run) throw new Error(`Run ${runId} not found`);
+  
+  const workflowRow = db.select().from(workflowsTable).where(eq(workflowsTable.id, run.workflowId)).get() as any;
+  if (!workflowRow) throw new Error(`Workflow ${run.workflowId} not found`);
+  
+  const workflow = parseWorkflow(workflowRow);
+  const stepDef = workflow.steps.find(s => s.id === stepId);
+  if (!stepDef) throw new Error(`Step ${stepId} not found in workflow definition`);
+
+  // Run gate checks if configured
+  const stepRuns = getStepRunsForRun(runId);
+  const checkResult = runGateChecks(stepDef, run, stepRuns);
+  
+  if (!checkResult.passed) {
+    // Gate checks failed — return error without approving
+    return {
+      approved: false,
+      checks: checkResult.checks,
+      error: `Gate check failed: ${checkResult.errors.join(', ')}`,
+    };
+  }
 
   // Mark gate step as completed (gates are checkpoints, not work)
   const output = resolvedBy ? `✅ Approved by ${resolvedBy}` : '✅ Approved';
@@ -985,11 +1076,9 @@ export async function approveGate(runId: string, stepId: string, resolvedBy?: st
   db.update(workflowRuns).set({ status: 'running' }).where(eq(workflowRuns.id, runId)).run();
 
   // Advance to next steps
-  const run = getRunById(runId)!;
-  const workflowRow = db.select().from(workflowsTable).where(eq(workflowsTable.id, run.workflowId)).get() as any;
-  if (!workflowRow) return;
-  const workflow = parseWorkflow(workflowRow);
   await advanceRun(run, workflow);
+
+  return { approved: true, checks: checkResult.checks };
 }
 
 // ── Reject a manual gate ────────────────────────────────────────────

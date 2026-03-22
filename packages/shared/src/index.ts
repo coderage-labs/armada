@@ -495,6 +495,8 @@ export interface WorkflowStep {
     notifyOnly?: ('human' | 'operator')[];
     approveOnly?: ('human' | 'operator')[];
   };
+  /** Verification checks to run before allowing gate approval */
+  gateChecks?: Array<'pr_exists' | 'tests_pass' | 'no_conflicts'>;
   /** Auto-retry on step failure */
   retryOnFailure?: boolean;
   /** Maximum retry attempts (default 3) */

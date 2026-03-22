@@ -411,7 +411,14 @@ router.post('/runs/:runId/approve/:stepId', requireScope('workflows:write'), asy
       .where(and(eq(workflowStepRuns.runId, req.params.runId), eq(workflowStepRuns.stepId, req.params.stepId)))
       .get();
 
-    await approveGate(req.params.runId, req.params.stepId, approver);
+    const result = await approveGate(req.params.runId, req.params.stepId, approver);
+    
+    // If gate checks failed, return error without marking approved
+    if (!result.approved) {
+      res.status(400).json(result);
+      return;
+    }
+    
     logAudit(req, 'gate.approve', 'workflow_run', req.params.runId, { stepId: req.params.stepId });
 
     // Edit original Telegram notification to show resolution
@@ -426,7 +433,7 @@ router.post('/runs/:runId/approve/:stepId', requireScope('workflows:write'), asy
       }
     }
 
-    res.json({ approved: true });
+    res.json(result);
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
