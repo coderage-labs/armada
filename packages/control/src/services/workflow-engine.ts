@@ -526,11 +526,11 @@ async function advanceRun(
       }
     }
 
-    // ── Auto-close GitHub issue on workflow completion ──────────────────
+    // ── Auto-close issue on workflow completion ─────────────────────────
     if (finalStatus === 'completed' && run.triggerRef) {
       // Fire-and-forget — failure must not affect run status
-      closeGithubIssueForRun(run, workflow, updatedStepRuns).catch((err: Error) => {
-        console.error('[workflow-engine] GitHub auto-close failed (non-fatal):', err.message);
+      closeIssueForRun(run, workflow, updatedStepRuns).catch((err: Error) => {
+        console.error('[workflow-engine] Issue auto-close failed (non-fatal):', err.message);
       });
     }
 
@@ -1286,25 +1286,28 @@ function findDownstream(stepId: string, steps: WorkflowStep[]): Set<string> {
   return downstream;
 }
 
-// ── Auto-close GitHub issue when a workflow run completes ───────────
+// ── Auto-close issue when a workflow run completes ─────────────────
 
 /**
- * If the workflow run was triggered by a GitHub issue URL, post a resolution
+ * If the workflow run was triggered by an issue reference, post a resolution
  * comment, close the issue, and add the "resolved-by-armada" label.
+ *
+ * Supports both generic format (owner/repo#number) and legacy GitHub URLs.
+ * Provider is resolved via project integrations (GitHub, Linear, etc.)
  *
  * Failures are non-fatal — the caller should wrap in try/catch.
  */
-async function closeGithubIssueForRun(
+async function closeIssueForRun(
   run: WorkflowRun,
   workflow: Workflow,
   stepRuns: WorkflowStepRun[],
 ): Promise<void> {
   if (!run.triggerRef) return;
 
-  const { parseGithubIssueUrl, closeIssue, addLabel, addComment } = await import('./github-actions.js');
+  const { parseIssueRef, closeIssue, addLabel, addComment } = await import('./github-actions.js');
 
-  const parsed = parseGithubIssueUrl(run.triggerRef);
-  if (!parsed) return; // Not a GitHub issue URL
+  const parsed = parseIssueRef(run.triggerRef);
+  if (!parsed) return; // Not a valid issue reference
 
   const { owner, repo, number: issueNumber } = parsed;
 
@@ -1321,7 +1324,7 @@ async function closeGithubIssueForRun(
   await closeIssue(run.projectId, owner, repo, issueNumber);
   await addLabel(run.projectId, owner, repo, issueNumber, 'resolved-by-armada');
 
-  console.log(`[workflow-engine] Auto-closed GitHub issue ${owner}/${repo}#${issueNumber} after workflow "${workflow.name}" completed`);
+  console.log(`[workflow-engine] Auto-closed issue ${owner}/${repo}#${issueNumber} after workflow "${workflow.name}" completed`);
 }
 
 // ── Cancel a run ────────────────────────────────────────────────────

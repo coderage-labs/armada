@@ -15,12 +15,29 @@ import { integrationsRepo } from './integrations/integrations-repo.js';
 import { projectIntegrationsRepo } from './integrations/project-integrations-repo.js';
 import type { IntegrationProvider, AuthConfig } from './integrations/types.js';
 
-// ── URL parser ─────────────────────────────────────────────────────────────────
+// ── URL & Reference parsers ────────────────────────────────────────────────────
 
 export function parseGithubIssueUrl(url: string): { owner: string; repo: string; number: number } | null {
   const match = url.match(/github\.com\/([^/]+)\/([^/]+)\/issues\/(\d+)/);
   if (!match) return null;
   return { owner: match[1], repo: match[2], number: parseInt(match[3], 10) };
+}
+
+/**
+ * Parse a generic issue reference in the format: owner/repo#number
+ * Example: "coderage-labs/demo-backend#32"
+ * 
+ * Also accepts legacy GitHub URLs for backwards compatibility.
+ */
+export function parseIssueRef(ref: string): { owner: string; repo: string; number: number } | null {
+  // Try new format first: owner/repo#number
+  const refMatch = ref.match(/^([^/]+)\/([^#]+)#(\d+)$/);
+  if (refMatch) {
+    return { owner: refMatch[1], repo: refMatch[2], number: parseInt(refMatch[3], 10) };
+  }
+  
+  // Fall back to GitHub URL format for backwards compatibility
+  return parseGithubIssueUrl(ref);
 }
 
 /** Convert owner/repo + number to the canonical issue key used by the adapter: owner/repo#number */

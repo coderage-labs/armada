@@ -372,9 +372,10 @@ router.post('/:id/run', requireScope('workflows:write'), async (req, res) => {
     const { triggerType, triggerRef, vars, variables, projectId } = req.body || {};
     const parsedVars = parseJsonField<Record<string, any>>(vars || variables);
     // Auto-build triggerRef from issue variables if not explicitly provided
+    // Uses generic format: owner/repo#number (provider-agnostic)
     const resolvedTriggerRef = triggerRef
       || (parsedVars?.issueRepo && parsedVars?.issueNumber
-        ? `https://github.com/${parsedVars.issueRepo}/issues/${parsedVars.issueNumber}`
+        ? `${parsedVars.issueRepo}#${parsedVars.issueNumber}`
         : undefined);
     const run = await startRun(wf, triggerType || 'api', resolvedTriggerRef, parsedVars, projectId);
     logAudit(req, 'workflow.run_start', 'workflow_run', run.id, { workflowId: req.params.id });
