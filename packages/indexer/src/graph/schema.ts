@@ -16,6 +16,7 @@ export interface FileNode {
   hash: string;           // content hash for change detection
   lineCount: number;
   indexedAt: string;       // ISO timestamp
+  description?: string;   // Semantic description for embedding-based search
 }
 
 export interface SymbolNode {

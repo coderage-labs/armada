@@ -618,6 +618,24 @@ const migrations: Migration[] = [
       "ALTER TABLE workflow_step_runs ADD COLUMN prompt_hash TEXT DEFAULT ''",
     ],
   },
+  {
+    version: 44,
+    description: 'Add embeddings table for semantic search (#191)',
+    run(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS embeddings (
+          id TEXT PRIMARY KEY,
+          entity_type TEXT NOT NULL,
+          entity_id TEXT NOT NULL,
+          text TEXT NOT NULL,
+          vector_json TEXT NOT NULL,
+          model TEXT DEFAULT 'text-embedding-3-small',
+          created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_embeddings_entity ON embeddings(entity_type, entity_id);
+      `);
+    },
+  },
 ];
 
 /**

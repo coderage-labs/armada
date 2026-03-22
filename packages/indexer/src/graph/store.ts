@@ -43,6 +43,7 @@ export class GraphStore {
         hash TEXT NOT NULL,
         line_count INTEGER NOT NULL,
         indexed_at TEXT NOT NULL,
+        description TEXT DEFAULT '',
         UNIQUE(repo_id, path)
       );
 
@@ -147,12 +148,13 @@ export class GraphStore {
 
   upsertFile(file: FileNode): void {
     this.db.prepare(`
-      INSERT INTO files (id, repo_id, path, language, size, hash, line_count, indexed_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO files (id, repo_id, path, language, size, hash, line_count, indexed_at, description)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         language = excluded.language, size = excluded.size, hash = excluded.hash,
-        line_count = excluded.line_count, indexed_at = excluded.indexed_at
-    `).run(file.id, file.repoId, file.path, file.language, file.size, file.hash, file.lineCount, file.indexedAt);
+        line_count = excluded.line_count, indexed_at = excluded.indexed_at,
+        description = excluded.description
+    `).run(file.id, file.repoId, file.path, file.language, file.size, file.hash, file.lineCount, file.indexedAt, file.description || '');
   }
 
   getFile(id: string): FileNode | null {
@@ -190,6 +192,7 @@ export class GraphStore {
       id: row.id, repoId: row.repo_id, path: row.path,
       language: row.language as Language, size: row.size,
       hash: row.hash, lineCount: row.line_count, indexedAt: row.indexed_at,
+      description: row.description || undefined,
     };
   }
 
