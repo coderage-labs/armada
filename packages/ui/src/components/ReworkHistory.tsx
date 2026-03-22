@@ -55,7 +55,7 @@ export default function ReworkHistory({ runId }: ReworkHistoryProps) {
     refetch,
   } = useQuery<RunContext>({
     queryKey: ['workflow-run-context', runId],
-    queryFn: () => apiFetch<RunContext>(`/api/workflow-runs/${runId}/context`),
+    queryFn: () => apiFetch<RunContext>(`/api/workflows/runs/${runId}/context`),
     refetchInterval: false,
   });
 

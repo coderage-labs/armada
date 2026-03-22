@@ -648,8 +648,8 @@ function RunDetailView({
   // Load rework count for conditional tab display
   const loadReworkCount = useCallback(async () => {
     try {
-      const ctx = await apiFetch<{ reworks: unknown[] }>(`/api/workflow-runs/${run.id}/context`);
-      setReworkCount(ctx.reworks?.length ?? 0);
+      const ctx = await apiFetch<any>(`/api/workflows/runs/${run.id}/context`);
+      setReworkCount(Array.isArray(ctx?.reworks) ? ctx.reworks.length : 0);
     } catch {
       // Silently ignore — context endpoint may not exist yet
     }
