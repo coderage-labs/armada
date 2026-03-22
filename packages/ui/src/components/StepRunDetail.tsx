@@ -323,7 +323,7 @@ export default function StepRunDetail({ step, onAction, showPrompt }: Props) {
       })()}
 
       {/* Shared refs */}
-      {step.sharedRefs.length > 0 && (
+      {step.sharedRefs?.length > 0 && (
         <div>
           <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Shared Files</div>
           <div className="flex flex-wrap gap-1">
