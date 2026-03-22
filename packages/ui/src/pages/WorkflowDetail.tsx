@@ -109,6 +109,7 @@ function StepEditorDialog({
   onCancel: () => void;
 }) {
   const [id, setId] = useState(step?.id || '');
+  const [stepType, setStepType] = useState<'agent' | 'action'>(step?.stepType || 'agent');
   const [role, setRole] = useState(step?.role || '');
   const [prompt, setPrompt] = useState(step?.prompt || '');
   const [waitFor, setWaitFor] = useState<string[]>(step?.waitFor || []);
@@ -130,6 +131,13 @@ function StepEditorDialog({
   const [maxLoopIterations, setMaxLoopIterations] = useState(step?.maxLoopIterations ?? 5);
   const [toolCategories, setToolCategories] = useState<string[]>(step?.toolCategories || []);
 
+  // Action step state
+  const [action, setAction] = useState(step?.action || '');
+  const [actionTimeoutMs, setActionTimeoutMs] = useState(step?.actionTimeoutMs || 300000);
+  const [onFailure, setOnFailure] = useState<'fail' | 'culprit'>(step?.onFailure || 'fail');
+  const [stepRepo, setStepRepo] = useState((step as any)?.repo || '');
+  const [availableActions, setAvailableActions] = useState<Array<{name: string, command: string}>>([]);
+
   const TOOL_CATEGORIES = [
     'instances', 'projects', 'issues', 'workflows', 'git', 'changesets',
     'integrations', 'notifications', 'system', 'hierarchy', 'plugins',
@@ -145,11 +153,29 @@ function StepEditorDialog({
       .catch(() => {});
   }, []);
 
+  // Fetch available actions when repo changes for action steps
+  useEffect(() => {
+    if (stepType === 'action' && stepRepo) {
+      apiFetch<{ actions: Array<{name: string, command: string}> }>('/api/codebase/actions', { 
+        method: 'POST', 
+        body: JSON.stringify({ repo: stepRepo }) 
+      })
+        .then(data => setAvailableActions(data.actions || []))
+        .catch(() => setAvailableActions([]));
+    } else {
+      setAvailableActions([]);
+    }
+  }, [stepType, stepRepo]);
+
   const otherIds = allStepIds.filter((sid) => sid !== step?.id);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!id.trim() || !role.trim() || !prompt.trim()) return;
+
+    // Validation
+    if (!id.trim()) return;
+    if (stepType === 'agent' && (!role.trim() || !prompt.trim())) return;
+    if (stepType === 'action' && !action.trim()) return;
 
     // Build gatePolicy only if gate is manual and not all types selected
     let gatePolicy: WorkflowStep['gatePolicy'] | undefined;
@@ -169,23 +195,34 @@ function StepEditorDialog({
       }
     }
 
-    onSave({
+    const saved: WorkflowStep = {
       id: id.trim(),
-      role: role.trim(),
-      prompt: prompt.trim(),
+      role: stepType === 'agent' ? role.trim() : 'system', // action steps don't need a real role
+      prompt: stepType === 'agent' ? prompt.trim() : '', // no prompt for actions
+      stepType,
       waitFor: waitFor.length > 0 ? waitFor : undefined,
       parallel: parallel.trim() || undefined,
       optional: optional || undefined,
       gate: gate || undefined,
       gatePolicy,
-      retryOnFailure: retryOnFailure || undefined,
-      maxRetries: retryOnFailure ? maxRetries : undefined,
-      retryDelayMs: retryOnFailure ? retryDelayMs : undefined,
-      loopUntilApproved: loopUntilApproved || undefined,
-      loopBackToStep: loopUntilApproved && loopBackToStep.trim() ? loopBackToStep.trim() : undefined,
-      maxLoopIterations: loopUntilApproved ? maxLoopIterations : undefined,
-      toolCategories: toolCategories.length > 0 ? toolCategories : undefined,
-    });
+      ...(stepType === 'agent' && {
+        retryOnFailure: retryOnFailure || undefined,
+        maxRetries: retryOnFailure ? maxRetries : undefined,
+        retryDelayMs: retryOnFailure ? retryDelayMs : undefined,
+        loopUntilApproved: loopUntilApproved || undefined,
+        loopBackToStep: loopUntilApproved && loopBackToStep.trim() ? loopBackToStep.trim() : undefined,
+        maxLoopIterations: loopUntilApproved ? maxLoopIterations : undefined,
+        toolCategories: toolCategories.length > 0 ? toolCategories : undefined,
+      }),
+      ...(stepType === 'action' && {
+        action: action.trim(),
+        actionTimeoutMs,
+        onFailure,
+        repo: stepRepo.trim() || undefined,
+      }),
+    };
+
+    onSave(saved);
   }
 
   return (
@@ -195,6 +232,35 @@ function StepEditorDialog({
           <DialogTitle>{step ? 'Edit Step' : 'Add Step'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Step Type Selector */}
+        <div>
+          <label className="block text-xs text-zinc-500 uppercase tracking-wider mb-2">Step Type</label>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setStepType('agent')}
+              className={`flex-1 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
+                stepType === 'agent'
+                  ? 'bg-violet-500/20 border-violet-500/50 text-violet-300'
+                  : 'bg-zinc-800/50 border-zinc-700 text-zinc-400 hover:border-zinc-600'
+              }`}
+            >
+              Agent
+            </button>
+            <button
+              type="button"
+              onClick={() => setStepType('action')}
+              className={`flex-1 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
+                stepType === 'action'
+                  ? 'bg-violet-500/20 border-violet-500/50 text-violet-300'
+                  : 'bg-zinc-800/50 border-zinc-700 text-zinc-400 hover:border-zinc-600'
+              }`}
+            >
+              Action
+            </button>
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-xs text-zinc-500 uppercase tracking-wider mb-1">Step ID</label>
@@ -206,6 +272,7 @@ function StepEditorDialog({
               className="w-full rounded-lg border border-zinc-800 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-200 placeholder-gray-600 focus:outline-none focus:border-violet-500/50 disabled:opacity-50"
             />
           </div>
+          {stepType === 'agent' && (
           <div>
             <label className="block text-xs text-zinc-500 uppercase tracking-wider mb-1">Role</label>
             {availableRoles.length > 0 ? (
@@ -229,8 +296,10 @@ function StepEditorDialog({
               />
             )}
           </div>
+          )}
         </div>
 
+        {stepType === 'agent' && (
         <div>
           <label className="block text-xs text-zinc-500 uppercase tracking-wider mb-1">Prompt</label>
           <Textarea
@@ -241,6 +310,77 @@ function StepEditorDialog({
             className="w-full rounded-lg border border-zinc-800 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-200 placeholder-gray-600 focus:outline-none focus:border-violet-500/50 resize-none font-mono"
           />
         </div>
+        )}
+
+        {stepType === 'action' && (
+        <div className="space-y-4">
+          {/* Repo field */}
+          <div>
+            <label className="block text-xs text-zinc-500 uppercase tracking-wider mb-1">
+              Repo <span className="text-zinc-600">(optional, falls back to issueRepo)</span>
+            </label>
+            <Input
+              value={stepRepo}
+              onChange={(e) => setStepRepo(e.target.value)}
+              placeholder="e.g. owner/repo"
+              className="w-full rounded-lg border border-zinc-800 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-200 placeholder-gray-600 focus:outline-none focus:border-violet-500/50"
+            />
+          </div>
+
+          {/* Action name - dropdown if actions available, text input otherwise */}
+          <div>
+            <label className="block text-xs text-zinc-500 uppercase tracking-wider mb-1">Action Name</label>
+            {availableActions.length > 0 ? (
+              <Select value={action || '__none__'} onValueChange={(val) => setAction(val === '__none__' ? '' : val)}>
+                <SelectTrigger className="w-full border-zinc-800 bg-zinc-800/50">
+                  <SelectValue placeholder="Select action…" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Select action…</SelectItem>
+                  {availableActions.map(a => (
+                    <SelectItem key={a.name} value={a.name}>{a.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input
+                value={action}
+                onChange={(e) => setAction(e.target.value)}
+                placeholder="e.g. test, lint, build"
+                className="w-full rounded-lg border border-zinc-800 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-200 placeholder-gray-600 focus:outline-none focus:border-violet-500/50"
+              />
+            )}
+          </div>
+
+          {/* Timeout */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-zinc-500 uppercase tracking-wider mb-1">Timeout (seconds)</label>
+              <Input
+                type="number"
+                min={1}
+                value={actionTimeoutMs / 1000}
+                onChange={(e) => setActionTimeoutMs(Number(e.target.value) * 1000)}
+                className="w-full rounded-lg border border-zinc-800 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-200"
+              />
+            </div>
+
+            {/* On Failure */}
+            <div>
+              <label className="block text-xs text-zinc-500 uppercase tracking-wider mb-1">On Failure</label>
+              <Select value={onFailure} onValueChange={(val) => setOnFailure(val as 'fail' | 'culprit')}>
+                <SelectTrigger className="w-full border-zinc-800 bg-zinc-800/50">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="fail">Fail</SelectItem>
+                  <SelectItem value="culprit">Route to culprit step</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+        )}
 
         {otherIds.length > 0 && (
           <div>
@@ -271,6 +411,7 @@ function StepEditorDialog({
               className="w-full rounded-lg border border-zinc-800 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-200 placeholder-gray-600 focus:outline-none focus:border-violet-500/50"
             />
           </div>
+          {stepType === 'agent' && (
           <div>
             <label className="block text-xs text-zinc-500 uppercase tracking-wider mb-1">Gate</label>
             <Select value={gate || '__none__'} onValueChange={(val) => setGate(val === '__none__' ? '' : val as 'manual' | '')}>
@@ -283,6 +424,7 @@ function StepEditorDialog({
               </SelectContent>
             </Select>
           </div>
+          )}
           <div className="flex items-end pb-2">
             <Checkbox
               checked={optional}
@@ -292,7 +434,7 @@ function StepEditorDialog({
           </div>
         </div>
 
-        {gate === 'manual' && (
+        {stepType === 'agent' && gate === 'manual' && (
           <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-3 space-y-3">
             <div className="text-xs font-semibold text-yellow-300">Gate Policy</div>
             <div className="grid grid-cols-2 gap-4">
@@ -315,6 +457,7 @@ function StepEditorDialog({
         )}
 
         {/* ── Retry Config ──────────────────────────────────── */}
+        {stepType === 'agent' && (
         <div className="rounded-lg border border-zinc-700/50 bg-zinc-800/30 p-3 space-y-3">
           <div className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Retry &amp; Loop</div>
 
@@ -433,6 +576,7 @@ function StepEditorDialog({
             )}
           </div>
         </div>
+        )}
 
         <DialogFooter>
           <Button
@@ -444,7 +588,11 @@ function StepEditorDialog({
           </Button>
           <Button
             variant="ghost" type="submit"
-            disabled={!id.trim() || !role.trim() || !prompt.trim()}
+            disabled={
+              !id.trim() || 
+              (stepType === 'agent' && (!role.trim() || !prompt.trim())) ||
+              (stepType === 'action' && !action.trim())
+            }
             className="rounded-lg border border-violet-500/30 bg-violet-500/20 px-4 py-2 text-sm font-medium text-violet-300 hover:bg-violet-500/30 transition disabled:opacity-50"
           >
             {step ? 'Save' : 'Add Step'}
