@@ -678,19 +678,22 @@ function findWorktreePathForActionStep(
   step: WorkflowStep,
   stepRuns: WorkflowStepRun[],
 ): string | null {
-  // Look at dependencies (waitFor)
   const deps = step.waitFor || [];
+  const runPrefix = run.id.slice(0, 8);
   
-  // Find the first dependency that has a worktree (implement steps)
+  // Find the first completed dependency step and use its conventional worktree path
+  // Worktrees are at /home/node/worktrees/{runId[0:8]}/{stepId}
   for (const depId of deps) {
-    const depStepRun = stepRuns.find(sr => sr.stepId === depId);
-    if (!depStepRun) continue;
-    
-    // Check if this step has a worktree path in its context
-    const contextEntry = (run.context as any)[depId];
-    if (contextEntry && contextEntry.worktreePath) {
-      return contextEntry.worktreePath;
+    const depStepRun = stepRuns.find(sr => sr.stepId === depId && sr.status === 'completed');
+    if (depStepRun) {
+      return `/home/node/worktrees/${runPrefix}/${depId}`;
     }
+  }
+  
+  // Also check run context for worktree paths stored by the provisioner
+  for (const depId of deps) {
+    const contextEntry = (run.context as any)[depId];
+    if (contextEntry?.worktreePath) return contextEntry.worktreePath;
   }
   
   return null;
