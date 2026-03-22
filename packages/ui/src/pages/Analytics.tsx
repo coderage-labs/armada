@@ -43,7 +43,7 @@ interface AgentAnalytics {
   avgDurationMs: number;
   avgReviewScore?: number;
   reviewCount: number;
-  rank: 'Cadet' | 'Lieutenant' | 'Commander' | 'Captain' | 'Admiral';
+  rank: string | { name: string; title: string; minScore: number };
   topCategories?: string[];
 }
 
@@ -302,13 +302,13 @@ function AgentsTab() {
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {agents.map(agent => {
-          const rankStyle = RANK_COLORS[agent.rank] || RANK_COLORS.Cadet;
+          const rankStyle = RANK_COLORS[typeof agent.rank === 'object' ? agent.rank.title : agent.rank] || RANK_COLORS.Cadet;
           return (
             <div key={agent.agent} className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5 hover:bg-zinc-800/50 transition-colors">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-lg font-semibold text-zinc-200">{agent.agent}</h3>
                 <Badge className={`${rankStyle.bg} ${rankStyle.text} text-xs font-bold`}>
-                  {agent.rank}
+                  {typeof agent.rank === 'object' ? agent.rank.title : agent.rank}
                 </Badge>
               </div>
               <div className="space-y-2 text-sm">
