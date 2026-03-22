@@ -542,6 +542,16 @@ async function advanceRun(
       });
     }
 
+    // ── Run convention extraction every 5 completed runs ────────────────
+    if (finalStatus === 'completed' && run.projectId) {
+      const { shouldExtractConventions, extractConventions } = await import('./convention-extractor.js');
+      if (shouldExtractConventions(run.projectId)) {
+        extractConventions(run.projectId).catch((err: Error) => {
+          console.error('[convention-extractor]', err.message);
+        });
+      }
+    }
+
     if (_notifyFn) {
       // For failed runs, include details about which step failed and why
       const failedStepRun = finalStatus === 'failed'
