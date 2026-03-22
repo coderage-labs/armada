@@ -45,6 +45,14 @@ interface WorkflowStep {
   condition?: string;
   /** Per-step repo for multi-repo workflows */
   repo?: string;
+  /** Step type: 'agent' (default) runs an LLM agent, 'action' runs a command */
+  stepType?: 'agent' | 'action';
+  /** Action name from armada.json (e.g. 'test', 'lint', 'build') */
+  action?: string;
+  /** Timeout for action execution in ms (default 300000 = 5 min) */
+  actionTimeoutMs?: number;
+  /** Failure handling: 'fail' marks step failed, 'culprit' routes to source step */
+  onFailure?: 'fail' | 'culprit';
 }
 interface RetryState {
   retryCount: number;
@@ -600,6 +608,293 @@ async function advanceRun(
   }
 }
 
+// ── Action Step Utilities ───────────────────────────────────────────
+
+interface ArmadaJson {
+  install?: string;
+  verify?: string;
+  test?: string;
+  build?: string;
+  lint?: string;
+  actions?: Record<string, { command: string; description?: string } | string>;
+  [key: string]: any;
+}
+
+/**
+ * Resolve an action command from armada.json.
+ * Checks `actions[actionName].command` first, then falls back to top-level fields.
+ */
+export function resolveActionCommand(armadaJson: ArmadaJson, actionName: string): string | null {
+  // Check new actions object first
+  if (armadaJson.actions && armadaJson.actions[actionName]) {
+    const entry = armadaJson.actions[actionName];
+    if (typeof entry === 'string') return entry;
+    if (typeof entry === 'object' && entry.command) return entry.command;
+  }
+  
+  // Fallback to legacy top-level fields
+  const legacyCommand = armadaJson[actionName];
+  if (typeof legacyCommand === 'string') return legacyCommand;
+  
+  return null;
+}
+
+/**
+ * Parse error output for file paths and match them to completed implement steps.
+ * Returns the stepId of the culprit step, or null if no match found.
+ */
+export function detectCulprit(
+  errorOutput: string,
+  completedSteps: Array<{ stepId: string; output: string | null }>,
+): string | null {
+  // Extract file paths from error output (common patterns for test failures)
+  const filePathPattern = /(?:at\s+)?(?:file:\/\/)?([a-zA-Z0-9_\-/.]+\.(ts|js|tsx|jsx|py|go|rs|java|rb|php|c|cpp|h|hpp))/gi;
+  const matches = [...errorOutput.matchAll(filePathPattern)];
+  const errorFiles = new Set(matches.map(m => m[1]));
+  
+  if (errorFiles.size === 0) return null;
+  
+  // Look for which step mentioned these files in their output
+  for (const step of completedSteps) {
+    if (!step.output) continue;
+    for (const file of errorFiles) {
+      // Match file basename or full path
+      const basename = file.split('/').pop();
+      if (step.output.includes(file) || (basename && step.output.includes(basename))) {
+        return step.stepId;
+      }
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Find the worktree path for an action step.
+ * Action steps don't have their own worktrees — they run in a dependency's worktree.
+ */
+function findWorktreePathForActionStep(
+  run: WorkflowRun,
+  step: WorkflowStep,
+  stepRuns: WorkflowStepRun[],
+): string | null {
+  // Look at dependencies (waitFor)
+  const deps = step.waitFor || [];
+  
+  // Find the first dependency that has a worktree (implement steps)
+  for (const depId of deps) {
+    const depStepRun = stepRuns.find(sr => sr.stepId === depId);
+    if (!depStepRun) continue;
+    
+    // Check if this step has a worktree path in its context
+    const contextEntry = (run.context as any)[depId];
+    if (contextEntry && contextEntry.worktreePath) {
+      return contextEntry.worktreePath;
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Execute an action step — run a command from armada.json in the worktree.
+ */
+async function executeActionStep(
+  run: WorkflowRun,
+  workflow: Workflow,
+  step: WorkflowStep,
+  stepRun: WorkflowStepRun,
+  extraVars?: Record<string, any>,
+): Promise<void> {
+  const db = getDrizzle();
+  const actionName = step.action;
+  
+  // Helper to mark step as failed and trigger completion
+  const failStep = async (output: string) => {
+    db.run(sql`
+      UPDATE workflow_step_runs
+      SET status = 'failed', completed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+          output = ${output}
+      WHERE id = ${stepRun.id}
+    `);
+    
+    // Reload the step run to get the updated task_id
+    const updated = db.select().from(workflowStepRuns).where(eq(workflowStepRuns.id, stepRun.id)).get();
+    if (updated?.taskId) {
+      await onStepCompleted(updated.taskId, 'failed', output, []);
+    }
+  };
+  
+  if (!actionName) {
+    console.error(`[workflow-engine] Action step "${step.id}" has no action name`);
+    await failStep('Action step has no action name');
+    return;
+  }
+  
+  // Find the repo for this step
+  const storedVars = (run.context as any)?._vars || {};
+  const mergedVars = { ...storedVars, ...extraVars };
+  const repo = step.repo || mergedVars.issueRepo;
+  
+  if (!repo) {
+    console.error(`[workflow-engine] Action step "${step.id}" has no repo`);
+    await failStep('Action step has no repo');
+    return;
+  }
+  
+  // Find the worktree path (from a dependency step)
+  const allStepRuns = getStepRunsForRun(run.id);
+  const worktreePath = findWorktreePathForActionStep(run, step, allStepRuns);
+  
+  if (!worktreePath) {
+    console.error(`[workflow-engine] Action step "${step.id}" could not find worktree path`);
+    await failStep('Could not find worktree path for action step');
+    return;
+  }
+  
+  // Find the instance and node for this workflow
+  const project = run.projectId ? projectsRepo.get(run.projectId) : null;
+  const agents = agentsRepo.getAll();
+  const agent = agents[0];
+  if (!agent) {
+    console.error(`[workflow-engine] No agents available for action step "${step.id}"`);
+    await failStep('No agents available');
+    return;
+  }
+  
+  const instance = instancesRepo.getById(agent.instanceId);
+  if (!instance) {
+    console.error(`[workflow-engine] Instance not found for agent "${agent.name}"`);
+    await failStep('Instance not found');
+    return;
+  }
+  
+  const node = getNodeClient(instance.nodeId);
+  
+  // Create task ID for this action step
+  const taskId = `wf-${run.id.slice(0, 8)}-${step.id}-action`;
+  
+  // Mark step as running
+  db.run(sql`
+    UPDATE workflow_step_runs
+    SET status = 'running', started_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), task_id = ${taskId}
+    WHERE id = ${stepRun.id}
+  `);
+  db.update(workflowRuns).set({ currentStep: step.id }).where(eq(workflowRuns.id, run.id)).run();
+  
+  try {
+    // Read armada.json from the worktree
+    const catResult = await node.execInWorkspace(
+      instance.name,
+      worktreePath,
+      'cat armada.json',
+      30_000,
+    );
+    
+    if (catResult.exitCode !== 0) {
+      const output = `Failed to read armada.json:\n${catResult.output}`;
+      await failStep(output);
+      return;
+    }
+    
+    // Parse armada.json and resolve the action command
+    let armadaJson: ArmadaJson;
+    try {
+      armadaJson = JSON.parse(catResult.output);
+    } catch (err: any) {
+      const output = `Failed to parse armada.json: ${err.message}`;
+      await failStep(output);
+      return;
+    }
+    
+    const command = resolveActionCommand(armadaJson, actionName);
+    if (!command) {
+      const output = `Action "${actionName}" not found in armada.json`;
+      await failStep(output);
+      return;
+    }
+    
+    console.log(`[workflow-engine] Running action "${actionName}" in ${worktreePath}: ${command}`);
+    
+    // Execute the command in the worktree
+    const timeout = step.actionTimeoutMs || 300_000;
+    const execResult = await node.execInWorkspace(
+      instance.name,
+      worktreePath,
+      command,
+      timeout,
+    );
+    
+    const output = execResult.output;
+    
+    if (execResult.exitCode === 0) {
+      // Success
+      db.run(sql`
+        UPDATE workflow_step_runs
+        SET status = 'completed', completed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+            output = ${output}
+        WHERE id = ${stepRun.id}
+      `);
+      await onStepCompleted(taskId, 'completed', output, []);
+    } else {
+      // Failure — handle culprit detection if configured
+      if (step.onFailure === 'culprit') {
+        const completedStepRuns = allStepRuns.filter(sr => sr.status === 'completed');
+        const culpritStepId = detectCulprit(output, completedStepRuns);
+        
+        if (culpritStepId) {
+          console.log(`[workflow-engine] Action "${actionName}" failed — culprit detected: ${culpritStepId}`);
+          
+          // Set rework feedback on the culprit step
+          const ctx = run.context as any;
+          ctx[`${culpritStepId}_reworkFeedback`] = `Test failure from ${step.id}:\n${output}`;
+          ctx[`${culpritStepId}_previousOutput`] = completedStepRuns.find(sr => sr.stepId === culpritStepId)?.output;
+          
+          db.run(sql`
+            UPDATE workflow_runs
+            SET context = ${JSON.stringify(ctx)}
+            WHERE id = ${run.id}
+          `);
+          
+          // Mark culprit step as waiting_for_rework
+          db.run(sql`
+            UPDATE workflow_step_runs
+            SET status = 'waiting_for_rework'
+            WHERE run_id = ${run.id} AND step_id = ${culpritStepId}
+          `);
+          
+          // Mark this action step as failed
+          const failOutput = `Culprit detected: ${culpritStepId}\n\n${output}`;
+          db.run(sql`
+            UPDATE workflow_step_runs
+            SET status = 'failed', completed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+                output = ${failOutput}
+            WHERE id = ${stepRun.id}
+          `);
+          
+          await onStepCompleted(taskId, 'failed', failOutput, []);
+          return;
+        }
+        
+        // No culprit found — fall through to normal failure
+        console.log(`[workflow-engine] Action "${actionName}" failed — no culprit detected`);
+      }
+      
+      // Normal failure
+      db.run(sql`
+        UPDATE workflow_step_runs
+        SET status = 'failed', completed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+            output = ${output}
+        WHERE id = ${stepRun.id}
+      `);
+      await onStepCompleted(taskId, 'failed', output, []);
+    }
+  } catch (err: any) {
+    const output = `Action execution error: ${err.message}`;
+    await failStep(output);
+  }
+}
+
 // ── Dispatch a single step ──────────────────────────────────────────
 
 async function dispatchStep(
@@ -609,6 +904,12 @@ async function dispatchStep(
   stepRun: WorkflowStepRun,
   extraVars?: Record<string, any>,
 ): Promise<void> {
+  // Route action steps to executeActionStep
+  if (step.stepType === 'action' && step.action) {
+    await executeActionStep(run, workflow, step, stepRun, extraVars);
+    return;
+  }
+
   if (!_dispatchFn) {
     console.error('[workflow-engine] No dispatch function configured');
     return;

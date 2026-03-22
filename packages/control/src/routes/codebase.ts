@@ -325,3 +325,49 @@ codebaseRouter.post('/index-status', requireScope('projects:read'), (req, res) =
   if (!index) return res.json({ indexed: false });
   res.json({ indexed: true, ...index });
 });
+
+codebaseRouter.post('/actions', requireScope('projects:read'), (req, res) => {
+  const { repo } = req.body;
+  if (!repo) return res.status(400).json({ error: 'repo is required' });
+  
+  try {
+    const token = resolveTokenForRepo(repo);
+    const repoDir = ensureRepoClone(repo, token);
+    const armadaJsonPath = resolve(repoDir, 'armada.json');
+    
+    if (!existsSync(armadaJsonPath)) {
+      return res.json({ actions: [] });
+    }
+    
+    const armadaJson = JSON.parse(require('fs').readFileSync(armadaJsonPath, 'utf-8'));
+    const actions: Array<{ name: string; command: string; description?: string }> = [];
+    
+    // Check new actions object first
+    if (armadaJson.actions && typeof armadaJson.actions === 'object') {
+      for (const [name, entry] of Object.entries(armadaJson.actions)) {
+        if (typeof entry === 'string') {
+          actions.push({ name, command: entry });
+        } else if (typeof entry === 'object' && entry !== null && 'command' in entry) {
+          const cmd = (entry as any).command;
+          const desc = (entry as any).description;
+          actions.push({ name, command: cmd, description: desc });
+        }
+      }
+    }
+    
+    // Add legacy top-level fields
+    const legacyFields = ['install', 'verify', 'test', 'build', 'lint'];
+    for (const field of legacyFields) {
+      if (armadaJson[field] && typeof armadaJson[field] === 'string') {
+        // Don't duplicate if already in actions object
+        if (!actions.find(a => a.name === field)) {
+          actions.push({ name: field, command: armadaJson[field] });
+        }
+      }
+    }
+    
+    res.json({ actions });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
