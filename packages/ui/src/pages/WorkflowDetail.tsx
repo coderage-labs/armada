@@ -100,11 +100,13 @@ const RUN_STATUS_STYLES: Record<string, string> = {
 function StepEditorDialog({
   step,
   allStepIds,
+  projectIds,
   onSave,
   onCancel,
 }: {
   step: WorkflowStep | null; // null = creating new
   allStepIds: string[];
+  projectIds?: string[];
   onSave: (step: WorkflowStep) => void;
   onCancel: () => void;
 }) {
@@ -136,7 +138,24 @@ function StepEditorDialog({
   const [actionTimeoutMs, setActionTimeoutMs] = useState(step?.actionTimeoutMs || 300000);
   const [onFailure, setOnFailure] = useState<'fail' | 'culprit'>(step?.onFailure || 'fail');
   const [stepRepo, setStepRepo] = useState((step as any)?.repo || '');
-  const [availableActions, setAvailableActions] = useState<Array<{name: string, command: string}>>([]);
+  const [availableActions, setAvailableActions] = useState<Array<{name: string, command: string, description?: string}>>([]);
+  const [projectRepos, setProjectRepos] = useState<Array<{fullName: string}>>([]);
+
+  // Fetch repos from project for action step repo dropdown
+  useEffect(() => {
+    if (projectIds?.length) {
+      apiFetch<Array<{fullName: string}>>(`/api/projects/${projectIds[0]}/repos2`)
+        .then(repos => setProjectRepos(repos || []))
+        .catch(() => setProjectRepos([]));
+    }
+  }, [projectIds]);
+
+  // Auto-select first repo if none set
+  useEffect(() => {
+    if (stepType === 'action' && !stepRepo && projectRepos.length > 0) {
+      setStepRepo(projectRepos[0].fullName);
+    }
+  }, [stepType, projectRepos, stepRepo]);
 
   const TOOL_CATEGORIES = [
     'instances', 'projects', 'issues', 'workflows', 'git', 'changesets',
@@ -314,17 +333,30 @@ function StepEditorDialog({
 
         {stepType === 'action' && (
         <div className="space-y-4">
-          {/* Repo field */}
+          {/* Repo field — dropdown from project repos, or text input */}
           <div>
             <label className="block text-xs text-zinc-500 uppercase tracking-wider mb-1">
               Repo <span className="text-zinc-600">(optional, falls back to issueRepo)</span>
             </label>
-            <Input
-              value={stepRepo}
-              onChange={(e) => setStepRepo(e.target.value)}
-              placeholder="e.g. owner/repo"
-              className="w-full rounded-lg border border-zinc-800 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-200 placeholder-gray-600 focus:outline-none focus:border-violet-500/50"
-            />
+            {projectRepos.length > 0 ? (
+              <select
+                value={stepRepo}
+                onChange={(e) => setStepRepo(e.target.value)}
+                className="w-full rounded-lg border border-zinc-800 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-violet-500/50"
+              >
+                <option value="">Select repo...</option>
+                {projectRepos.map(r => (
+                  <option key={r.fullName} value={r.fullName}>{r.fullName}</option>
+                ))}
+              </select>
+            ) : (
+              <Input
+                value={stepRepo}
+                onChange={(e) => setStepRepo(e.target.value)}
+                placeholder="e.g. owner/repo"
+                className="w-full rounded-lg border border-zinc-800 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-200 placeholder-gray-600 focus:outline-none focus:border-violet-500/50"
+              />
+            )}
           </div>
 
           {/* Action name - dropdown if actions available, text input otherwise */}
@@ -1522,6 +1554,7 @@ export default function WorkflowDetail() {
         <StepEditorDialog
           step={editingStep}
           allStepIds={workflow.steps.map((s: WorkflowStep) => s.id)}
+          projectIds={getProjectIds(workflow)}
           onSave={handleSaveStep}
           onCancel={() => setEditingStep(undefined)}
         />
