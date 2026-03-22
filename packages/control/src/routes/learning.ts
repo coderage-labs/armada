@@ -38,6 +38,10 @@ const LEARNING_TOOLS = [
     parameters: [
       { name: 'projectId', type: 'string', description: 'Project ID', required: true },
     ] },
+  { category: 'learning', scope: 'projects:write', name: 'armada_conventions_extract', description: 'Manually trigger convention extraction for a project. Analyzes review feedback and extracts recurring patterns.', method: 'POST', path: '/api/learning/conventions/extract',
+    parameters: [
+      { name: 'projectId', type: 'string', description: 'Project ID', required: true },
+    ] },
 ] as const;
 
 for (const tool of LEARNING_TOOLS) {
@@ -267,6 +271,21 @@ learningRouter.post('/conventions/add', requireScope('projects:write'), (req, re
   }).run();
 
   res.status(201).json({ id, convention });
+});
+
+// POST /api/learning/conventions/extract — manually trigger convention extraction
+learningRouter.post('/conventions/extract', requireScope('projects:write'), async (req, res) => {
+  const { projectId } = req.body;
+  if (!projectId) return res.status(400).json({ error: 'projectId required' });
+
+  try {
+    const { extractConventions } = await import('../services/convention-extractor.js');
+    const result = await extractConventions(projectId);
+    res.json(result);
+  } catch (err) {
+    console.error('[learning] Convention extraction failed:', err);
+    res.status(500).json({ error: 'Extraction failed', message: (err as Error).message });
+  }
 });
 
 // GET /api/learning/leaderboard — agent score leaderboard

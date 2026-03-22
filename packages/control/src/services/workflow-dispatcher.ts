@@ -29,13 +29,52 @@ const _worktreeTasks = new Map<string, WorktreeTaskEntry>();
  * Find the least busy running agent with the given role.
  * Uses capacity data from the health monitor for load balancing:
  * sorted by healthy first, then lowest taskCount, then lowest responseMs.
+ * 
+ * If multiple agents match, prefer the one with higher review scores for this role.
  *
  * When the agent belongs to a multi-agent instance, returns the instance URL
  * plus targetAgent so the receiving instance can route correctly.
  */
-function findAgentByRole(role: string): { name: string; url: string; targetAgent?: string } | null {
+async function findAgentByRole(role: string, category?: string): Promise<{ name: string; url: string; targetAgent?: string } | null> {
   const candidates = getAgentsByRoleWithCapacity(role);
   if (candidates.length === 0) return null;
+
+  // If multiple candidates exist and we have a category, prefer higher-scoring agents
+  if (candidates.length > 1 && category) {
+    const { getDrizzle } = await import('../db/drizzle.js');
+    const { agentScores } = await import('../db/drizzle-schema.js');
+    const { eq, and } = await import('drizzle-orm');
+    
+    const db = getDrizzle();
+    const cat = category || role; // Use role as fallback category
+    
+    // Fetch scores for all candidates
+    const candidateNames = candidates.map(c => c.name);
+    const scores = db.select()
+      .from(agentScores)
+      .where(eq(agentScores.category, cat))
+      .all();
+    
+    // Build score map
+    const scoreMap = new Map<string, number>();
+    for (const score of scores) {
+      if (candidateNames.includes(score.agentId)) {
+        scoreMap.set(score.agentId, score.avgScore || 0);
+      }
+    }
+    
+    // Sort candidates: first by score (desc), then by capacity
+    candidates.sort((a, b) => {
+      const scoreA = scoreMap.get(a.name) || 0;
+      const scoreB = scoreMap.get(b.name) || 0;
+      
+      if (scoreA !== scoreB) return scoreB - scoreA; // Higher score first
+      
+      // Fall back to capacity sort
+      if (a.taskCount !== b.taskCount) return a.taskCount - b.taskCount;
+      return a.responseMs - b.responseMs;
+    });
+  }
 
   // Already sorted by capacity (healthy first, lowest taskCount, lowest responseMs)
   return {
@@ -51,7 +90,8 @@ function findAgentByRole(role: string): { name: string; url: string; targetAgent
  */
 export function initWorkflowDispatcher() {
   setWorkflowDispatcher(async (opts) => {
-    const agent = findAgentByRole(opts.role);
+    // Use role as category for skill-level routing (Phase 3 enhancement)
+    const agent = await findAgentByRole(opts.role, opts.role);
     // Resolve project UUID → project name (tasks table stores name as project_id)
     const projectName = opts.projectId
       ? (projectsRepo.get(opts.projectId)?.name ?? opts.projectId)
