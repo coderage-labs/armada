@@ -127,7 +127,6 @@ learningRouter.post('/reviews', requireScope('workflows:write'), (req, res) => {
         avgScore: score,
       }).run();
     }
-  }
 
     // Also update 'overall' scores if category is specific
     if (cat !== 'overall') {
