@@ -211,7 +211,7 @@ export function initWorkflowDispatcher() {
         taskId: opts.taskId,
         from: 'workflow-engine',
         fromRole: 'operator',
-        message: opts.message + worktreeContext + (discoveryContext ?? ''),
+        message: opts.message + worktreeContext + (discoveryContext ?? '') + (opts as any).learningContext || '',
         callbackUrl: `${callbackBaseUrl}/api/tasks/${opts.taskId}/result`,
         projectId: opts.projectId,
         ...(agent.targetAgent && { targetAgent: agent.targetAgent }),

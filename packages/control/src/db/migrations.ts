@@ -531,6 +531,67 @@ const migrations: Migration[] = [
       }
     },
   },
+  {
+    version: 41,
+    description: 'Create review_records, agent_lessons, and project_conventions tables (#185)',
+    run(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS review_records (
+          id TEXT PRIMARY KEY,
+          run_id TEXT NOT NULL,
+          step_id TEXT NOT NULL,
+          reviewer TEXT,
+          executor TEXT,
+          score INTEGER NOT NULL CHECK(score BETWEEN 1 AND 5),
+          result TEXT NOT NULL CHECK(result IN ('approved', 'rejected')),
+          feedback TEXT DEFAULT '',
+          issues_json TEXT DEFAULT '[]',
+          round INTEGER DEFAULT 1,
+          category TEXT,
+          created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_review_records_run ON review_records(run_id);
+        CREATE INDEX IF NOT EXISTS idx_review_records_executor ON review_records(executor);
+
+        CREATE TABLE IF NOT EXISTS agent_lessons (
+          id TEXT PRIMARY KEY,
+          agent_id TEXT NOT NULL,
+          project_id TEXT,
+          lesson TEXT NOT NULL,
+          source TEXT DEFAULT 'review',
+          severity TEXT DEFAULT 'medium',
+          review_id TEXT,
+          active INTEGER DEFAULT 1,
+          times_injected INTEGER DEFAULT 0,
+          created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+          resolved_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_agent_lessons_agent ON agent_lessons(agent_id);
+        CREATE INDEX IF NOT EXISTS idx_agent_lessons_active ON agent_lessons(active);
+
+        CREATE TABLE IF NOT EXISTS project_conventions (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL,
+          convention TEXT NOT NULL,
+          source TEXT DEFAULT 'extracted',
+          evidence_count INTEGER DEFAULT 1,
+          active INTEGER DEFAULT 1,
+          created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_project_conventions_project ON project_conventions(project_id);
+
+        CREATE TABLE IF NOT EXISTS agent_scores (
+          agent_id TEXT NOT NULL,
+          category TEXT NOT NULL DEFAULT 'overall',
+          total_score INTEGER DEFAULT 0,
+          review_count INTEGER DEFAULT 0,
+          avg_score REAL DEFAULT 0,
+          last_updated TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+          PRIMARY KEY (agent_id, category)
+        );
+      `);
+    },
+  },
 ];
 
 /**
