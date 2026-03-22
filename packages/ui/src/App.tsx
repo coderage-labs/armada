@@ -60,6 +60,7 @@ function AnimatedRoutes() {
             <Route path="/plugins" element={<Plugins />} />
             <Route path="/models" element={<Models />} />
             <Route path="/providers" element={<Providers />} />
+            <Route path="/analytics" element={<Analytics />} />
             <Route path="/codebase" element={<Codebase />} />
             <Route path="/logs" element={<Logs />} />
             <Route path="/settings" element={<Settings />} />
@@ -103,6 +104,7 @@ import SetupWizard from './pages/SetupWizard';
 import Settings from './pages/Settings';
 import Usage from './pages/Usage';
 import Notifications from './pages/Notifications';
+import Analytics from './pages/Analytics';
 import Codebase from './pages/Codebase';
 import { ChangesetBottomBar } from './components/ChangesetBottomBar';
 import { Toaster } from './components/ui/sonner';

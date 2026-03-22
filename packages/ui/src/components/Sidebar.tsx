@@ -10,7 +10,7 @@ import {
   Home, Monitor, Bot, Cpu, Rocket, FileCode, FolderKanban, GitBranch,
   Activity, Bell, BellRing, Puzzle, Plug, Terminal, Menu, X, LogOut, Bolt, Users,
   Workflow, Radio, Cable, Layers, Settings, Shield, Server, GitPullRequest,
-  Wifi, WifiOff, TrendingUp, Code2,
+  Wifi, WifiOff, TrendingUp, Code2, BarChart3,
 } from 'lucide-react';
 
 interface BadgeCounts {
@@ -39,6 +39,7 @@ const navItems: NavItem[] = [
   { to: '/models', label: 'Models', icon: Cpu },
   { to: '/projects', label: 'Projects', icon: FolderKanban },
   { to: '/workflows', label: 'Workflows', icon: Workflow },
+  { to: '/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/codebase', label: 'Codebase', icon: Code2 },
   { to: '/users', label: 'Users', icon: Users, requiredScope: 'users:write' },
   { to: '/hierarchy', label: 'Hierarchy', icon: GitBranch },
