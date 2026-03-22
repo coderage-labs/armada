@@ -1983,7 +1983,7 @@ export function updateWorkflow(id: string, params: UpdateWorkflowParams): (Workf
     db.update(workflowsTable).set({ stepsJson: JSON.stringify(normalised) }).where(eq(workflowsTable.id, id)).run();
 
     // Snapshot prompt versions for changed steps (#185 Phase 4)
-    const { snapshotPromptVersion } = require('./prompt-performance.js');
+    const { snapshotPromptVersion } = await import('./prompt-performance.js');
     for (const step of normalised) {
       if (step.prompt) {
         snapshotPromptVersion(id, step.id, step.prompt);
