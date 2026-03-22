@@ -5,7 +5,7 @@
 
 import { Router } from 'express';
 import { resolve } from 'node:path';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { requireScope } from '../middleware/scopes.js';
 import { registerToolDef } from '../utils/tool-registry.js';
@@ -339,7 +339,7 @@ codebaseRouter.post('/actions', requireScope('projects:read'), (req, res) => {
       return res.json({ actions: [] });
     }
     
-    const armadaJson = JSON.parse(require('fs').readFileSync(armadaJsonPath, 'utf-8'));
+    const armadaJson = JSON.parse(readFileSync(armadaJsonPath, 'utf-8'));
     const actions: Array<{ name: string; command: string; description?: string }> = [];
     
     // Check new actions object first
