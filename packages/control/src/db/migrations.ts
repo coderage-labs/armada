@@ -592,6 +592,32 @@ const migrations: Migration[] = [
       `);
     },
   },
+  {
+    version: 42,
+    description: 'Create prompt_versions table for tracking prompt evolution (#185 Phase 4)',
+    run(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS prompt_versions (
+          id TEXT PRIMARY KEY,
+          workflow_id TEXT NOT NULL,
+          step_id TEXT NOT NULL,
+          version INTEGER NOT NULL DEFAULT 1,
+          prompt_template TEXT NOT NULL,
+          created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+          retired_at TEXT,
+          UNIQUE(workflow_id, step_id, version)
+        );
+        CREATE INDEX IF NOT EXISTS idx_prompt_versions_workflow ON prompt_versions(workflow_id, step_id);
+      `);
+    },
+  },
+  {
+    version: 43,
+    description: 'Add prompt_hash column to workflow_step_runs (#185 Phase 4)',
+    sql: [
+      "ALTER TABLE workflow_step_runs ADD COLUMN prompt_hash TEXT DEFAULT ''",
+    ],
+  },
 ];
 
 /**
