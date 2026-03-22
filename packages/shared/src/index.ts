@@ -522,6 +522,14 @@ export interface WorkflowStep {
    * E.g. ['git', 'issues'] loads only git and issue-tracking tools.
    */
   toolCategories?: string[];
+  /** Step type: 'agent' (default) runs an LLM agent, 'action' runs a command */
+  stepType?: 'agent' | 'action';
+  /** Action name from armada.json (e.g. 'test', 'lint', 'build') */
+  action?: string;
+  /** Timeout for action execution in ms (default 300000 = 5 min) */
+  actionTimeoutMs?: number;
+  /** Failure handling: 'fail' marks step failed, 'culprit' routes to source step */
+  onFailure?: 'fail' | 'culprit';
 }
 
 export interface Workflow {
