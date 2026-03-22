@@ -1983,12 +1983,13 @@ export function updateWorkflow(id: string, params: UpdateWorkflowParams): (Workf
     db.update(workflowsTable).set({ stepsJson: JSON.stringify(normalised) }).where(eq(workflowsTable.id, id)).run();
 
     // Snapshot prompt versions for changed steps (#185 Phase 4)
-    const { snapshotPromptVersion } = await import('./prompt-performance.js');
-    for (const step of normalised) {
-      if (step.prompt) {
-        snapshotPromptVersion(id, step.id, step.prompt);
+    import('./prompt-performance.js').then(({ snapshotPromptVersion }) => {
+      for (const step of normalised) {
+        if (step.prompt) {
+          snapshotPromptVersion(id, step.id, step.prompt);
+        }
       }
-    }
+    }).catch(() => {});
   }
   if (params.enabled !== undefined) db.update(workflowsTable).set({ enabled: params.enabled ? 1 : 0 }).where(eq(workflowsTable.id, id)).run();
 
