@@ -11,6 +11,10 @@ import {
   getAgentStats,
   getRecentRuns,
 } from '../services/workflow-metrics.js';
+import {
+  getPromptPerformance,
+  getAllStepPromptPerformance,
+} from '../services/prompt-performance.js';
 
 export const analyticsRouter = Router();
 
@@ -66,6 +70,29 @@ const ANALYTICS_TOOLS = [
     path: '/api/analytics/runs/recent',
     parameters: [
       { name: 'limit', type: 'number', description: 'Number of runs to return (default 20)' },
+    ],
+  },
+  {
+    category: 'analytics',
+    scope: 'workflows:read',
+    name: 'armada_prompt_performance',
+    description: 'Get prompt version performance for all steps in a workflow. Shows which prompt versions correlate with higher review scores.',
+    method: 'GET',
+    path: '/api/analytics/prompts/:workflowId',
+    parameters: [
+      { name: 'workflowId', type: 'string', description: 'Workflow ID', required: true },
+    ],
+  },
+  {
+    category: 'analytics',
+    scope: 'workflows:read',
+    name: 'armada_prompt_performance_step',
+    description: 'Get detailed prompt version performance for a specific workflow step.',
+    method: 'GET',
+    path: '/api/analytics/prompts/:workflowId/:stepId',
+    parameters: [
+      { name: 'workflowId', type: 'string', description: 'Workflow ID', required: true },
+      { name: 'stepId', type: 'string', description: 'Step ID', required: true },
     ],
   },
 ] as const;
@@ -141,5 +168,29 @@ analyticsRouter.get('/runs/recent', requireScope('workflows:read'), (req, res) =
   } catch (error: any) {
     console.error('Error fetching recent runs:', error);
     res.status(500).json({ error: error.message || 'Failed to fetch recent runs' });
+  }
+});
+
+// GET /api/analytics/prompts/:workflowId — prompt version performance for all steps
+analyticsRouter.get('/prompts/:workflowId', requireScope('workflows:read'), (req, res) => {
+  try {
+    const { workflowId } = req.params;
+    const stats = getAllStepPromptPerformance(workflowId);
+    res.json(stats);
+  } catch (error: any) {
+    console.error('Error fetching prompt performance:', error);
+    res.status(500).json({ error: error.message || 'Failed to fetch prompt performance' });
+  }
+});
+
+// GET /api/analytics/prompts/:workflowId/:stepId — detailed performance for a specific step
+analyticsRouter.get('/prompts/:workflowId/:stepId', requireScope('workflows:read'), (req, res) => {
+  try {
+    const { workflowId, stepId } = req.params;
+    const stats = getPromptPerformance(workflowId, stepId);
+    res.json(stats);
+  } catch (error: any) {
+    console.error('Error fetching step prompt performance:', error);
+    res.status(500).json({ error: error.message || 'Failed to fetch step prompt performance' });
   }
 });

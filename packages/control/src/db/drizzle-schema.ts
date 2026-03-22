@@ -310,6 +310,7 @@ export const workflowStepRuns = sqliteTable('workflow_step_runs', {
   completedAt: text('completed_at'),
   retryConfigJson: text('retry_config'),
   telegramNotificationsJson: text('telegram_notifications_json'),
+  promptHash: text('prompt_hash').notNull().default(''),
 });
 
 // ── users ────────────────────────────────────────────────────────────
@@ -744,4 +745,14 @@ export const agentScores = sqliteTable('agent_scores', {
   reviewCount: integer('review_count').default(0),
   avgScore: real('avg_score').default(0),
   lastUpdated: text('last_updated').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+});
+
+export const promptVersions = sqliteTable('prompt_versions', {
+  id: text('id').primaryKey(),
+  workflowId: text('workflow_id').notNull(),
+  stepId: text('step_id').notNull(),
+  version: integer('version').notNull().default(1),
+  promptTemplate: text('prompt_template').notNull(),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+  retiredAt: text('retired_at'),
 });

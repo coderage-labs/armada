@@ -21,6 +21,7 @@ import { getArtifactContextBlock } from '../routes/workflow-artifacts.js';
 import { projectsRepo, agentsRepo, instancesRepo } from '../repositories/index.js';
 import { getNodeClient } from '../infrastructure/node-client.js';
 import { eventBus } from '../infrastructure/event-bus.js';
+import { hashPrompt } from './prompt-performance.js';
 
 // Types — mirror shared package types locally to avoid build ordering issues
 interface WorkflowStep {
@@ -655,10 +656,11 @@ async function dispatchStep(
   const prompt = contextWithArtifacts + '\n\n' + resolvedPrompt;
   const taskId = `wf-${run.id.slice(0, 8)}-${step.id}`;
 
-  // Mark step as running and store the resolved prompt
+  // Mark step as running and store the resolved prompt + prompt hash
   const db = getDrizzle();
+  const promptHash = hashPrompt(prompt);
   db.run(sql`
-    UPDATE workflow_step_runs SET status = 'running', started_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), task_id = ${taskId}, input_json = ${JSON.stringify({ prompt })}
+    UPDATE workflow_step_runs SET status = 'running', started_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), task_id = ${taskId}, input_json = ${JSON.stringify({ prompt })}, prompt_hash = ${promptHash}
     WHERE id = ${stepRun.id}
   `);
 
@@ -1678,6 +1680,14 @@ export function updateWorkflow(id: string, params: UpdateWorkflowParams): (Workf
       waitFor: s.waitFor || (s as any).dependsOn || (s as any).dependencies || [],
     }));
     db.update(workflowsTable).set({ stepsJson: JSON.stringify(normalised) }).where(eq(workflowsTable.id, id)).run();
+
+    // Snapshot prompt versions for changed steps (#185 Phase 4)
+    const { snapshotPromptVersion } = require('./prompt-performance.js');
+    for (const step of normalised) {
+      if (step.prompt) {
+        snapshotPromptVersion(id, step.id, step.prompt);
+      }
+    }
   }
   if (params.enabled !== undefined) db.update(workflowsTable).set({ enabled: params.enabled ? 1 : 0 }).where(eq(workflowsTable.id, id)).run();
 
