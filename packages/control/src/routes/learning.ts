@@ -129,6 +129,25 @@ learningRouter.post('/reviews', requireScope('workflows:write'), (req, res) => {
     }
   }
 
+    // Also update 'overall' scores if category is specific
+    if (cat !== 'overall') {
+      const overallScore = db.select().from(agentScores)
+        .where(and(eq(agentScores.agentId, executor), eq(agentScores.category, 'overall'))).get();
+      if (overallScore) {
+        const newCount = (overallScore.reviewCount || 0) + 1;
+        const newTotal = (overallScore.totalScore || 0) + score;
+        db.update(agentScores).set({
+          totalScore: newTotal, reviewCount: newCount, avgScore: newTotal / newCount,
+          lastUpdated: new Date().toISOString(),
+        }).where(and(eq(agentScores.agentId, executor), eq(agentScores.category, 'overall'))).run();
+      } else {
+        db.insert(agentScores).values({
+          agentId: executor, category: 'overall', totalScore: score, reviewCount: 1, avgScore: score,
+        }).run();
+      }
+    }
+  }
+
   // If rejected, extract lesson from feedback
   if (result === 'rejected' && feedback && executor) {
     const lessonId = randomUUID();
