@@ -756,3 +756,15 @@ export const promptVersions = sqliteTable('prompt_versions', {
   createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
   retiredAt: text('retired_at'),
 });
+
+// ── Semantic Search (#191) ──────────────────────────────────────────
+
+export const embeddings = sqliteTable('embeddings', {
+  id: text('id').primaryKey(),
+  entityType: text('entity_type').notNull(),
+  entityId: text('entity_id').notNull(),
+  text: text('text').notNull(),
+  vectorJson: text('vector_json').notNull(),
+  model: text('model').default('text-embedding-3-small'),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+});

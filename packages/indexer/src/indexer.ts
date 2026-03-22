@@ -127,6 +127,44 @@ export async function indexRepository(opts: IndexOptions): Promise<IndexResult> 
 }
 
 /**
+ * Generate a semantic description of a file from its metadata.
+ */
+function generateFileDescription(opts: {
+  filePath: string;
+  language: Language;
+  symbols: Omit<SymbolNode, 'id' | 'fileId'>[];
+  imports: Omit<ImportEdge, 'id' | 'fromFileId' | 'toFileId'>[];
+}): string {
+  const { filePath, language, symbols, imports } = opts;
+  const parts: string[] = [filePath];
+
+  // Add language
+  const langLabel = language.charAt(0).toUpperCase() + language.slice(1);
+  parts.push(langLabel);
+
+  // Add exports (public symbols)
+  const exported = symbols.filter(s => s.exported);
+  if (exported.length > 0) {
+    const exportDesc = exported
+      .map(s => `${s.name} (${s.kind})`)
+      .slice(0, 5) // limit to 5
+      .join(', ');
+    parts.push(`Exports: ${exportDesc}`);
+    if (exported.length > 5) parts.push(`+${exported.length - 5} more`);
+  }
+
+  // Add imports (modules only, not internal symbols)
+  const importModules = [...new Set(imports.map(i => i.toModule))];
+  if (importModules.length > 0) {
+    const importDesc = importModules.slice(0, 5).join(', ');
+    parts.push(`Imports: ${importDesc}`);
+    if (importModules.length > 5) parts.push(`+${importModules.length - 5} more`);
+  }
+
+  return parts.join(' — ');
+}
+
+/**
  * Index a single file — parse and store its symbols + imports.
  */
 export async function indexFile(opts: {
@@ -142,7 +180,25 @@ export async function indexFile(opts: {
   const now = new Date().toISOString();
   const lineCount = content.split('\n').length;
 
-  // Store file node
+  // Clear existing symbols + imports for this file (re-index)
+  store.deleteSymbolsByFile(fileId);
+  store.deleteImportsByFile(fileId);
+
+  // Parse if supported language
+  let parsed = { symbols: [], imports: [] } as { symbols: Omit<SymbolNode, 'id' | 'fileId'>[]; imports: Omit<ImportEdge, 'id' | 'fromFileId' | 'toFileId'>[] };
+  if (isParseable(language)) {
+    parsed = await parseSource(content, language, filePath);
+  }
+
+  // Generate semantic description
+  const description = generateFileDescription({
+    filePath,
+    language,
+    symbols: parsed.symbols,
+    imports: parsed.imports,
+  });
+
+  // Store file node with description
   const fileNode: FileNode = {
     id: fileId,
     repoId,
@@ -152,17 +208,10 @@ export async function indexFile(opts: {
     hash,
     lineCount,
     indexedAt: now,
+    description,
   };
   store.upsertFile(fileNode);
 
-  // Clear existing symbols + imports for this file (re-index)
-  store.deleteSymbolsByFile(fileId);
-  store.deleteImportsByFile(fileId);
-
-  // Parse if supported language
-  if (!isParseable(language)) return { symbols: 0, imports: 0 };
-
-  const parsed = await parseSource(content, language, filePath);
   let symbolCount = 0;
   let importCount = 0;
 
