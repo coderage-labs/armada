@@ -797,13 +797,30 @@ async function executeActionStep(
   db.update(workflowRuns).set({ currentStep: step.id }).where(eq(workflowRuns.id, run.id)).run();
   
   try {
-    // Read armada.json from the worktree
-    const catResult = await node.execInWorkspace(
+    // Read armada.json — try worktree first, fall back to base repo
+    let effectivePath = worktreePath;
+    let catResult = await node.execInWorkspace(
       instance.name,
       worktreePath,
       'cat armada.json',
       30_000,
     );
+    
+    // If worktree doesn't exist, fall back to base repo
+    if (catResult.exitCode !== 0 && repo) {
+      const parts = repo.split('/');
+      const baseRepoPath = parts.length === 2
+        ? `/home/node/repos/${parts[0]}/${parts[1]}`
+        : worktreePath;
+      console.log(`[workflow-engine] Worktree ${worktreePath} not accessible, falling back to base repo ${baseRepoPath}`);
+      effectivePath = baseRepoPath;
+      catResult = await node.execInWorkspace(
+        instance.name,
+        baseRepoPath,
+        'cat armada.json',
+        30_000,
+      );
+    }
     
     if (catResult.exitCode !== 0) {
       const output = `Failed to read armada.json:\n${catResult.output}`;
@@ -828,13 +845,13 @@ async function executeActionStep(
       return;
     }
     
-    console.log(`[workflow-engine] Running action "${actionName}" in ${worktreePath}: ${command}`);
+    console.log(`[workflow-engine] Running action "${actionName}" in ${effectivePath}: ${command}`);
     
-    // Execute the command in the worktree
+    // Execute the command in the worktree (or base repo fallback)
     const timeout = step.actionTimeoutMs || 300_000;
     const execResult = await node.execInWorkspace(
       instance.name,
-      worktreePath,
+      effectivePath,
       command,
       timeout,
     );
