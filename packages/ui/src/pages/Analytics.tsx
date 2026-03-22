@@ -422,9 +422,22 @@ function PromptPerformanceTab() {
 
   useEffect(() => {
     if (!selectedWorkflowId) return;
-    apiFetch<PromptAnalytics[]>(`/api/analytics/prompts/${selectedWorkflowId}`)
-      .then(setPrompts)
-      .catch(() => {});
+    apiFetch<any>(`/api/analytics/prompts/${selectedWorkflowId}`)
+      .then(data => {
+        // API may return object keyed by stepId or array — normalise to array
+        if (Array.isArray(data)) {
+          setPrompts(data);
+        } else if (data && typeof data === 'object') {
+          const arr = Object.entries(data).map(([stepId, versions]) => ({
+            stepId,
+            versions: Array.isArray(versions) ? versions : [],
+          }));
+          setPrompts(arr);
+        } else {
+          setPrompts([]);
+        }
+      })
+      .catch(() => setPrompts([]));
   }, [selectedWorkflowId]);
 
   if (loading) {

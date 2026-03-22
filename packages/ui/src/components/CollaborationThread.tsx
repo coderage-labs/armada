@@ -223,7 +223,7 @@ export default function CollaborationThread({ runId }: CollaborationThreadProps)
     refetch,
   } = useQuery<RunContext>({
     queryKey: ['workflow-run-context', runId],
-    queryFn: () => apiFetch<RunContext>(`/api/workflow-runs/${runId}/context`),
+    queryFn: () => apiFetch<RunContext>(`/api/workflows/runs/${runId}/context`),
     refetchInterval: false,
   });
 
