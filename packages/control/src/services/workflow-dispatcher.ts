@@ -14,6 +14,47 @@ import { createWorktree, mergeWorktree, cleanupWorktree } from './worktree-servi
 
 const CONTROL_PLANE_URL = process.env.ARMADA_API_URL || 'http://armada-control:3001';
 
+// ── Retry helpers ────────────────────────────────────────────────────
+
+/**
+ * Retry a function with exponential backoff on retryable errors.
+ */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  delays: number[] = [5000, 15000, 30000],
+  shouldRetry?: (error: any) => boolean,
+): Promise<T> {
+  let lastError: Error;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      lastError = err;
+      if (attempt < maxRetries && (!shouldRetry || shouldRetry(err))) {
+        const delay = delays[attempt] || delays[delays.length - 1];
+        console.log(`[workflow-dispatcher] Retry ${attempt + 1}/${maxRetries} in ${delay}ms: ${err.message}`);
+        await new Promise(r => setTimeout(r, delay));
+      }
+    }
+  }
+  throw lastError!;
+}
+
+/**
+ * Check if an error is retryable (connection/network related).
+ */
+function isRetryableError(err: any): boolean {
+  const msg = (err.message || '').toLowerCase();
+  return msg.includes('not connected') || 
+         msg.includes('connection refused') || 
+         msg.includes('socket hang up') ||
+         msg.includes('timeout') ||
+         msg.includes('econnreset') ||
+         msg.includes('disconnected') ||
+         msg.includes('unreachable');
+}
+
 // ── Worktree task registry ──────────────────────────────────────────
 
 interface WorktreeTaskEntry {
@@ -194,13 +235,19 @@ export function initWorkflowDispatcher() {
         let workPath: string | undefined;
         try {
           const wsNode = getNodeClient(instance.nodeId);
-          const provisionResult = await wsNode.provisionWorkspace(instance.name, {
-            repo: targetRepo,
-            branch,
-            stepId: opts.stepId,
-            runId: opts.runId,
-            installCmd: undefined, // Let the node discover from armada.json
-          });
+          // Wrap provisioning with retry logic for reconnection resilience
+          const provisionResult = await withRetry(
+            async () => wsNode.provisionWorkspace(instance.name, {
+              repo: targetRepo,
+              branch,
+              stepId: opts.stepId,
+              runId: opts.runId,
+              installCmd: undefined, // Let the node discover from armada.json
+            }),
+            3,
+            [5000, 15000, 30000],
+            isRetryableError,
+          );
           workPath = provisionResult.path;
           console.log(`[workflow-dispatcher] Provisioned worktree for step "${opts.stepId}": ${workPath} (branch: ${branch})`);
 
@@ -258,7 +305,13 @@ export function initWorkflowDispatcher() {
         ...(opts.toolCategories?.length && { toolCategories: opts.toolCategories }),
       });
 
-      const resp = await node.relayRequest(containerName, 'POST', '/armada/task', body) as any;
+      // Wrap relay request with retry logic for reconnection resilience
+      const resp = await withRetry(
+        async () => node.relayRequest(containerName, 'POST', '/armada/task', body),
+        3,
+        [5000, 15000, 30000],
+        isRetryableError,
+      ) as any;
       const status = resp?.statusCode ?? resp?.status ?? 200;
 
       if (status >= 400) {
