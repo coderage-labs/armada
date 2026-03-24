@@ -252,6 +252,14 @@ let _dispatchFn: DispatchFn | null = null;
 let _notifyFn: ((opts: NotifyOptions) => void) | null = null;
 let _cleanupWorkspacesFn: ((run: { id: string }) => Promise<void>) | null = null;
 
+// ── Startup grace period ─────────────────────────────────────────────
+// At startup, wait 30s for nodes to reconnect before processing workflows
+let _startupGracePeriod = true;
+setTimeout(() => {
+  _startupGracePeriod = false;
+  console.log('[workflow-engine] Startup grace period ended');
+}, 30_000);
+
 export function setWorkflowDispatcher(fn: DispatchFn) {
   _dispatchFn = fn;
 }
@@ -386,6 +394,12 @@ async function advanceRun(
   workflow: Workflow,
   extraVars?: Record<string, any>,
 ): Promise<void> {
+  // Skip processing during startup grace period to allow nodes to reconnect
+  if (_startupGracePeriod) {
+    console.log(`[workflow-engine] Skipping advanceRun for ${run.id.slice(0, 8)} — startup grace period active`);
+    return;
+  }
+
   if (run.status !== 'running' && run.status !== 'paused') return;
   // Paused runs can still advance non-gated steps (gates only block THEIR step)
 
