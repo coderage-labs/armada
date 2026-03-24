@@ -6,9 +6,10 @@ import { logActivity } from './activity-service.js';
 import { eventBus } from '../infrastructure/event-bus.js';
 import { projectIntegrationsRepo } from './integrations/project-integrations-repo.js';
 import { integrationsRepo } from './integrations/integrations-repo.js';
+import { getProvider } from './integrations/registry.js';
 import type { GitHubIssue } from '@coderage-labs/armada-shared';
+import type { AuthConfig, ExternalIssue } from './integrations/types.js';
 
-const GITHUB_API = 'https://api.github.com';
 const DEFAULT_SYNC_INTERVAL_MINUTES = 5;
 const SCHEDULER_TICK_MS = 60_000; // Check every 60s which projects are due
 
@@ -16,7 +17,7 @@ const SCHEDULER_TICK_MS = 60_000; // Check every 60s which projects are due
 
 const lastSyncAt = new Map<string, number>();
 
-// ── DB-backed cache of GitHub issues per project ────────────────────
+// ── DB-backed cache of issues per project ───────────────────────────
 
 export function getCachedIssues(projectId: string): GitHubIssue[] {
   const rows = getDrizzle()
@@ -39,24 +40,35 @@ export function getCachedIssues(projectId: string): GitHubIssue[] {
 }
 
 /**
- * Resolve the GitHub token for a project:
- * 1. Check for a GitHub integration attached to the project
- * 2. Fall back to GITHUB_TOKEN env var
+ * Resolve integration auth for a project.
+ * Returns the first enabled integration with the specified provider (or any provider if not specified).
+ * Falls back to GITHUB_TOKEN env var for GitHub provider.
  */
-function resolveGitHubToken(projectId: string): string {
+function resolveIntegrationAuth(projectId: string, provider?: string): { provider: string; authConfig: AuthConfig } | null {
   try {
     const projectIntegrations = projectIntegrationsRepo.getByProject(projectId);
     for (const pi of projectIntegrations) {
       if (!pi.enabled) continue;
       const integration = integrationsRepo.getById(pi.integrationId);
-      if (integration && integration.provider === 'github' && integration.authConfig?.token) {
-        return integration.authConfig.token as string;
+      if (!integration) continue;
+      
+      // Filter by provider if specified
+      if (provider && integration.provider !== provider) continue;
+      
+      if (integration.authConfig) {
+        return { provider: integration.provider, authConfig: integration.authConfig };
       }
     }
   } catch (err: any) {
-    console.warn(`[issue-sync] Failed to resolve integration token for project ${projectId}:`, err.message);
+    console.warn(`[issue-sync] Failed to resolve integration auth for project ${projectId}:`, err.message);
   }
-  return process.env.GITHUB_TOKEN || '';
+
+  // Fallback to GITHUB_TOKEN env var for GitHub only
+  if ((!provider || provider === 'github') && process.env.GITHUB_TOKEN) {
+    return { provider: 'github', authConfig: { token: process.env.GITHUB_TOKEN } };
+  }
+
+  return null;
 }
 
 /**
@@ -107,6 +119,52 @@ export function parseDependencies(
   }
 }
 
+/**
+ * Convert ExternalIssue (from adapter) to GitHubIssue (legacy format for cache).
+ * Maps provider-specific issue keys to numbers for storage.
+ */
+function externalToGitHubIssue(external: ExternalIssue, repo: string, provider: string): GitHubIssue {
+  // Extract issue number from externalId
+  // GitHub: "123" → number 123
+  // Jira: "PROJ-123" → hash to number for compatibility
+  let issueNumber: number;
+  if (provider === 'github') {
+    issueNumber = parseInt(external.externalId, 10);
+  } else {
+    // For non-GitHub providers (Jira, etc.), hash the external ID to a number
+    // This maintains the number field for DB compatibility while supporting keys
+    issueNumber = hashStringToNumber(external.externalId);
+  }
+
+  return {
+    number: issueNumber,
+    title: external.title,
+    body: external.description,
+    url: external.url,
+    htmlUrl: external.url,
+    labels: external.labels,
+    milestone: external.priority, // Map priority to milestone field
+    state: external.status,
+    createdAt: external.createdAt,
+    updatedAt: external.updatedAt,
+    repo,
+  };
+}
+
+/**
+ * Simple hash function to convert string keys (e.g., "PROJ-123") to numbers.
+ * Used for non-GitHub providers that use string keys instead of numeric IDs.
+ */
+function hashStringToNumber(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash);
+}
+
 export async function syncProjectIssues(projectId: string): Promise<{ fetched: number }> {
   const project = projectsRepo.get(projectId);
   if (!project) throw new Error('Project not found');
@@ -116,77 +174,72 @@ export async function syncProjectIssues(projectId: string): Promise<{ fetched: n
   const config = JSON.parse(project.configJson || '{}');
   const legacyRepos: Array<{ url: string }> = config.repositories || [];
 
-  // Build list of {slug, token} pairs to fetch
-  type RepoFetch = { slug: string; token: string };
-  const repoFetches: RepoFetch[] = [];
+  const allIssues: GitHubIssue[] = [];
 
+  // Sync from linked repos (modern path — uses adapters)
   if (linkedRepos.length > 0) {
-    for (const lr of linkedRepos) {
-      if (lr.provider !== 'github') continue;
-      let token = '';
+    for (const linkedRepo of linkedRepos) {
+      const integration = integrationsRepo.getById(linkedRepo.integrationId);
+      if (!integration) {
+        console.warn(`[issue-sync] Integration not found for repo ${linkedRepo.fullName}`);
+        continue;
+      }
+
+      const adapter = getProvider(integration.provider);
+      if (!adapter?.fetchIssues) {
+        console.warn(`[issue-sync] Provider ${integration.provider} does not support fetchIssues`);
+        continue;
+      }
+
       try {
-        const integration = (await import('./integrations/integrations-repo.js')).integrationsRepo.getById(lr.integrationId);
-        if (integration?.authConfig?.token) {
-          token = integration.authConfig.token as string;
+        // Fetch issues for this repo
+        const filters = {
+          projects: [linkedRepo.fullName], // For GitHub: owner/repo, for Jira: project key
+        };
+
+        const { issues } = await adapter.fetchIssues(integration.authConfig, filters);
+
+        // Convert to GitHubIssue format for cache
+        for (const issue of issues) {
+          const ghIssue = externalToGitHubIssue(issue, linkedRepo.fullName, integration.provider);
+          allIssues.push(ghIssue);
         }
-      } catch {}
-      if (!token) token = resolveGitHubToken(projectId);
-      repoFetches.push({ slug: lr.fullName, token });
+      } catch (err: any) {
+        console.error(`[issue-sync] Failed to fetch issues from ${linkedRepo.fullName}:`, err.message);
+      }
     }
-  } else {
-    // Legacy fallback: config.repositories + global token
-    const token = resolveGitHubToken(projectId);
+  } else if (legacyRepos.length > 0) {
+    // Legacy fallback: config.repositories + global GitHub token
+    const auth = resolveIntegrationAuth(projectId, 'github');
+    if (!auth) {
+      console.warn(`[issue-sync] No GitHub integration or token available for project ${projectId}`);
+      return { fetched: 0 };
+    }
+
+    const adapter = getProvider('github');
+    if (!adapter?.fetchIssues) {
+      console.error('[issue-sync] GitHub adapter not registered or does not support fetchIssues');
+      return { fetched: 0 };
+    }
+
     for (const repo of legacyRepos) {
       const match = repo.url.match(/(?:github\.com\/)?([^/]+\/[^/]+?)(?:\.git)?$/);
       if (!match) continue;
       const slug = match[1].replace(/^\//, '');
       const parts = slug.split('/');
       if (parts.length < 2) continue;
-      repoFetches.push({ slug, token });
-    }
-  }
 
-  const allIssues: GitHubIssue[] = [];
+      try {
+        const filters = { projects: [slug] };
+        const { issues } = await adapter.fetchIssues(auth.authConfig, filters);
 
-  for (const { slug, token: repoToken } of repoFetches) {
-    const parts = slug.split('/');
-    if (parts.length < 2) continue;
-    const owner = parts[0];
-    const repoName = parts[1];
-    const repoSlug = `${owner}/${repoName}`;
-
-    // Fetch open issues (not PRs)
-    const resp = await fetch(
-      `${GITHUB_API}/repos/${owner}/${repoName}/issues?state=open&per_page=100&sort=updated`,
-      {
-        headers: {
-          ...(repoToken ? { Authorization: `Bearer ${repoToken}` } : {}),
-          Accept: 'application/vnd.github.v3+json',
-        },
-        signal: AbortSignal.timeout(30_000),
-      },
-    );
-
-    if (!resp.ok) continue;
-    const issues = (await resp.json()) as Array<Record<string, any>>;
-
-    for (const issue of issues) {
-      // Skip PRs (GitHub API returns PRs as issues too)
-      if (issue.pull_request) continue;
-
-      allIssues.push({
-        number: issue.number as number,
-        title: issue.title as string,
-        body: (issue.body as string) || '',
-        url: issue.html_url as string,
-        htmlUrl: issue.html_url as string,
-        labels: (issue.labels as Array<{ name: string }> || []).map(l => l.name),
-        milestone: (issue.milestone as { title: string } | null)?.title,
-        state: issue.state as string,
-        createdAt: issue.created_at as string,
-        updatedAt: issue.updated_at as string,
-        repo: repoSlug,
-      });
+        for (const issue of issues) {
+          const ghIssue = externalToGitHubIssue(issue, slug, 'github');
+          allIssues.push(ghIssue);
+        }
+      } catch (err: any) {
+        console.error(`[issue-sync] Failed to fetch issues from ${slug}:`, err.message);
+      }
     }
   }
 
@@ -229,7 +282,7 @@ export async function syncProjectIssues(projectId: string): Promise<{ fetched: n
     parseDependencies(projectId, issue.repo || '', issue.number, issue.body || '');
   }
 
-  // Mark cached issues NOT in the fresh response as closed (they were closed/deleted on GitHub)
+  // Mark cached issues NOT in the fresh response as closed (they were closed/deleted on the provider)
   const freshNumbers = new Set(allIssues.map(i => `${i.repo}:${i.number}`));
   const cached = db.select().from(githubIssueCache)
     .where(eq(githubIssueCache.projectId, projectId))
@@ -300,9 +353,9 @@ export function startIssueSyncScheduler() {
       const intervalMs = resolveProjectIntervalMs(config);
       if (intervalMs === 0) continue; // Explicitly disabled
 
-      // Check if project has a GitHub token available
-      const token = resolveGitHubToken(project.id);
-      if (!token) continue; // No token, skip
+      // Check if project has any integration available
+      const auth = resolveIntegrationAuth(project.id);
+      if (!auth && linkedReposCount === 0) continue; // No auth for legacy repos
 
       // Check if due
       const last = lastSyncAt.get(project.id) || 0;
