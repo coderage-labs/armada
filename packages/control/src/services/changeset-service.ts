@@ -13,7 +13,7 @@ import { operationManager } from '../infrastructure/operations.js';
 import { changesetValidator, type ChangesetValidationResult } from './changeset-validator.js';
 import { applyChangeset, retryFailedInstances } from './changeset-apply.js';
 import { computeMutationDiffs } from './diff-computer.js';
-import { buildStepsForInstance, dagToSteps } from './step-planner.js';
+import { buildStepsForInstance, dagToSteps, resolveFileWrites } from './step-planner.js';
 import { analyseChangesetImpact } from './changeset-impact.js';
 import type { StateChange, ChangesetPlan, Changeset, ArmadaInstance, Agent } from '@coderage-labs/armada-shared';
 
@@ -275,13 +275,41 @@ export function createChangesetService(): ChangesetService {
         },
       ];
 
+      // For file-only changesets, ensure push_files step is included
+      // even though we skip config_version and restart
+      let finalSteps = steps;
+      let finalDeps = dag.deps;
+      if (isFileOnly && steps.length === 0) {
+        // Resolve the actual nodeId from the instance record
+        const instanceRecord = instancesRepo.getById(inst.instanceId);
+        const nodeId = instanceRecord?.nodeId || '';
+        // Resolve file writes from the pending agent mutations
+        const fileWrites = resolveFileWrites(
+          instanceMutations.filter(m => m.entityType === 'agent'),
+          inst.instanceId,
+        );
+        const fileWriteStep = {
+          id: crypto.crypto.randomUUID(),
+          name: 'push_files' as const,
+          status: 'pending' as const,
+          metadata: {
+            nodeId,
+            containerName: `armada-instance-${inst.instanceName}`,
+            instanceId: inst.instanceId,
+            files: fileWrites,
+          },
+        };
+        finalSteps = [fileWriteStep];
+        finalDeps = [];
+      }
+
       return {
         instanceId: inst.instanceId,
         instanceName: inst.instanceName,
         changes: instChanges,
-        steps,
-        stepDeps: dag.deps,
-        estimatedDowntime: 5, // ~5s per restart
+        steps: finalSteps,
+        stepDeps: finalDeps,
+        estimatedDowntime: 0,
       };
     });
 
@@ -325,7 +353,7 @@ export function createChangesetService(): ChangesetService {
     // Capture rollback snapshot
     const rollback = configDiffService.snapshot();
 
-    const id = crypto.randomUUID();
+    const id = crypto.crypto.randomUUID();
     const now = new Date().toISOString();
 
     // Stamp with current schema version for stale draft detection after migrations
