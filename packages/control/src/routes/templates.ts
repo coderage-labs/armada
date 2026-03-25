@@ -11,6 +11,7 @@ import { eventBus } from '../infrastructure/event-bus.js';
 import { computeTemplateDrift, syncTemplateToAgents } from '../services/template-sync.js';
 import { changesetService } from '../services/changeset-service.js';
 import { workingCopy } from '../services/working-copy.js';
+import { mutationService } from '../services/mutation-service.js';
 
 const router = Router();
 
@@ -178,11 +179,17 @@ router.put('/:id', requireScope('templates:write'), (req, res, next) => {
     for (const key of ['plugins', 'pluginsList', 'skillsList', 'toolsAllow', 'env', 'internalAgents', 'tools', 'projects', 'resources'] as const) {
       if (body[key] !== undefined) body[key] = parseJsonField(body[key]);
     }
+    
+    // Update working copy for UI diff preview
     workingCopy.update('template', req.params.id, body);
+    
+    // Stage a mutation so changesets can pick it up
+    mutationService.stage('template', 'update', body, req.params.id);
+    
     logActivity({ eventType: 'template.updated', detail: `Template "${existing.name}" staged for update` });
     eventBus.emit('template.updated', { templateId: req.params.id });
     logAudit(req, 'template.update', 'template', req.params.id, { name: existing.name });
-    res.json({ ok: true, action: 'update', message: 'Staged in working copy' });
+    res.json({ ok: true, action: 'update', message: 'Staged — create and apply a changeset to commit' });
   } catch (err) {
     next(err);
   }
