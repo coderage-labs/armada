@@ -169,13 +169,14 @@ class AgentManagerImpl implements AgentManager {
     // Update workspace files (SOUL.md, AGENTS.md, gitconfig) — these don't need restart
     await lifecycle.updateAgent(agent.instanceId, agentConfig);
 
-    // Write files to absolute paths within the container workspace
-    // These paths should resolve to /home/node/.openclaw/workspace inside the container
+    // Write files to per-agent directory inside the container
+    // Each agent has its own dir at /home/node/.openclaw/agents/{name}/
+    const agentDir = `/home/node/.openclaw/agents/${agent.name}`;
     if (template.soul) {
-      await lifecycle.writeInstanceFile(agent.instanceId, `/home/node/.openclaw/workspace/SOUL.md`, resolveVariables(template.soul, vars));
+      await lifecycle.writeInstanceFile(agent.instanceId, `${agentDir}/SOUL.md`, resolveVariables(template.soul, vars));
     }
     if (template.agents) {
-      await lifecycle.writeInstanceFile(agent.instanceId, `/home/node/.openclaw/workspace/AGENTS.md`, resolveVariables(template.agents, vars));
+      await lifecycle.writeInstanceFile(agent.instanceId, `${agentDir}/AGENTS.md`, resolveVariables(template.agents, vars));
     }
 
     // Stage the update mutation — DB record stays as-is until changeset is applied
