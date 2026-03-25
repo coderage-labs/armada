@@ -223,30 +223,57 @@ export function createChangesetService(): ChangesetService {
     const instanceOps = targetInstances.map(inst => {
       const dag = buildStepsForInstance(inst.instanceId, currentVersion);
       const steps = dagToSteps(dag);
-      // Each stale instance gets the full set of global changes
-      const instChanges: StateChange[] = currentSnapshot.providers.length > 0 ||
-        currentSnapshot.models.length > 0 ||
-        currentSnapshot.plugins.length > 0
-        ? [
-            {
-              instanceId: inst.instanceId,
-              type: 'config' as const,
-              field: 'config_version',
-              current: null,
-              desired: currentVersion,
-              requiresRestart: true,
-            },
-          ]
-        : [
-            {
-              instanceId: inst.instanceId,
-              type: 'config' as const,
-              field: 'config_version',
-              current: null,
-              desired: currentVersion,
-              requiresRestart: true,
-            },
-          ];
+      
+      // Check if ALL mutations for this instance are "file-only" (soul/agents text changes)
+      // Template mutations that only touch soul/agents are file-only
+      // Agent mutations that only touch soul/agentsMd/instanceId are file-only
+      const instanceMutations = allMutations.filter(m => {
+        if (m.entityType === 'template') {
+          // Template affects this instance if any agent on this instance uses the template
+          const templateAgents = agentsRepo.getAll().filter((a: Agent) => a.templateId === m.entityId);
+          return templateAgents.some(a => a.instanceId === inst.instanceId);
+        }
+        if (m.entityType === 'agent') {
+          return m.payload?.instanceId === inst.instanceId;
+        }
+        if (m.entityType === 'instance') {
+          return m.entityId === inst.instanceId;
+        }
+        // Global mutations (provider, model, api_key, plugin) affect all instances in scope
+        if (['provider', 'model', 'api_key', 'plugin'].includes(m.entityType)) {
+          return true;
+        }
+        return false;
+      });
+
+      const isFileOnly = instanceMutations.length > 0 && instanceMutations.every(m => {
+        if (m.entityType === 'template') {
+          const payload = m.payload || {};
+          const payloadKeys = Object.keys(payload);
+          // Template mutations that only touch soul/agents are file-only
+          return payloadKeys.length > 0 && payloadKeys.every(k => ['soul', 'agents'].includes(k));
+        }
+        if (m.entityType === 'agent') {
+          const payload = m.payload || {};
+          const payloadKeys = Object.keys(payload);
+          // Agent mutations that only touch soul/agentsMd/instanceId are file-only
+          return payloadKeys.length > 0 && payloadKeys.every(k => ['soul', 'agentsMd', 'instanceId'].includes(k));
+        }
+        // Any other mutation type (instance, provider, model, plugin) is NOT file-only
+        return false;
+      });
+
+      // Only add config_version change if NOT file-only
+      const instChanges: StateChange[] = isFileOnly ? [] : [
+        {
+          instanceId: inst.instanceId,
+          type: 'config' as const,
+          field: 'config_version',
+          current: null,
+          desired: currentVersion,
+          requiresRestart: true,
+        },
+      ];
 
       return {
         instanceId: inst.instanceId,

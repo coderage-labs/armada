@@ -266,11 +266,21 @@ function createChangesetValidator(): ChangesetValidator {
     const conflicts = [...intraConflicts, ...interConflicts];
     const hasErrors = conflicts.some(c => c.type === 'error');
 
+    // File-only changesets (no config_version bumps) are immune to staleness
+    // They only write workspace files and update DB — no config drift to worry about
+    const hasConfigVersionChange = changeset.changes.some(c => 
+      c.type === 'config' && c.field === 'config_version'
+    );
+    
     // Agent-only changesets (no config/provider/model/plugin/instance changes)
-    // are immune to staleness — they don't conflict with config version drift
+    // are also immune to staleness — they don't conflict with config version drift
     const agentOnlyTypes = new Set(['agent']);
     const isAgentOnly = changeset.changes.every(c => agentOnlyTypes.has(c.type));
-    const canApply = !hasErrors && (isAgentOnly || !staleness.stale);
+    
+    // Skip staleness check if:
+    // - No config_version change (file-only changeset)
+    // - Agent-only changeset
+    const canApply = !hasErrors && (!hasConfigVersionChange || isAgentOnly || !staleness.stale);
 
     return { conflicts, staleness, canApply };
   }
