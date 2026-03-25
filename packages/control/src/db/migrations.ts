@@ -636,6 +636,27 @@ const migrations: Migration[] = [
       `);
     },
   },
+  {
+    version: 45,
+    description: 'Create patrol_records table for autonomous health monitoring (#194)',
+    sql: [
+      `CREATE TABLE IF NOT EXISTS patrol_records (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        severity TEXT NOT NULL,
+        run_id TEXT,
+        step_id TEXT,
+        agent_id TEXT,
+        description TEXT NOT NULL,
+        action_taken TEXT DEFAULT '',
+        status TEXT DEFAULT 'open',
+        created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+        resolved_at TEXT
+      )`,
+      'CREATE INDEX IF NOT EXISTS idx_patrol_type ON patrol_records(type)',
+      'CREATE INDEX IF NOT EXISTS idx_patrol_status ON patrol_records(status)',
+    ],
+  },
 ];
 
 /**
