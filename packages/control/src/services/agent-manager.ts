@@ -153,10 +153,11 @@ class AgentManagerImpl implements AgentManager {
     };
 
     // Build the agent config entry from template
+    // workspace should be the container-side absolute path (relative to /home/node/.openclaw)
     const agentConfig: Record<string, any> = {
       id: agent.name,
       name: agent.name,
-      workspace: `workspace/agents/${agent.name}`,
+      workspace: 'workspace', // This resolves to /home/node/.openclaw/workspace inside the container
       model: resolveTemplateModel(template),
       tools: undefined as any,
       identity: { name: agent.name },
@@ -168,12 +169,13 @@ class AgentManagerImpl implements AgentManager {
     // Update workspace files (SOUL.md, AGENTS.md, gitconfig) — these don't need restart
     await lifecycle.updateAgent(agent.instanceId, agentConfig);
 
-    const workspaceBase = `workspace/agents/${agent.name}`;
+    // Write files to absolute paths within the container workspace
+    // These paths should resolve to /home/node/.openclaw/workspace inside the container
     if (template.soul) {
-      await lifecycle.writeInstanceFile(agent.instanceId, `${workspaceBase}/SOUL.md`, resolveVariables(template.soul, vars));
+      await lifecycle.writeInstanceFile(agent.instanceId, `/home/node/.openclaw/workspace/SOUL.md`, resolveVariables(template.soul, vars));
     }
     if (template.agents) {
-      await lifecycle.writeInstanceFile(agent.instanceId, `${workspaceBase}/AGENTS.md`, resolveVariables(template.agents, vars));
+      await lifecycle.writeInstanceFile(agent.instanceId, `/home/node/.openclaw/workspace/AGENTS.md`, resolveVariables(template.agents, vars));
     }
 
     // Stage the update mutation — DB record stays as-is until changeset is applied

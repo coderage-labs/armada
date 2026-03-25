@@ -54,11 +54,37 @@ async function handleFileRead(msg: CommandMessage): Promise<ResponseMessage> {
 }
 
 async function handleFileWrite(msg: CommandMessage): Promise<ResponseMessage> {
-  const { path, content, encoding = 'utf8' } = msg.params as { path: string; content: string; encoding?: 'utf8' | 'base64' };
+  const { instance, path, content, encoding = 'utf8' } = msg.params as { 
+    instance?: string; 
+    path: string; 
+    content: string; 
+    encoding?: 'utf8' | 'base64' 
+  };
   if (!path || content === undefined) {
     return { type: 'response', id: msg.id, status: 'error', error: 'path and content are required', code: WsErrorCode.UNKNOWN };
   }
-  const resolved = validatePath(path);
+  
+  let resolved: string;
+  if (instance) {
+    // Writing to an instance data volume
+    // Path should be absolute within the container (e.g., /home/node/.openclaw/workspace/SOUL.md)
+    // We need to map it to the host-side volume path
+    const instanceDataDir = `${ARMADA_INSTANCES_DIR}/${instance}`;
+    
+    // Strip /home/node/.openclaw prefix if present, since that's the container mount point
+    const containerPrefix = '/home/node/.openclaw';
+    const relativePath = path.startsWith(containerPrefix) 
+      ? path.slice(containerPrefix.length)
+      : path;
+    
+    // Ensure path doesn't start with / after prefix removal
+    const cleanPath = relativePath.startsWith('/') ? relativePath.slice(1) : relativePath;
+    resolved = resolve(instanceDataDir, cleanPath);
+  } else {
+    // Writing to DATA_DIR (legacy behavior)
+    resolved = validatePath(path);
+  }
+  
   // Create parent directories if needed
   const dir = resolved.substring(0, resolved.lastIndexOf('/'));
   await mkdir(dir, { recursive: true });
