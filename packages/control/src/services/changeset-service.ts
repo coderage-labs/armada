@@ -289,7 +289,7 @@ export function createChangesetService(): ChangesetService {
           inst.instanceId,
         );
         const fileWriteStep = {
-          id: crypto.crypto.randomUUID(),
+          id: crypto.randomUUID(),
           name: 'push_files' as const,
           status: 'pending' as const,
           metadata: {
@@ -353,7 +353,7 @@ export function createChangesetService(): ChangesetService {
     // Capture rollback snapshot
     const rollback = configDiffService.snapshot();
 
-    const id = crypto.crypto.randomUUID();
+    const id = crypto.randomUUID();
     const now = new Date().toISOString();
 
     // Stamp with current schema version for stale draft detection after migrations
