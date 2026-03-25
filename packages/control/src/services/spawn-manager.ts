@@ -81,9 +81,9 @@ class SpawnManagerImpl implements SpawnManager {
       throw Object.assign(new Error(`Template not found: ${templateId}`), { statusCode: 404 });
     }
 
-    // If projects specified, update template before spawn
+    // If projects specified, stage template update mutation instead of direct DB write
     if (opts.projects && Array.isArray(opts.projects)) {
-      templatesRepo.update(templateId, { projects: opts.projects });
+      mutationService.stage('template', 'update', { projects: opts.projects }, templateId);
     }
 
     // ── 2. Instance placement ───────────────────────────────────
@@ -140,7 +140,44 @@ class SpawnManagerImpl implements SpawnManager {
     // ── 4. Plugin installation is handled by the `install_plugins` changeset step ──
     //    (no eager installation here — node may not be connected yet)
 
-    // ── 5. Stage agent creation as a pending mutation (instead of writing directly to DB) ──
+    // ── 5. Process template variables for SOUL.md and AGENTS.md ──
+
+    const vars: Record<string, string> = {
+      agent_name: agentName,
+      role: template.role,
+      skills: template.skills,
+    };
+
+    let processedSoul: string | undefined;
+    let processedAgents: string | undefined;
+
+    if (template.soul) {
+      processedSoul = resolveVariables(template.soul, vars);
+    }
+
+    if (template.agents) {
+      processedAgents = resolveVariables(template.agents, vars);
+
+      // Append project context for PM-role agents
+      const templateProjects = (template as any).projects as string[] | undefined;
+      if (template.role === 'project-manager' && templateProjects?.length) {
+        const projectLines: string[] = ['\n## Your Projects'];
+        for (const projName of templateProjects) {
+          const project = projectsRepo.getByName(projName);
+          if (project) {
+            const members = projectsRepo.getMembers(project.id);
+            const memberList = members.length > 0 ? ` (${members.join(', ')})` : '';
+            projectLines.push(`- **${project.name}**${memberList}: ${project.description || 'No description'}`);
+          }
+        }
+        if (projectLines.length > 1) {
+          processedAgents += '\n' + projectLines.join('\n');
+        }
+      }
+    }
+
+    // ── 6. Stage agent creation as a pending mutation (instead of writing directly to DB) ──
+    // Include processed soul and agentsMd so the step-planner can write them during changeset apply
 
     const agentPayload = {
       name: agentName,
@@ -156,8 +193,8 @@ class SpawnManagerImpl implements SpawnManager {
       lastHeartbeat: null,
       healthStatus: 'unknown',
       heartbeatMeta: null,
-      soul: template.soul,
-      agentsMd: template.agents,
+      soul: processedSoul,
+      agentsMd: processedAgents,
     };
 
     const stagedMutation = mutationService.stage('agent', 'create', agentPayload);
@@ -169,55 +206,12 @@ class SpawnManagerImpl implements SpawnManager {
       ...agentPayload,
     } as any;
 
-    // ── 6. Set up agent workspace files on instance ─────────────
+    // ── 7. Set up agent workspace files on instance ─────────────
+    // Note: SOUL.md and AGENTS.md are NO LONGER written here — they will be
+    // written during changeset apply via the step-planner's push_config step.
 
     const lifecycle = getAgentLifecycle();
     await lifecycle.createAgent(placementInstanceId, agentConfig);
-
-    // ── 7. Write SOUL.md and AGENTS.md ──────────────────────────
-
-    const vars: Record<string, string> = {
-      agent_name: agentName,
-      role: template.role,
-      skills: template.skills,
-    };
-
-    const workspaceBase = `workspace/agents/${agentName}`;
-
-    if (template.soul) {
-      await (lifecycle as any).writeInstanceFile(
-        placementInstanceId,
-        `${workspaceBase}/SOUL.md`,
-        resolveVariables(template.soul, vars),
-      );
-    }
-
-    if (template.agents) {
-      let agentsMd = resolveVariables(template.agents, vars);
-
-      // Append project context for PM-role agents
-      const templateProjects = (template as any).projects as string[] | undefined;
-      if (template.role === 'project-manager' && templateProjects?.length) {
-        const projectLines: string[] = ['\n## Your Projects'];
-        for (const projName of templateProjects) {
-          const project = projectsRepo.getByName(projName);
-          if (project) {
-            const members = projectsRepo.getMembers(project.id);
-            const memberList = members.length > 0 ? ` (${members.join(', ')})` : '';
-            projectLines.push(`- **${project.name}**${memberList}: ${project.description || 'No description'}`);
-          }
-        }
-        if (projectLines.length > 1) {
-          agentsMd += '\n' + projectLines.join('\n');
-        }
-      }
-
-      await (lifecycle as any).writeInstanceFile(
-        placementInstanceId,
-        `${workspaceBase}/AGENTS.md`,
-        agentsMd,
-      );
-    }
 
     // ── 8. Sync credentials if integrations are configured ──────
     // Credentials are synced at the instance level via the lifecycle's
