@@ -14,6 +14,7 @@ import { initDiscordBot } from './services/discord-bot.js';
 import { registerAllProviders } from './services/integrations/index.js';
 import { startVersionChecker, stopVersionChecker } from './services/version-checker.js';
 import { startStuckDetector, stopStuckDetector } from './services/stuck-detector.js';
+import { startPatrolScheduler, stopPatrolScheduler } from './services/patrol-service.js';
 import { pluginManager } from './services/plugin-manager.js';
 import { providerApiKeyRepo } from './repositories/provider-api-key-repo.js';
 
@@ -184,6 +185,9 @@ async function start() {
   // ── Stuck task detector ─────────────────────────────────────────────
   startStuckDetector();
 
+  // ── Patrol service ──────────────────────────────────────────────────
+  startPatrolScheduler(5 * 60 * 1000); // Every 5 minutes
+
   // ── Version checker ─────────────────────────────────────────────────
   startVersionChecker();
 
@@ -201,6 +205,7 @@ async function start() {
     stopHealthMonitor();
     stopWorkspaceRetention();
     stopStuckDetector();
+    stopPatrolScheduler();
     stopVersionChecker();
     stopIssueSyncScheduler();
     await stopTelegramBot();

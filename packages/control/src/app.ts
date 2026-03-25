@@ -56,6 +56,7 @@ import projectReposRoutes from './routes/project-repos.js';
 import { codebaseRouter } from './routes/codebase.js';
 import { learningRouter } from './routes/learning.js';
 import { analyticsRouter } from './routes/analytics.js';
+import patrolRoutes from './routes/patrol.js';
 
 export interface AppOptions {
   nodeManager: NodeManager;
@@ -123,6 +124,7 @@ export function createApp(opts: AppOptions): express.Express {
   app.use('/api/codebase', codebaseRouter);
   app.use('/api/learning', learningRouter);
   app.use('/api/analytics', analyticsRouter);
+  app.use('/api/patrol', patrolRoutes);
   app.use('/api/webhooks', webhookRoutes);
   app.use('/api/webhooks/inbound', webhooksInboundMgmtRouter);
   app.use('/api/tools', createToolRoutes(nodeManager));

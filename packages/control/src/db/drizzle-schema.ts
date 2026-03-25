@@ -768,3 +768,19 @@ export const embeddings = sqliteTable('embeddings', {
   model: text('model').default('text-embedding-3-small'),
   createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 });
+
+// ── Patrol Records (#194) ────────────────────────────────────────────
+
+export const patrolRecords = sqliteTable('patrol_records', {
+  id: text('id').primaryKey(),
+  type: text('type').notNull(),
+  severity: text('severity').notNull(),
+  runId: text('run_id'),
+  stepId: text('step_id'),
+  agentId: text('agent_id'),
+  description: text('description').notNull(),
+  actionTaken: text('action_taken').notNull().default(''),
+  status: text('status').notNull().default('open'),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+  resolvedAt: text('resolved_at'),
+});
