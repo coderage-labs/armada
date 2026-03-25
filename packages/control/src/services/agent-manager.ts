@@ -9,6 +9,7 @@ import { agentsRepo, templatesRepo, instancesRepo, deletedAgentRepo } from '../r
 import { resolveTemplateModel } from './model-resolver.js';
 import { eventBus } from '../infrastructure/event-bus.js';
 import { mutationService } from './mutation-service.js';
+import { changesetService, getOrCreateDraftChangeset } from './changeset-service.js';
 import { instanceManager } from './instance-manager.js';
 import { logActivity } from './activity-service.js';
 import { dispatchWebhook } from './webhook-dispatcher.js';
@@ -169,25 +170,23 @@ class AgentManagerImpl implements AgentManager {
     // Update workspace files (SOUL.md, AGENTS.md, gitconfig) — these don't need restart
     await lifecycle.updateAgent(agent.instanceId, agentConfig);
 
-    // Write files to per-agent directory inside the container
-    // Each agent has its own dir at /home/node/.openclaw/agents/{name}/
-    const agentDir = `/home/node/.openclaw/agents/${agent.name}`;
-    if (template.soul) {
-      await lifecycle.writeInstanceFile(agent.instanceId, `${agentDir}/SOUL.md`, resolveVariables(template.soul, vars));
-    }
-    if (template.agents) {
-      await lifecycle.writeInstanceFile(agent.instanceId, `${agentDir}/AGENTS.md`, resolveVariables(template.agents, vars));
-    }
-
-    // Stage the update mutation — DB record stays as-is until changeset is applied
+    // Stage the update mutation with soul and agentsMd
+    // The step-planner's resolveFileWrites() will write these files during changeset apply
     mutationService.stage('agent', 'update', {
       model: resolveTemplateModel(template),
       role: template.role,
-      soul: template.soul,
-      agentsMd: template.agents,
+      soul: template.soul ? resolveVariables(template.soul, vars) : undefined,
+      agentsMd: template.agents ? resolveVariables(template.agents, vars) : undefined,
     }, agent.id);
 
-    logActivity({ eventType: 'agent.redeploy', agentName: agent.name, detail: 'Agent update staged (pending changeset apply)' });
+    // Auto-create and apply changeset for immediate effect
+    // Redeploy is an explicit user action that expects immediate effect
+    const changeset = getOrCreateDraftChangeset('system');
+    if (changeset) {
+      await changesetService.apply(changeset.id, { force: true });
+    }
+
+    logActivity({ eventType: 'agent.redeploy', agentName: agent.name, detail: 'Agent redeployed via changeset' });
     // Note: agent.updated is NOT emitted — mutation.staged replaces it.
     dispatchWebhook('agent.redeploy', { name: agent.name });
     dispatchWebhook('deploy.completed', { name: agent.name, templateId: agent.templateId });
