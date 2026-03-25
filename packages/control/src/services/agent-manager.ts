@@ -29,7 +29,7 @@ export interface AgentManager {
   getByName(name: string): Agent | undefined;
   getAll(): Agent[];
   getByInstance(instanceId: string): Agent[];
-  update(id: string, patch: Partial<Agent>): Agent | undefined;
+  updateOperational(id: string, patch: Pick<Partial<Agent>, 'status' | 'healthStatus' | 'lastHeartbeat' | 'heartbeatMeta' | 'avatarGenerating' | 'avatarVersion'>): Agent | undefined;
   destroy(agentName: string): Promise<import('../repositories/index.js').PendingMutation>;
 
   // Runtime
@@ -70,7 +70,7 @@ class AgentManagerImpl implements AgentManager {
     return agentsRepo.getAll().filter((a) => a.instanceId === instanceId);
   }
 
-  update(id: string, patch: Partial<Agent>): Agent | undefined {
+  updateOperational(id: string, patch: Pick<Partial<Agent>, 'status' | 'healthStatus' | 'lastHeartbeat' | 'heartbeatMeta' | 'avatarGenerating' | 'avatarVersion'>): Agent | undefined {
     return agentsRepo.update(id, patch);
   }
 
@@ -224,7 +224,7 @@ class AgentManagerImpl implements AgentManager {
     if (meta.uptimeMs !== undefined) cleanMeta.uptimeMs = meta.uptimeMs;
 
     const previousStatus = agent.status;
-    agentsRepo.update(agent.id, {
+    this.updateOperational(agent.id, {
       status: 'running',
       lastHeartbeat: new Date().toISOString(),
       healthStatus: 'healthy',
