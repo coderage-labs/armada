@@ -11,6 +11,9 @@
 
 import { instancesRepo, agentsRepo, templatesRepo, nodesRepo } from '../repositories/index.js';
 import type { ArmadaInstance, Agent } from '@coderage-labs/armada-shared';
+import { mutationService } from './mutation-service.js';
+import { executePendingMutations } from './mutation-executor.js';
+import { randomUUID } from 'node:crypto';
 
 export interface PlacementResult {
   instanceId: string;
@@ -102,24 +105,35 @@ export async function findOrCreateInstance(opts: PlacementOptions = {}): Promise
     };
   }
 
-  // 4. No suitable instance found — create a new one
+  // 4. No suitable instance found — create a new one via changeset pipeline
   const targetNodeId = nodeId || getDefaultNodeId();
   if (!targetNodeId) {
     throw new Error('No nodes available to create an instance');
   }
 
   const instanceName = `instance-${Date.now().toString(36)}`;
-  const instance = instancesRepo.create({
+  const instanceId = randomUUID();
+  
+  // Stage the mutation
+  mutationService.stage('instance', 'create', {
     name: instanceName,
     nodeId: targetNodeId,
     capacity: 5,
     config: {},
     status: 'running',  // Will be provisioned as part of spawn
-  });
+  }, instanceId);
+
+  // Execute immediately — spawn-manager needs the instance to exist
+  const changeset = mutationService.getOrCreateDraft();
+  const result = executePendingMutations(changeset.id);
+  
+  if (result.errors.length > 0) {
+    throw new Error(`Failed to create instance: ${result.errors.join(', ')}`);
+  }
 
   return {
-    instanceId: instance.id,
-    instanceName: instance.name,
+    instanceId,
+    instanceName,
     nodeId: targetNodeId,
     created: true,
   };
