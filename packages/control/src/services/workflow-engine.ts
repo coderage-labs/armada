@@ -368,7 +368,7 @@ function evaluateStepCondition(
 
   // "X contains 'text'" — use \s+contains\s+ as delimiter, not anchored to start/end
   const containsMatch = resolved.match(/^([\s\S]+?)\s+contains\s+'([^']+)'$/i);
-  if (containsMatch) return containsMatch[1].includes(containsMatch[2]);
+  if (containsMatch) return containsMatch[1].toLowerCase().includes(containsMatch[2].toLowerCase());
 
   // "X not empty"
   if (resolved.trim().endsWith('not empty')) {
