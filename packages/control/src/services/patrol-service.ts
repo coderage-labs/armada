@@ -8,7 +8,7 @@
 import { randomUUID } from 'node:crypto';
 import { getDrizzle } from '../db/drizzle.js';
 import { sql } from 'drizzle-orm';
-import { workflowStepRuns, workflowRuns, agents, reviewRecords, patrolRecords } from '../db/drizzle-schema.js';
+import { workflowStepRuns, workflowRuns, agents, reviewRecords, patrolRecords, agentLessons, projectConventions } from '../db/drizzle-schema.js';
 import { eq } from 'drizzle-orm';
 import { logActivity } from './activity-service.js';
 
@@ -22,6 +22,18 @@ export type PatrolRecordType =
   | 'score_drop';
 
 export type PatrolSeverity = 'info' | 'warning' | 'critical';
+
+export type FailureType = 
+  | 'dispatch_failure' 
+  | 'timeout' 
+  | 'runtime_error' 
+  | 'infinite_loop' 
+  | 'no_deliverable' 
+  | 'agent_crash' 
+  | 'hung_mid_task' 
+  | 'bad_upstream' 
+  | 'workspace_failure' 
+  | 'unknown';
 
 export interface PatrolRecord {
   id: string;
@@ -52,7 +64,7 @@ let intervalHandle: ReturnType<typeof setInterval> | null = null;
 
 // ── Database helpers ─────────────────────────────────────────────────
 
-function storePatrolRecord(record: Omit<PatrolRecord, 'id' | 'createdAt'>): void {
+function storePatrolRecord(record: Omit<PatrolRecord, 'id' | 'createdAt'>, classification?: string): void {
   const db = getDrizzle();
   const id = randomUUID();
   db.insert(patrolRecords).values({
@@ -67,7 +79,145 @@ function storePatrolRecord(record: Omit<PatrolRecord, 'id' | 'createdAt'>): void
     status: record.status,
     createdAt: new Date().toISOString(),
     resolvedAt: record.resolvedAt,
+    classification: classification || '',
   }).run();
+}
+
+// ── Failure classification ──────────────────────────────────────────
+
+const LESSON_TEMPLATES: Record<FailureType, string> = {
+  dispatch_failure: 'Task was dispatched but agent never responded. Check connectivity and agent health before starting.',
+  timeout: 'Task timed out after {duration}. Break complex tasks into smaller subtasks.',
+  runtime_error: 'Task hit a runtime error: {detail}. Add error handling for this case.',
+  infinite_loop: 'Task appeared to loop without making progress. Set clear exit conditions and verify output before continuing.',
+  no_deliverable: 'Task ran but produced no PR or commit. Always create a PR as the deliverable.',
+  agent_crash: 'Agent went offline during task. Infrastructure issue.',
+  hung_mid_task: 'Task started but stalled before completing. Check for blocking operations.',
+  bad_upstream: 'Previous step output was unclear — insufficient context for this step.',
+  workspace_failure: 'Workspace provisioning failed. Check git credentials and repo access.',
+  unknown: 'Task failed for unknown reasons. Needs investigation.',
+};
+
+function classifyFailure(stepRun: any, agentHealth?: string): { type: FailureType; detail: string } {
+  const output = stepRun.output || '';
+  
+  if (!output || output.trim().length === 0) {
+    return { type: 'dispatch_failure', detail: 'Agent never responded — empty output' };
+  }
+  
+  if (agentHealth === 'offline') {
+    return { type: 'agent_crash', detail: 'Agent went offline during task' };
+  }
+  
+  if (/timed?\s*out/i.test(output)) {
+    return { type: 'timeout', detail: 'Task timed out' };
+  }
+  
+  if (/error|Error|ERROR|exception|Exception/.test(output)) {
+    const errorLine = output.split('\n').find((l: string) => /error|Error|ERROR|exception/i.test(l)) || '';
+    return { type: 'runtime_error', detail: `Runtime error: ${errorLine.slice(0, 100)}` };
+  }
+  
+  // Check for repeated text (infinite loop indicator)
+  const lines = output.split('\n');
+  const unique = new Set(lines);
+  if (lines.length > 20 && unique.size < lines.length * 0.3) {
+    return { type: 'infinite_loop', detail: 'Output contains excessive repetition' };
+  }
+  
+  // Long output but no PR/commit reference
+  if (output.length > 500 && !/pull\/\d+|PR\s*#?\d+|commit\s+[a-f0-9]{7}/i.test(output)) {
+    return { type: 'no_deliverable', detail: 'Task produced output but no PR or commit' };
+  }
+  
+  // Started but never completed
+  if (output.length > 0 && output.length < 200) {
+    return { type: 'hung_mid_task', detail: 'Task started but produced minimal output before stalling' };
+  }
+  
+  return { type: 'unknown', detail: 'Could not classify failure — needs manual review' };
+}
+
+async function extractLessonFromFailure(
+  stepRun: any, 
+  classification: { type: FailureType; detail: string }, 
+  agentId: string, 
+  projectId?: string
+): Promise<void> {
+  // Don't create lessons for infra issues
+  if (classification.type === 'agent_crash' || classification.type === 'workspace_failure') {
+    return;
+  }
+  
+  const lessonText = LESSON_TEMPLATES[classification.type]
+    .replace('{detail}', classification.detail)
+    .replace('{duration}', '60+ minutes');
+  
+  const db = getDrizzle();
+  const id = randomUUID();
+  
+  db.insert(agentLessons).values({
+    id,
+    agentId,
+    projectId: projectId || null,
+    lesson: lessonText,
+    source: 'patrol',
+    severity: classification.type === 'unknown' ? 'medium' : 'high',
+    active: 1,
+    timesInjected: 0,
+  }).run();
+  
+  console.log(`[patrol] Lesson extracted for ${agentId}: ${classification.type}`);
+}
+
+async function checkForConventionPromotion(projectId: string): Promise<void> {
+  if (!projectId) return;
+  
+  const db = getDrizzle();
+  
+  // Get patrol records for this project in the last 30 days
+  const recent = db.all(
+    sql`
+      SELECT pr.*, wr.project_id 
+      FROM patrol_records pr
+      LEFT JOIN workflow_runs wr ON pr.run_id = wr.id
+      WHERE wr.project_id = ${projectId}
+        AND pr.created_at > datetime('now', '-30 days')
+        AND pr.classification IS NOT NULL
+        AND pr.classification != ''
+    `
+  ) as any[];
+  
+  // Group by classification
+  const grouped: Record<string, number> = {};
+  for (const r of recent) {
+    if (r.classification) {
+      grouped[r.classification] = (grouped[r.classification] || 0) + 1;
+    }
+  }
+  
+  // If any type appears 3+ times, create a convention
+  for (const [type, count] of Object.entries(grouped)) {
+    if (count >= 3 && type in LESSON_TEMPLATES) {
+      // Check if convention already exists
+      const existing = db.select().from(projectConventions)
+        .where(sql`project_id = ${projectId} AND convention LIKE ${'%' + type + '%'}`)
+        .all();
+      
+      if (existing.length === 0) {
+        const id = randomUUID();
+        db.insert(projectConventions).values({
+          id,
+          projectId,
+          convention: `Recurring patrol finding (${count}x): ${LESSON_TEMPLATES[type as FailureType]}`,
+          source: 'patrol',
+          evidenceCount: count,
+          active: 1,
+        }).run();
+        console.log(`[patrol] Convention promoted for project ${projectId}: ${type} (${count} occurrences)`);
+      }
+    }
+  }
 }
 
 // ── Detection checks ─────────────────────────────────────────────────
@@ -95,6 +245,16 @@ function checkStuckTasks(): PatrolRecord[] {
     const age = now - startedTime;
 
     if (age > STUCK_CRITICAL_THRESHOLD_MS) {
+      // Get agent health status
+      let agentHealth: string | undefined;
+      if (step.agentName) {
+        const agent = db.select().from(agents).where(eq(agents.name, step.agentName)).get();
+        agentHealth = agent?.healthStatus || undefined;
+      }
+      
+      // Classify the failure
+      const classification = classifyFailure(step, agentHealth);
+      
       // Mark as failed
       db.update(workflowStepRuns)
         .set({ 
@@ -111,17 +271,25 @@ function checkStuckTasks(): PatrolRecord[] {
         runId: step.runId,
         stepId: step.stepId,
         agentId: step.agentName || undefined,
-        description: `Step ${step.stepId} stuck for ${Math.round(age / 60000)} minutes — auto-failed`,
-        actionTaken: 'Marked step as failed',
+        description: `Step ${step.stepId} stuck for ${Math.round(age / 60000)} minutes — auto-failed [${classification.type}]: ${classification.detail}`,
+        actionTaken: `Marked step as failed. Classified as: ${classification.type}`,
         status: 'open',
       };
-      storePatrolRecord(record);
+      storePatrolRecord(record, classification.type);
       records.push({ ...record, id: '', createdAt: '' });
+
+      // Extract lesson for the agent
+      if (step.agentName) {
+        const run = db.select().from(workflowRuns).where(eq(workflowRuns.id, step.runId)).get();
+        extractLessonFromFailure(step, classification, step.agentName, run?.projectId).catch(err => {
+          console.error('[patrol] Failed to extract lesson:', err);
+        });
+      }
 
       logActivity({
         eventType: 'patrol.stuck_task',
         agentName: step.agentName || 'unknown',
-        detail: `Step ${step.stepId} in run ${step.runId} auto-failed after 60+ minutes`,
+        detail: `Step ${step.stepId} in run ${step.runId} auto-failed after 60+ minutes (${classification.type})`,
       });
     } else if (age > STUCK_WARNING_THRESHOLD_MS) {
       // Warning only
@@ -385,6 +553,24 @@ export function runPatrol(): PatrolRecord[] {
       console.log(`🚨 Patrol found ${allRecords.length} issue(s)`);
     } else {
       console.log('✅ Patrol completed — no issues detected');
+    }
+    
+    // Check for convention promotion across all affected projects
+    const db = getDrizzle();
+    const projectIds = new Set(
+      allRecords
+        .filter(r => r.runId)
+        .map(r => {
+          const run = db.select().from(workflowRuns).where(eq(workflowRuns.id, r.runId!)).get();
+          return run?.projectId;
+        })
+        .filter(Boolean) as string[]
+    );
+    
+    for (const pid of projectIds) {
+      checkForConventionPromotion(pid).catch(err => {
+        console.error('[patrol] Failed to check convention promotion:', err);
+      });
     }
   } catch (err: unknown) {
     console.error('Patrol service error:', err);

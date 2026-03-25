@@ -657,6 +657,11 @@ const migrations: Migration[] = [
       'CREATE INDEX IF NOT EXISTS idx_patrol_status ON patrol_records(status)',
     ],
   },
+  {
+    version: 46,
+    description: 'Add classification field to patrol_records for failure investigation (#226)',
+    sql: "ALTER TABLE patrol_records ADD COLUMN classification TEXT DEFAULT ''",
+  },
 ];
 
 /**
