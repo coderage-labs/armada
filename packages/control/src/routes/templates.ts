@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import { requireScope } from '../middleware/scopes.js';
-import { templatesRepo, agentsRepo } from '../repositories/index.js';
+import { templatesRepo, agentsRepo, instancesRepo } from '../repositories/index.js';
 import { isValidName, isValidMemory, isValidCpus } from '../utils/validate.js';
 import { registerToolDef } from '../utils/tool-registry.js';
 import { logActivity } from '../services/activity-service.js';
@@ -12,6 +12,7 @@ import { computeTemplateDrift, syncTemplateToAgents } from '../services/template
 import { changesetService } from '../services/changeset-service.js';
 import { workingCopy } from '../services/working-copy.js';
 import { mutationService } from '../services/mutation-service.js';
+import { getNodeClient } from '../infrastructure/node-client.js';
 
 const router = Router();
 
@@ -148,7 +149,7 @@ router.post('/', requireScope('templates:write'), (req, res, next) => {
 });
 
 // PUT /api/templates/:id
-router.put('/:id', requireScope('templates:write'), (req, res, next) => {
+router.put('/:id', requireScope('templates:write'), async (req, res, next) => {
   try {
     const existing = templatesRepo.getById(req.params.id);
     if (!existing) {
@@ -180,29 +181,64 @@ router.put('/:id', requireScope('templates:write'), (req, res, next) => {
       if (body[key] !== undefined) body[key] = parseJsonField(body[key]);
     }
     
-    // Update working copy for UI diff preview
-    workingCopy.update('template', req.params.id, body);
+    // Check if update is ONLY soul/agents (text content) — no config changes
+    const isSoulAgentsOnly = Object.keys(body).every(k => ['soul', 'agents'].includes(k));
     
-    // Stage a template mutation for the template record itself
-    mutationService.stage('template', 'update', body, req.params.id);
-    
-    // Find agents using this template and stage agent mutations for file writes
-    // This ensures the changeset system can plan workspace file updates
-    const agents = agentsRepo.getAll().filter(a => a.templateId === req.params.id);
-    for (const agent of agents) {
-      // Stage agent update mutation with soul/agents content
-      // Include instanceId so the changeset knows which instance to target
-      mutationService.stage('agent', 'update', {
-        soul: body.soul,
-        agentsMd: body.agents,
-        instanceId: agent.instanceId,
-      }, agent.id);
+    if (isSoulAgentsOnly) {
+      // Direct update — no changeset needed for text content
+      const updates: Record<string, any> = {};
+      if (body.soul !== undefined) updates.soul = body.soul;
+      if (body.agents !== undefined) updates.agents_md = body.agents;  // DB column is agents_md
+      
+      templatesRepo.update(req.params.id, updates);
+      
+      // Push files to all agents using this template
+      const agents = agentsRepo.getAll().filter(a => a.templateId === req.params.id);
+      for (const agent of agents) {
+        const instance = instancesRepo.getById(agent.instanceId);
+        if (!instance) continue;
+        const node = getNodeClient(instance.nodeId ?? undefined);
+        if (!node) continue;
+        
+        if (body.soul !== undefined) {
+          await node.writeInstanceFile(instance.name, `agents/${agent.name}/SOUL.md`, body.soul);
+        }
+        if (body.agents !== undefined) {
+          await node.writeInstanceFile(instance.name, `agents/${agent.name}/AGENTS.md`, body.agents);
+        }
+      }
+      
+      logActivity({ eventType: 'template.updated', detail: `Template "${existing.name}" updated and synced to ${agents.length} agent(s)` });
+      eventBus.emit('template.updated', { templateId: req.params.id });
+      logAudit(req, 'template.update', 'template', req.params.id, { name: existing.name });
+      res.json({ ok: true, action: 'update', message: 'Template updated and synced to agents' });
+    } else {
+      // Config change — go through changeset pipeline
+      
+      // Update working copy for UI diff preview
+      workingCopy.update('template', req.params.id, body);
+      
+      // Stage a template mutation for the template record itself
+      mutationService.stage('template', 'update', body, req.params.id);
+      
+      // Find agents using this template and stage agent mutations for file writes
+      // This ensures the changeset system can plan workspace file updates
+      const agents = agentsRepo.getAll().filter(a => a.templateId === req.params.id);
+      for (const agent of agents) {
+        // Stage agent update mutation with soul/agents content
+        // Include instanceId so the changeset knows which instance to target
+        mutationService.stage('agent', 'update', {
+          soul: body.soul,
+          agentsMd: body.agents,
+          instanceId: agent.instanceId,
+        }, agent.id);
+      }
+      
+      logActivity({ eventType: 'template.updated', detail: `Template "${existing.name}" staged for update, ${agents.length} agent(s) queued for sync` });
+      eventBus.emit('template.updated', { templateId: req.params.id });
+      logAudit(req, 'template.update', 'template', req.params.id, { name: existing.name });
+      res.json({ ok: true, action: 'update', message: 'Staged — create and apply a changeset to commit' });
     }
-    
-    logActivity({ eventType: 'template.updated', detail: `Template "${existing.name}" staged for update, ${agents.length} agent(s) queued for sync` });
-    eventBus.emit('template.updated', { templateId: req.params.id });
-    logAudit(req, 'template.update', 'template', req.params.id, { name: existing.name });
-    res.json({ ok: true, action: 'update', message: 'Staged — create and apply a changeset to commit' });
   } catch (err) {
     next(err);
   }
