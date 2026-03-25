@@ -47,6 +47,13 @@ export function resolveInstanceImage(instanceId: string): string {
 
 /**
  * Resolve workspace file writes from pending mutations.
+ * 
+ * Note: Each agent runs in its own instance. The container workspace is at
+ * /home/node/.openclaw/workspace, which maps to the host-side instance data
+ * volume at /data/armada/instances/{instanceName}/workspace.
+ * 
+ * Agent metadata files (SOUL.md, AGENTS.md) live directly in the workspace
+ * root, not in a per-agent subdirectory.
  */
 export function resolveFileWrites(mutations: any[], instanceId: string): Array<{ path: string; content: string }> {
   const files: Array<{ path: string; content: string }> = [];
@@ -60,14 +67,14 @@ export function resolveFileWrites(mutations: any[], instanceId: string): Array<{
 
     if (payload.soul !== undefined) {
       files.push({
-        path: `workspace/agents/${agent.name}/SOUL.md`,
+        path: `agents/${agent.name}/SOUL.md`,
         content: payload.soul ?? '',
       });
     }
 
     if (payload.agentsMd !== undefined || payload.agents_md !== undefined) {
       files.push({
-        path: `workspace/agents/${agent.name}/AGENTS.md`,
+        path: `agents/${agent.name}/AGENTS.md`,
         content: payload.agentsMd ?? payload.agents_md ?? '',
       });
     }
