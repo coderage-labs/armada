@@ -7,6 +7,7 @@ import {
   pluginLibraryRepo,
   instancesRepo,
   assignmentRepo,
+  templatesRepo,
 } from '../repositories/index.js';
 import type { PendingMutation } from '../repositories/pending-mutation-repo.js';
 import { pluginManager } from './plugin-manager.js';
@@ -154,6 +155,16 @@ function executeMutation(mutation: PendingMutation): void {
         pluginManager.update(entityId, payload as any);
       } else if (action === 'delete' && entityId) {
         pluginManager.delete(entityId);
+      }
+      break;
+
+    case 'template':
+      if (action === 'create' && entityId) {
+        templatesRepo.create(payload as any);
+      } else if (action === 'update' && entityId) {
+        templatesRepo.update(entityId, payload as any);
+      } else if (action === 'delete' && entityId) {
+        templatesRepo.remove(entityId);
       }
       break;
 

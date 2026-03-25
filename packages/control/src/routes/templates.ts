@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import { requireScope } from '../middleware/scopes.js';
-import { templatesRepo } from '../repositories/index.js';
+import { templatesRepo, agentsRepo } from '../repositories/index.js';
 import { isValidName, isValidMemory, isValidCpus } from '../utils/validate.js';
 import { registerToolDef } from '../utils/tool-registry.js';
 import { logActivity } from '../services/activity-service.js';
@@ -183,10 +183,23 @@ router.put('/:id', requireScope('templates:write'), (req, res, next) => {
     // Update working copy for UI diff preview
     workingCopy.update('template', req.params.id, body);
     
-    // Stage a mutation so changesets can pick it up
+    // Stage a template mutation for the template record itself
     mutationService.stage('template', 'update', body, req.params.id);
     
-    logActivity({ eventType: 'template.updated', detail: `Template "${existing.name}" staged for update` });
+    // Find agents using this template and stage agent mutations for file writes
+    // This ensures the changeset system can plan workspace file updates
+    const agents = agentsRepo.getAll().filter(a => a.templateId === req.params.id);
+    for (const agent of agents) {
+      // Stage agent update mutation with soul/agents content
+      // Include instanceId so the changeset knows which instance to target
+      mutationService.stage('agent', 'update', {
+        soul: body.soul,
+        agentsMd: body.agents,
+        instanceId: agent.instanceId,
+      }, agent.id);
+    }
+    
+    logActivity({ eventType: 'template.updated', detail: `Template "${existing.name}" staged for update, ${agents.length} agent(s) queued for sync` });
     eventBus.emit('template.updated', { templateId: req.params.id });
     logAudit(req, 'template.update', 'template', req.params.id, { name: existing.name });
     res.json({ ok: true, action: 'update', message: 'Staged — create and apply a changeset to commit' });

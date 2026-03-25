@@ -6,7 +6,7 @@ import { getDrizzle } from '../db/drizzle.js';
 import { getDb } from '../db/index.js';
 import { getCurrentSchemaVersion } from '../db/migrations.js';
 import { changesets, changesetOperations } from '../db/drizzle-schema.js';
-import { instancesRepo, pendingMutationRepo, templatesRepo } from '../repositories/index.js';
+import { instancesRepo, pendingMutationRepo, templatesRepo, agentsRepo } from '../repositories/index.js';
 import { configDiffService } from './config-diff.js';
 import { eventBus } from '../infrastructure/event-bus.js';
 import { operationManager } from '../infrastructure/operations.js';
@@ -15,7 +15,7 @@ import { applyChangeset, retryFailedInstances } from './changeset-apply.js';
 import { computeMutationDiffs } from './diff-computer.js';
 import { buildStepsForInstance, dagToSteps } from './step-planner.js';
 import { analyseChangesetImpact } from './changeset-impact.js';
-import type { StateChange, ChangesetPlan, Changeset, ArmadaInstance } from '@coderage-labs/armada-shared';
+import type { StateChange, ChangesetPlan, Changeset, ArmadaInstance, Agent } from '@coderage-labs/armada-shared';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -198,6 +198,17 @@ export function createChangesetService(): ChangesetService {
           if (instMutation) {
             instanceMap.set(instanceId, { instanceId, instanceName: instMutation.payload?.name || instanceId });
           }
+        }
+      }
+    }
+
+    // Template mutations — find affected instances via agents using this template
+    for (const m of allMutations.filter(m => m.entityType === 'template')) {
+      const agents = agentsRepo.getAll().filter((a: Agent) => a.templateId === m.entityId);
+      for (const agent of agents) {
+        const inst = instancesRepo.getById(agent.instanceId);
+        if (inst && !instanceMap.has(inst.id)) {
+          instanceMap.set(inst.id, { instanceId: inst.id, instanceName: inst.name });
         }
       }
     }
