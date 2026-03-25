@@ -366,29 +366,22 @@ export function createAgentRoutes(nodeManager: NodeManager): Router {
   });
 
   // POST /api/agents/:name/redeploy — stage redeploy via changeset pipeline
-  router.post('/:name/redeploy', requireScope('agents:write'), (req, res, next) => {
+  router.post('/:name/redeploy', requireScope('agents:write'), async (req, res, next) => {
     try {
       const name = req.params.name;
 
       if (name === 'all') {
         // Stage redeploy for all agents
-        const agents = agentManager.getAll().filter(a => a.status === 'running');
-        const mutations = agents.map(a =>
-          mutationService.stage('agent', 'update', { redeploy: true }, a.instanceId)
-        );
+        const result = await agentManager.redeployAll();
         logAudit(req, 'agent.redeploy_all.staged', 'agent', 'all');
-        res.status(202).json({ staged: true, count: agents.length, mutations });
+        res.status(202).json({ staged: true, count: result.redeployed.length, redeployed: result.redeployed, errors: result.errors });
         return;
       }
 
-      const agent = agentManager.getByName(name);
-      if (!agent) {
-        res.status(404).json({ error: `Agent "${name}" not found` });
-        return;
-      }
-      const mutation = mutationService.stage('agent', 'update', { redeploy: true }, agent.instanceId);
+      // Single agent redeploy
+      const result = await agentManager.redeploy(name);
       logAudit(req, 'agent.redeploy.staged', 'agent', name);
-      res.status(202).json({ staged: true, mutation });
+      res.status(202).json({ staged: true, agent: result.agent, status: result.status });
     } catch (err: any) {
       if (err.statusCode) return res.status(err.statusCode).json({ error: err.message });
       next(err);
