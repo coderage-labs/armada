@@ -159,9 +159,11 @@ function executeMutation(mutation: PendingMutation): void {
       break;
 
     case 'template':
+      console.log(`[mutation-executor] Template mutation: ${action} ${entityId}, payload keys: ${Object.keys(payload).join(',')}`);
       if (action === 'create' && entityId) {
         templatesRepo.create(payload as any);
       } else if (action === 'update' && entityId) {
+        console.log(`[mutation-executor] Updating template ${entityId}, soul length: ${(payload.soul || '').length}`);
         templatesRepo.update(entityId, payload as any);
       } else if (action === 'delete' && entityId) {
         templatesRepo.remove(entityId);
