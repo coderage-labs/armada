@@ -4,6 +4,7 @@ import { templatesRepo, agentsRepo } from '../repositories/index.js';
 import { generateOpenClawConfig } from '../templates/config-generator.js';
 import { resolveVariables } from '../templates/resolver.js';
 import { registerToolDef } from '../utils/tool-registry.js';
+import { mutationService } from '../services/mutation-service.js';
 import type { NodeManager } from '../node-manager.js';
 import type { Agent, Template, TemplateSkill } from '@coderage-labs/armada-shared';
 
@@ -400,6 +401,7 @@ export function createTemplateSyncRoutes(nodeManager: NodeManager): Router {
             });
             const newId = (result as any).containerId;
             if (newId) {
+              // containerId is infrastructure state, not config — direct write OK
               agentsRepo.update(agent.id, { containerId: newId });
             }
             recreated = true;
@@ -422,12 +424,12 @@ export function createTemplateSyncRoutes(nodeManager: NodeManager): Router {
           }
         }
 
-        // 7. Update agent record
-        agentsRepo.update(agent.id, {
+        // 7. Stage configuration update mutation
+        mutationService.stage('agent', 'update', {
           role: template.role,
           skills: template.skills,
           model: template.model,
-        });
+        }, agent.id);
 
         synced.push({ name: agent.name, changes, restarted, recreated });
       }
