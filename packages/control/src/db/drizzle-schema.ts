@@ -783,4 +783,5 @@ export const patrolRecords = sqliteTable('patrol_records', {
   status: text('status').notNull().default('open'),
   createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
   resolvedAt: text('resolved_at'),
+  classification: text('classification').default(''),
 });
