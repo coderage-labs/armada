@@ -215,6 +215,10 @@ router.post('/:id/result', requireScope('tasks:write'), async (req, res) => {
     return;
   }
 
+  // Workflow step advancement — ONLY triggered from POST callback (not PUT)
+  // This is the authoritative completion path with the full result from DB
+  await checkWorkflowStep(req.params.id, finalStatus, finalResult);
+
   res.json({ ok: true });
 });
 
