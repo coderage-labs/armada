@@ -181,10 +181,12 @@ router.put('/:id', requireScope('templates:write'), async (req, res, next) => {
       if (body[key] !== undefined) body[key] = parseJsonField(body[key]);
     }
     
-    // Check if update is ONLY soul/agents (text content) — no config changes
-    const isSoulAgentsOnly = Object.keys(body).every(k => ['soul', 'agents'].includes(k));
+    // Check if update is metadata-only (no config changes that need instance restarts)
+    // These fields are resolved at dispatch time, not baked into instance config
+    const METADATA_FIELDS = ['soul', 'agents', 'model', 'name', 'description', 'role', 'skills'];
+    const isMetadataOnly = Object.keys(body).every(k => METADATA_FIELDS.includes(k));
     
-    if (isSoulAgentsOnly) {
+    if (isMetadataOnly) {
       // Direct update — no changeset needed for text content
       const updates: Record<string, any> = {};
       if (body.soul !== undefined) updates.soul = body.soul;
