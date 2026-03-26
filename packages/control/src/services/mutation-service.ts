@@ -118,14 +118,9 @@ function createMutationService(): MutationService {
     // Derive instanceId for agent mutations so getByInstance() can use the proper column (#445)
     const instanceId = entityType === 'agent' ? (payload.instanceId ?? null) : null;
 
-    // 1. Get or create draft changeset FIRST
-    const changeset = getOrCreateDraft();
-    const changesetId = changeset?.id ?? 'pending';
-
-    // 2. Write mutation to DB, linked to the draft changeset
-    // This prevents orphaned mutations during the create flow (#237)
+    // 1. Write mutation to DB
     const mutation = pendingMutationRepo.create({
-      changesetId,
+      changesetId: 'pending',
       entityType,
       entityId: entityId ?? null,
       action,
@@ -133,8 +128,17 @@ function createMutationService(): MutationService {
       instanceId,
     });
 
-    // 3. Rebuild draft changeset steps
-    if (changesetId !== 'pending') {
+    // 2. Get or create draft changeset
+    const changeset = getOrCreateDraft();
+    const changesetId = changeset?.id ?? null;
+
+    // 3. Link mutation to the changeset
+    if (changesetId) {
+      pendingMutationRepo.linkToChangeset(mutation.id, changesetId);
+    }
+
+    // 4. Rebuild draft changeset steps
+    if (changesetId) {
       try {
         changesetService.rebuildSteps(changesetId);
       } catch (err: any) {
@@ -142,7 +146,7 @@ function createMutationService(): MutationService {
       }
     }
 
-    // 4. Emit AFTER everything is consistent — DB, changeset, steps all ready
+    // 5. Emit AFTER everything is consistent — DB, changeset, steps all ready
     eventBus.emit('mutation.staged', { entityType, action, entityId, changesetId });
 
     return mutation;
