@@ -1165,8 +1165,20 @@ export async function onStepCompleted(
 
   if (!stepRun) return; // Not a workflow task
 
-  // Idempotent — skip if already completed/failed (prevents duplicate calls from racing)
-  if (stepRun.status === 'completed' || stepRun.status === 'failed' || stepRun.status === 'skipped') return;
+  // Idempotent — if already completed/failed, only update output if new one is longer (fuller result)
+  if (stepRun.status === 'completed' || stepRun.status === 'failed' || stepRun.status === 'skipped') {
+    if (output && output.length > (stepRun.output || '').length) {
+      db.run(sql`UPDATE workflow_step_runs SET output = ${output} WHERE id = ${stepRun.id}`);
+      // Also update run context
+      const run = getRunById(stepRun.runId);
+      if (run) {
+        const context = { ...run.context } as any;
+        context[stepRun.stepId] = { output, sharedRefs };
+        db.update(workflowRuns).set({ contextJson: JSON.stringify(context) }).where(eq(workflowRuns.id, stepRun.runId)).run();
+      }
+    }
+    return;
+  }
 
   const runId = stepRun.runId;
   const stepId = stepRun.stepId;
