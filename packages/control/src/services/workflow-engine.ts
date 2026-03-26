@@ -497,9 +497,18 @@ async function _advanceRunInner(
 
     // Check condition — skip if condition evaluates to false (planned skip, not failure)
     if (step.condition) {
-      console.log(`[workflow-engine] Evaluating condition for step "${step.id}": ${step.condition}`);
+      // Defer condition evaluation if any dependency step's output isn't stored yet.
+      // Race condition: advanceRun can fire before onStepCompleted writes the output.
+      const depsWithMissingOutput = deps.filter(depId => {
+        const depRun = stepRuns.find(sr => sr.stepId === depId);
+        return depRun && depRun.status === 'completed' && (!depRun.output || depRun.output.length === 0);
+      });
+      if (depsWithMissingOutput.length > 0) {
+        // Output not stored yet — skip this step for now, next advanceRun pass will retry
+        continue;
+      }
+
       const shouldRun = evaluateStepCondition(step.condition, run, stepRuns);
-      console.log(`[workflow-engine] Condition result for step "${step.id}": ${shouldRun}`);
       if (!shouldRun) {
         markStepStatus(stepRun.id, 'skipped');
         getDrizzle().run(sql`UPDATE workflow_step_runs SET output = 'Skipped: condition not met' WHERE id = ${stepRun.id}`);
