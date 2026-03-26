@@ -178,4 +178,43 @@ export const pendingMutationRepo = {
       .all()
       .map(rowToMutation);
   },
+
+  /**
+   * Unlink mutations from a changeset, setting their changeset_id back to 'pending'.
+   * Used when a changeset is cancelled to preserve mutations for future changesets.
+   */
+  unlinkFromChangeset(changesetId: string): number {
+    const existing = pendingMutationRepo.getByChangeset(changesetId);
+    const count = existing.length;
+    if (count > 0) {
+      getDrizzle()
+        .update(pendingMutations)
+        .set({ changesetId: 'pending' })
+        .where(eq(pendingMutations.changesetId, changesetId))
+        .run();
+    }
+    return count;
+  },
+
+  /**
+   * Link orphaned mutations (changeset_id = 'pending') to a new changeset.
+   * Used when creating a new changeset to adopt mutations from cancelled changesets.
+   */
+  linkOrphansToChangeset(changesetId: string): number {
+    const orphans = getDrizzle()
+      .select()
+      .from(pendingMutations)
+      .where(eq(pendingMutations.changesetId, 'pending'))
+      .all();
+    
+    const count = orphans.length;
+    if (count > 0) {
+      getDrizzle()
+        .update(pendingMutations)
+        .set({ changesetId })
+        .where(eq(pendingMutations.changesetId, 'pending'))
+        .run();
+    }
+    return count;
+  },
 };
