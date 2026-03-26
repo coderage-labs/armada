@@ -1403,9 +1403,9 @@ export default function WorkflowDetail() {
           </div>
 
           {/* Sparkline */}
-          {stats.recentRuns.length > 1 && (
+          {stats.recentRuns?.length > 1 && (
             <div>
-              <p className="text-xs text-zinc-500 mb-2">Recent run durations (last {stats.recentRuns.length})</p>
+              <p className="text-xs text-zinc-500 mb-2">Recent run durations (last {stats.recentRuns?.length})</p>
               <div className="flex items-end gap-1 h-12">
                 {(() => {
                   const maxMs = Math.max(...stats.recentRuns.map(r => r.durationMs ?? 0), 1);
@@ -1480,7 +1480,7 @@ export default function WorkflowDetail() {
                     </div>
                     {step.prompt && (
                       <p className="text-xs text-zinc-500 truncate max-w-md mt-0.5">
-                        {step.prompt.slice(0, 80)}{step.prompt.length > 80 ? '…' : ''}
+                        {step.prompt?.slice(0, 80)}{step.prompt?.length > 80 ? '…' : ''}
                       </p>
                     )}
                     {step.waitFor && step.waitFor.length > 0 && (
