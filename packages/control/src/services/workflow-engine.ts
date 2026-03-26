@@ -937,7 +937,7 @@ async function executeActionStep(
           
           db.run(sql`
             UPDATE workflow_runs
-            SET context = ${JSON.stringify(ctx)}
+            SET context_json = ${JSON.stringify(ctx)}
             WHERE id = ${run.id}
           `);
           
