@@ -1156,6 +1156,9 @@ export async function onStepCompleted(
 
   if (!stepRun) return; // Not a workflow task
 
+  // Idempotent — skip if already completed/failed (prevents duplicate calls from racing)
+  if (stepRun.status === 'completed' || stepRun.status === 'failed' || stepRun.status === 'skipped') return;
+
   const runId = stepRun.runId;
   const stepId = stepRun.stepId;
 
