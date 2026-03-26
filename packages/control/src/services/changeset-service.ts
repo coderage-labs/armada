@@ -381,12 +381,6 @@ export function createChangesetService(): ChangesetService {
       requiresRestart: impact.requiresRestart ? 1 : 0,
     }).run();
 
-    // Adopt orphaned mutations from cancelled changesets (#237)
-    const adopted = pendingMutationRepo.linkOrphansToChangeset(id);
-    if (adopted > 0) {
-      console.log(`[changeset] Adopted ${adopted} orphaned mutation(s) into new changeset ${id}`);
-    }
-
     const changeset = get(id)!;
 
     // ── Auto-apply zero-impact changesets (#83, #87) ────────────────────────
@@ -671,18 +665,17 @@ export function createChangesetService(): ChangesetService {
       console.log(`[changeset] Deleted orphaned pending instance ${m.entityId} after changeset cancel`);
     }
 
-    // Re-link mutations back to 'pending' instead of deleting them (#237)
-    // This allows them to be adopted by future changesets
-    const unlinked = pendingMutationRepo.unlinkFromChangeset(id);
-    if (unlinked > 0) {
-      console.log(`[changeset] Re-linked ${unlinked} pending mutation(s) to 'pending' for cancelled changeset ${id}`);
+    // Clean up pending mutations — nothing was applied, so discard them
+    const removed = pendingMutationRepo.removeByChangeset(id);
+    if (removed > 0) {
+      console.log(`[changeset] Discarded ${removed} pending mutation(s) for cancelled changeset ${id}`);
     }
 
     getDrizzle().update(changesets).set({
       status: 'cancelled',
     }).where(eq(changesets.id, id)).run();
 
-    eventBus.emit('changeset.discarded', { changesetId: id, mutationsUnlinked: unlinked });
+    eventBus.emit('changeset.discarded', { changesetId: id, mutationsRemoved: removed });
 
     return get(id)!;
   }
