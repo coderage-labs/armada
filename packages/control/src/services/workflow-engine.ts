@@ -941,23 +941,27 @@ async function executeActionStep(
             WHERE id = ${run.id}
           `);
           
-          // Mark culprit step as waiting_for_rework
+          // Reset culprit step to pending so it gets re-dispatched with rework feedback
           db.run(sql`
             UPDATE workflow_step_runs
-            SET status = 'waiting_for_rework'
+            SET status = 'pending', started_at = NULL, completed_at = NULL, agent_name = NULL, task_id = NULL
             WHERE run_id = ${run.id} AND step_id = ${culpritStepId}
           `);
           
-          // Mark this action step as failed
-          const failOutput = `Culprit detected: ${culpritStepId}\n\n${output}`;
+          // Also reset this action step to pending (it will re-run after the culprit completes)
           db.run(sql`
             UPDATE workflow_step_runs
-            SET status = 'failed', completed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
-                output = ${failOutput}
+            SET status = 'pending', started_at = NULL, completed_at = NULL, task_id = NULL,
+                output = ${`Previous failure:\n${output}`}
             WHERE id = ${stepRun.id}
           `);
           
-          await onStepCompleted(taskId, 'failed', failOutput, []);
+          // Re-advance the run — culprit step will be dispatched with rework feedback
+          const freshRun = getRunById(run.id);
+          if (freshRun) {
+            console.log(`[workflow-engine] Reworking step "${culpritStepId}" due to test failure`);
+            await advanceRun(freshRun, workflow);
+          }
           return;
         }
         
