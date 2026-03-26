@@ -250,8 +250,8 @@ export function createChangesetService(): ChangesetService {
         if (m.entityType === 'template') {
           const payload = m.payload || {};
           const payloadKeys = Object.keys(payload);
-          // Template mutations that only touch soul/agents are file-only
-          return payloadKeys.length > 0 && payloadKeys.every(k => ['soul', 'agents'].includes(k));
+          // Template mutations that only touch these fields don't need config changes or restarts
+          return payloadKeys.length > 0 && payloadKeys.every(k => ['soul', 'agents', 'model', 'name', 'description', 'role', 'skills'].includes(k));
         }
         if (m.entityType === 'agent') {
           const payload = m.payload || {};
