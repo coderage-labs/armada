@@ -66,8 +66,10 @@ function createTaskManager(): TaskManager {
         eventBus.emit('task.completed', { taskId: id, agentName: task.toAgent, success: false });
       }
 
-      // 6. Check workflow step advancement
-      checkWorkflowStep(id, status, result || '');
+      // 6. Workflow step advancement is handled by the callback endpoint
+      // (POST /tasks/:id/result → checkWorkflowStep in workflow-dispatcher)
+      // Do NOT call it here — the PUT endpoint sends truncated output that
+      // races with the POST's full output, causing condition evaluation failures.
 
       // 7. Handle board column management and next task dispatch
       await onTaskCompleted(task).catch(() => {});
