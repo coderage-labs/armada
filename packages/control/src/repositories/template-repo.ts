@@ -86,30 +86,34 @@ export const templatesRepo = {
   update(id: string, data: Partial<Template>): Template | undefined {
     const existing = templatesRepo.getById(id);
     if (!existing) return undefined;
+    
+    // Build update object with only fields present in data
+    const updates: Record<string, any> = {};
+    
+    if ('name' in data) updates.name = data.name;
+    if ('description' in data) updates.description = data.description || null;
+    if ('image' in data) updates.image = data.image;
+    if ('role' in data) updates.role = data.role || null;
+    if ('skills' in data) updates.skills = data.skills || null;
+    if ('model' in data) updates.model = data.model || null;
+    if ('resources' in data) updates.resourcesJson = JSON.stringify(data.resources);
+    if ('plugins' in data) updates.pluginsJson = JSON.stringify(data.plugins);
+    if ('pluginsList' in data) updates.pluginsListJson = JSON.stringify(data.pluginsList || []);
+    if ('skillsList' in data) updates.skillsListJson = JSON.stringify(data.skillsList || []);
+    if ('toolsAllow' in data) updates.toolsAllowJson = JSON.stringify(data.toolsAllow || []);
+    if ('toolsProfile' in data) updates.toolsProfile = data.toolsProfile || '';
+    if ('soul' in data) updates.soul = data.soul || null;
+    if ('agents' in data) updates.agentsMd = data.agents || null;
+    if ('env' in data) updates.envJson = JSON.stringify(data.env);
+    if ('internalAgents' in data) updates.internalAgentsJson = JSON.stringify(data.internalAgents || []);
+    if ('tools' in data) updates.toolsJson = JSON.stringify(data.tools || []);
+    if ('projects' in data) updates.projectsJson = JSON.stringify(data.projects || []);
+    if ('models' in data) updates.modelsJson = JSON.stringify(data.models || []);
+    
+    getDrizzle().update(templates).set(updates).where(eq(templates.id, id)).run();
+    
+    // Return merged result
     const merged = { ...existing, ...data, id };
-    getDrizzle().update(templates).set({
-      name: merged.name,
-      description: merged.description || null,
-      image: merged.image,
-      role: merged.role || null,
-      skills: merged.skills || null,
-      model: merged.model || null,
-      resourcesJson: JSON.stringify(merged.resources),
-      pluginsJson: JSON.stringify(merged.plugins),
-      pluginsListJson: JSON.stringify(merged.pluginsList || []),
-      skillsListJson: JSON.stringify(merged.skillsList || []),
-      toolsDenyJson: '[]',
-      toolsAllowJson: JSON.stringify(merged.toolsAllow || []),
-      toolsProfile: merged.toolsProfile || '',
-      soul: merged.soul || null,
-      agentsMd: merged.agents || null,
-      envJson: JSON.stringify(merged.env),
-      internalAgentsJson: JSON.stringify(merged.internalAgents || []),
-      contactsJson: '[]',  // deprecated, kept for schema compatibility
-      toolsJson: JSON.stringify(merged.tools || []),
-      projectsJson: JSON.stringify(merged.projects || []),
-      modelsJson: JSON.stringify(merged.models || []),
-    }).where(eq(templates.id, id)).run();
     return merged;
   },
 
