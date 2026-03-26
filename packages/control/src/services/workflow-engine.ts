@@ -389,6 +389,9 @@ function evaluateStepCondition(
 
 // ── Advance a run — find and dispatch ready steps ───────────────────
 
+// Per-run lock to prevent concurrent advanceRun calls from racing
+const _advanceRunLocks = new Map<string, Promise<void>>();
+
 async function advanceRun(
   run: WorkflowRun,
   workflow: Workflow,
@@ -399,6 +402,34 @@ async function advanceRun(
     console.log(`[workflow-engine] Skipping advanceRun for ${run.id.slice(0, 8)} — startup grace period active`);
     return;
   }
+
+  // Serialize concurrent advanceRun calls for the same run
+  const existingLock = _advanceRunLocks.get(run.id);
+  if (existingLock) {
+    await existingLock;
+    // Re-fetch run state after waiting — previous call may have advanced it
+    const freshRun = getRunById(run.id);
+    if (!freshRun || freshRun.status !== 'running') return;
+    run = freshRun;
+  }
+
+  let releaseLock: () => void;
+  const lockPromise = new Promise<void>(resolve => { releaseLock = resolve; });
+  _advanceRunLocks.set(run.id, lockPromise);
+
+  try {
+    await _advanceRunInner(run, workflow, extraVars);
+  } finally {
+    _advanceRunLocks.delete(run.id);
+    releaseLock!();
+  }
+}
+
+async function _advanceRunInner(
+  run: WorkflowRun,
+  workflow: Workflow,
+  extraVars?: Record<string, any>,
+): Promise<void> {
 
   if (run.status !== 'running' && run.status !== 'paused') return;
   // Paused runs can still advance non-gated steps (gates only block THEIR step)
