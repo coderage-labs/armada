@@ -190,7 +190,12 @@ router.put('/:id', requireScope('templates:write'), async (req, res, next) => {
       // Direct update — no changeset needed for text content
       const updates: Record<string, any> = {};
       if (body.soul !== undefined) updates.soul = body.soul;
-      if (body.agents !== undefined) updates.agents_md = body.agents;  // DB column is agents_md
+      if (body.agents !== undefined) updates.agents = body.agents;
+      if (body.model !== undefined) updates.model = body.model;
+      if (body.name !== undefined) updates.name = body.name;
+      if (body.description !== undefined) updates.description = body.description;
+      if (body.role !== undefined) updates.role = body.role;
+      if (body.skills !== undefined) updates.skills = body.skills;
       
       templatesRepo.update(req.params.id, updates);
       
