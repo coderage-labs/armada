@@ -1,5 +1,5 @@
 import { resolve, extname, basename } from 'path';
-import { readFile, writeFile, readdir, stat, unlink, mkdir, copyFile } from 'fs/promises';
+import { readFile, writeFile, readdir, stat, unlink, mkdir, copyFile, chown } from 'fs/promises';
 import { randomUUID } from 'crypto';
 import type { CommandMessage, ResponseMessage } from '@coderage-labs/armada-shared';
 import { WsErrorCode } from '@coderage-labs/armada-shared';
@@ -11,6 +11,35 @@ const SHARED_FILES_DIR = process.env.ARMADA_SHARED_FILES_DIR || '/data/armada/sh
 const ARMADA_INSTANCES_DIR = process.env.ARMADA_INSTANCES_DIR || '/data/armada/instances';
 
 const DATA_DIR = process.env.DATA_DIR || '/data';
+
+/**
+ * Recursively chown directories from a base path up to (but not including) stopAt.
+ * Used to ensure instance container files are owned by the node user (UID 1000).
+ */
+async function chownRecursive(targetPath: string, uid: number, gid: number, stopAt: string): Promise<void> {
+  const normalizedTarget = resolve(targetPath);
+  const normalizedStop = resolve(stopAt);
+  
+  // Walk up from target to stopAt, collecting directories
+  const dirs: string[] = [];
+  let current = normalizedTarget;
+  while (current.startsWith(normalizedStop + '/') && current !== normalizedStop) {
+    dirs.push(current);
+    const parent = current.substring(0, current.lastIndexOf('/'));
+    if (parent === current) break; // Safety: avoid infinite loop
+    current = parent;
+  }
+  
+  // Chown from top down (parent first, then children)
+  for (let i = dirs.length - 1; i >= 0; i--) {
+    try {
+      await chown(dirs[i], uid, gid);
+    } catch (err: any) {
+      // Non-fatal — we might not have permission in some contexts
+      console.warn(`[files] Failed to chown ${dirs[i]}:`, err.message);
+    }
+  }
+}
 
 function validatePath(requestedPath: string): string {
   const resolved = resolve(DATA_DIR, requestedPath.startsWith('/') ? requestedPath.slice(1) : requestedPath);
@@ -65,11 +94,12 @@ async function handleFileWrite(msg: CommandMessage): Promise<ResponseMessage> {
   }
   
   let resolved: string;
+  let instanceDataDir: string | undefined;
   if (instance) {
     // Writing to an instance data volume
     // Path should be absolute within the container (e.g., /home/node/.openclaw/workspace/SOUL.md)
     // We need to map it to the host-side volume path
-    const instanceDataDir = `${ARMADA_INSTANCES_DIR}/${instance}`;
+    instanceDataDir = `${ARMADA_INSTANCES_DIR}/${instance}`;
     
     // Strip /home/node/.openclaw prefix if present, since that's the container mount point
     const containerPrefix = '/home/node/.openclaw';
@@ -90,6 +120,24 @@ async function handleFileWrite(msg: CommandMessage): Promise<ResponseMessage> {
   await mkdir(dir, { recursive: true });
   const data = encoding === 'base64' ? Buffer.from(content, 'base64') : content;
   await writeFile(resolved, data);
+  
+  // Chown file and parent directories to node user (UID 1000) when writing to instance volumes
+  // Instance containers run as node:node (1000:1000), so files must be owned by that user
+  if (instance && instanceDataDir) {
+    const uid = 1000;
+    const gid = 1000;
+    
+    // Chown the file itself
+    try {
+      await chown(resolved, uid, gid);
+    } catch (err: any) {
+      console.warn(`[files] Failed to chown file ${resolved}:`, err.message);
+    }
+    
+    // Chown parent directories (but not the instance root itself)
+    await chownRecursive(dir, uid, gid, instanceDataDir);
+  }
+  
   const info = await stat(resolved);
   return { type: 'response', id: msg.id, status: 'ok', data: { path: resolved, size: info.size } };
 }
@@ -323,6 +371,19 @@ async function handleFileDeliver(msg: CommandMessage): Promise<ResponseMessage> 
   await mkdir(targetDir, { recursive: true });
 
   await copyFile(stagedFile, targetPath);
+
+  // Chown delivered file and parent directories to node user
+  // Instance containers run as node:node (1000:1000)
+  const uid = 1000;
+  const gid = 1000;
+  
+  try {
+    await chown(targetPath, uid, gid);
+  } catch (err: any) {
+    console.warn(`[files] Failed to chown delivered file ${targetPath}:`, err.message);
+  }
+  
+  await chownRecursive(targetDir, uid, gid, targetBase);
 
   // The path inside the container (mounted at /home/node/.openclaw)
   const containerPath = `/home/node/.openclaw/${relDest.startsWith('/') ? relDest.slice(1) : relDest}`;
