@@ -99,8 +99,8 @@ function executeMutation(mutation: PendingMutation): void {
 
   switch (entityType) {
     case 'agent':
-      if (action === 'create') {
-        agentsRepo.create(payload as any);
+      if (action === 'create' && entityId) {
+        agentsRepo.create({ ...payload, id: entityId } as any);
       } else if (action === 'update' && entityId) {
         agentsRepo.update(entityId, payload as any);
       } else if (action === 'delete' && entityId) {
@@ -161,7 +161,7 @@ function executeMutation(mutation: PendingMutation): void {
     case 'template':
       console.log(`[mutation-executor] Template mutation: ${action} ${entityId}, payload keys: ${Object.keys(payload).join(',')}`);
       if (action === 'create' && entityId) {
-        templatesRepo.create(payload as any);
+        templatesRepo.create({ ...payload, id: entityId } as any);
       } else if (action === 'update' && entityId) {
         console.log(`[mutation-executor] Updating template ${entityId}, soul length: ${(payload.soul || '').length}`);
         templatesRepo.update(entityId, payload as any);

@@ -119,7 +119,7 @@ router.post('/', requireScope('templates:write'), (req, res, next) => {
     }
 
     const id = randomUUID();
-    workingCopy.create('template', id, {
+    const templatePayload = {
       name,
       description: description ?? '',
       image: image ?? '',
@@ -138,7 +138,12 @@ router.post('/', requireScope('templates:write'), (req, res, next) => {
       internalAgents: parseJsonField(internalAgents) ?? [],
       tools: parseJsonField(tools) ?? [],
       projects: parseJsonField(projects) ?? [],
-    });
+    };
+
+    workingCopy.create('template', id, templatePayload);
+
+    // Stage a mutation so the changeset system can find it
+    mutationService.stage('template', 'create', templatePayload, id);
 
     logActivity({ eventType: 'template.created', detail: `Template "${name}" staged for creation` });
     logAudit(req, 'template.create', 'template', id, { name });

@@ -53,8 +53,8 @@ export const templatesRepo = {
     return row ? rowToTemplate(row) : undefined;
   },
 
-  create(data: Omit<Template, 'id' | 'createdAt'>): Template {
-    const id = uuidv4();
+  create(data: Omit<Template, 'id' | 'createdAt'> & { id?: string }): Template {
+    const id = data.id ?? uuidv4();
     getDrizzle().insert(templates).values({
       id,
       name: data.name,
