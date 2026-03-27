@@ -6,11 +6,12 @@
 
 import { agentsRepo, instancesRepo, projectsRepo } from '../repositories/index.js';
 import { tasksRepo } from '../repositories/index.js';
-import { setWorkflowDispatcher, setWorkflowNotifier, setWorkspaceCleanupFn, onStepCompleted } from './workflow-engine.js';
+import { setWorkflowDispatcher, setWorkflowNotifier, setWorkspaceCleanupFn, onStepCompleted, resumeStuckRuns } from './workflow-engine.js';
 import { getAgentsByRoleWithCapacity } from './health-monitor.js';
 import { notifyGate, notifyCompletion } from './user-notifier.js';
 import { getNodeClient } from '../infrastructure/node-client.js';
 import { createWorktree, mergeWorktree, cleanupWorktree } from './worktree-service.js';
+import { eventBus } from '../infrastructure/event-bus.js';
 
 const CONTROL_PLANE_URL = process.env.ARMADA_API_URL || 'http://armada-control:3001';
 
@@ -376,6 +377,15 @@ export function initWorkflowDispatcher() {
   // ── Register workspace cleanup hook ──────────────────────────────────
   setWorkspaceCleanupFn(async (run) => {
     await cleanupWorkspacesForRun(run.id);
+  });
+
+  // ── Resume stuck runs when nodes reconnect ────────────────────────────
+  eventBus.on('node.connected', (event) => {
+    const { nodeId } = event.data;
+    console.log(`[workflow-dispatcher] Node ${nodeId} reconnected — resuming stuck workflow runs`);
+    resumeStuckRuns().catch((err: Error) => {
+      console.error(`[workflow-dispatcher] Failed to resume stuck runs after node reconnection: ${err.message}`);
+    });
   });
 
   console.log('🔄 Workflow dispatcher initialized');
