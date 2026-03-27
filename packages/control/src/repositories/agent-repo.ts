@@ -74,8 +74,8 @@ export const agentsRepo = {
     return row ? rowToAgent(row) : undefined;
   },
 
-  create(data: Omit<Agent, 'id' | 'uptime' | 'createdAt'>): Agent {
-    const id = uuidv4();
+  create(data: Omit<Agent, 'id' | 'uptime' | 'createdAt'> & { id?: string }): Agent {
+    const id = data.id ?? uuidv4();
     getDrizzle().insert(agents).values({
       id,
       name: data.name,
