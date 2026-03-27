@@ -252,14 +252,6 @@ let _dispatchFn: DispatchFn | null = null;
 let _notifyFn: ((opts: NotifyOptions) => void) | null = null;
 let _cleanupWorkspacesFn: ((run: { id: string }) => Promise<void>) | null = null;
 
-// ── Startup grace period ─────────────────────────────────────────────
-// At startup, wait 30s for nodes to reconnect before processing workflows
-let _startupGracePeriod = true;
-setTimeout(() => {
-  _startupGracePeriod = false;
-  console.log('[workflow-engine] Startup grace period ended');
-}, 30_000);
-
 export function setWorkflowDispatcher(fn: DispatchFn) {
   _dispatchFn = fn;
 }
@@ -397,12 +389,6 @@ async function advanceRun(
   workflow: Workflow,
   extraVars?: Record<string, any>,
 ): Promise<void> {
-  // Skip processing during startup grace period to allow nodes to reconnect
-  if (_startupGracePeriod) {
-    console.log(`[workflow-engine] Skipping advanceRun for ${run.id.slice(0, 8)} — startup grace period active`);
-    return;
-  }
-
   // Serialize concurrent advanceRun calls for the same run
   const existingLock = _advanceRunLocks.get(run.id);
   if (existingLock) {
@@ -422,6 +408,56 @@ async function advanceRun(
   } finally {
     _advanceRunLocks.delete(run.id);
     releaseLock!();
+  }
+}
+
+/**
+ * Resume all running workflow runs by re-triggering advanceRun.
+ * Called when a node reconnects to handle runs that may have been
+ * stuck waiting for the node during a disconnect.
+ */
+export async function resumeStuckRuns(): Promise<void> {
+  const db = getDrizzle();
+  
+  // Find all running workflow runs
+  const runningRuns = db.select().from(workflowRuns)
+    .where(eq(workflowRuns.status, 'running'))
+    .all();
+  
+  if (runningRuns.length === 0) {
+    console.log('[workflow-engine] No running workflow runs to resume');
+    return;
+  }
+  
+  console.log(`[workflow-engine] Resuming ${runningRuns.length} running workflow run(s) after node reconnection`);
+  
+  // For each running run, get the workflow definition and call advanceRun
+  for (const runRow of runningRuns) {
+    try {
+      const run = getRunById(runRow.id);
+      if (!run) continue;
+      
+      const workflowRow = db.select().from(workflowsTable)
+        .where(eq(workflowsTable.id, run.workflowId))
+        .get();
+      
+      if (!workflowRow) {
+        console.warn(`[workflow-engine] Workflow ${run.workflowId} not found for run ${run.id}`);
+        continue;
+      }
+      
+      const workflow = parseWorkflow(workflowRow);
+      
+      // Extract trigger variables from context if present
+      const extraVars = (run.context as any)?._vars;
+      
+      // Fire and forget — let dispatch retry handle any still-disconnected nodes
+      advanceRun(run, workflow, extraVars).catch((err: Error) => {
+        console.error(`[workflow-engine] Failed to resume run ${run.id}: ${err.message}`);
+      });
+    } catch (err: any) {
+      console.error(`[workflow-engine] Error resuming run ${runRow.id}: ${err.message}`);
+    }
   }
 }
 
