@@ -76,7 +76,7 @@ registerToolDef({
     scope: 'issues:read',
 });
 
-router.post('/list', async (req, res, next) => {
+router.post('/list', requireScope('issues:read'), async (req, res, next) => {
   try {
     const agentName = (req.caller as any)?.agentName ?? null;
     const { project: projectRef, labels, statuses, assignees, types, cursor } = req.body;
@@ -121,7 +121,7 @@ registerToolDef({
     scope: 'issues:read',
 });
 
-router.post('/get', async (req, res, next) => {
+router.post('/get', requireScope('issues:read'), async (req, res, next) => {
   try {
     const agentName = (req.caller as any)?.agentName ?? null;
     const { project: projectRef, issueKey } = req.body;
@@ -232,7 +232,7 @@ registerToolDef({
     scope: 'issues:read',
 });
 
-router.post('/search', async (req, res, next) => {
+router.post('/search', requireScope('issues:read'), async (req, res, next) => {
   try {
     const agentName = (req.caller as any)?.agentName ?? null;
     const { project: projectRef, query, cursor } = req.body;
