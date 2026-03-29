@@ -528,8 +528,8 @@ export interface WorkflowStep {
   action?: string;
   /** Timeout for action execution in ms (default 300000 = 5 min) */
   actionTimeoutMs?: number;
-  /** Failure handling: 'fail' marks step failed, 'culprit' routes to source step */
-  onFailure?: 'fail' | 'culprit';
+  /** Failure handling: 'fail' marks step failed, 'culprit' routes to source step, 'rebase' triggers rebase rework on development step */
+  onFailure?: 'fail' | 'culprit' | 'rebase';
 }
 
 export interface Workflow {
