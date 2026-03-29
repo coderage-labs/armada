@@ -51,8 +51,8 @@ interface WorkflowStep {
   action?: string;
   /** Timeout for action execution in ms (default 300000 = 5 min) */
   actionTimeoutMs?: number;
-  /** Failure handling: 'fail' marks step failed, 'culprit' routes to source step */
-  onFailure?: 'fail' | 'culprit';
+  /** Failure handling: 'fail' marks step failed, 'culprit' routes to source step, 'rebase' triggers rebase rework on development step */
+  onFailure?: 'fail' | 'culprit' | 'rebase';
 }
 interface RetryState {
   retryCount: number;
@@ -1336,6 +1336,88 @@ export async function onStepCompleted(
       return;
     }
     console.log(`[workflow-engine] Step "${stepId}" exhausted all ${maxRetries} retries. Failing.`);
+  }
+
+  // ── Rebase rework: route back to implement step on merge conflict ──
+  if (stepDef?.onFailure === 'rebase' && status === 'failed') {
+    const conflictDetected = output && (
+      output.toLowerCase().includes('merge conflict') ||
+      output.toLowerCase().includes('cannot be merged') ||
+      output.toLowerCase().includes('conflicting')
+    );
+
+    if (conflictDetected) {
+      console.log(`[workflow-engine] Step "${stepId}" failed with merge conflict — triggering rebase rework`);
+
+      // Find the most recent development/implement step that created the PR
+      const allStepRuns = getStepRunsForRun(runId);
+      const implementStep = allStepRuns
+        .filter(sr => sr.status === 'completed')
+        .reverse() // Most recent first
+        .find(sr => {
+          const stepDef = workflow.steps.find(s => s.id === sr.stepId);
+          return stepDef?.role === 'development' || stepDef?.id.includes('implement');
+        });
+
+      if (implementStep) {
+        const implementStepId = implementStep.stepId;
+        console.log(`[workflow-engine] Reworking implement step "${implementStepId}" for rebase`);
+
+        // Set rework feedback on the implement step
+        const ctx = { ...run.context } as any;
+        ctx[`${implementStepId}_reworkFeedback`] = 
+          `PR has merge conflicts. Pull latest main, rebase your branch, resolve conflicts, force-push, and re-create the PR.`;
+        ctx[`${implementStepId}_previousOutput`] = implementStep.output;
+
+        // Track rework in context
+        if (!ctx.reworks) ctx.reworks = [];
+        ctx.reworks.push({
+          requestedBy: { stepId, taskId: stepRun.taskId },
+          targetStepId: implementStepId,
+          reason: 'merge conflict',
+          requestedAt: new Date().toISOString(),
+          resolvedAt: null,
+        });
+
+        db.update(workflowRuns).set({ contextJson: JSON.stringify(ctx) }).where(eq(workflowRuns.id, runId)).run();
+
+        // Reset implement step to pending
+        db.run(sql`
+          UPDATE workflow_step_runs
+          SET status = 'pending', output = NULL, task_id = NULL, agent_name = NULL,
+              started_at = NULL, completed_at = NULL
+          WHERE id = ${implementStep.id}
+        `);
+
+        // Reset the merge step to pending too
+        db.run(sql`
+          UPDATE workflow_step_runs
+          SET status = 'pending', output = NULL, task_id = NULL, agent_name = NULL,
+              started_at = NULL, completed_at = NULL
+          WHERE id = ${stepRun.id}
+        `);
+
+        // Clear outputs from context
+        delete ctx[implementStepId];
+        delete ctx[stepId];
+        db.update(workflowRuns).set({ contextJson: JSON.stringify(ctx), status: 'running' }).where(eq(workflowRuns.id, runId)).run();
+
+        // Emit SSE event
+        broadcast('workflow.rework.requested', {
+          runId,
+          requestedBy: stepId,
+          targetStepId: implementStepId,
+          reason: 'merge conflict',
+        });
+
+        // Advance the run to re-dispatch the implement step
+        const freshRun = getRunById(runId)!;
+        await advanceRun(freshRun, workflow);
+        return;
+      }
+
+      console.warn(`[workflow-engine] Merge conflict detected but no implement step found to rework — failing`);
+    }
   }
 
   // ── Review loop: loop back when output needs revision ──────────────

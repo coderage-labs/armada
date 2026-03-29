@@ -475,9 +475,35 @@ router.post('/merge', requireScope('prs:write'), async (req, res, next) => {
     if (!provider.mergePR) return res.status(501).json({ error: `Provider ${integration.provider} does not support mergePR` });
     if (!validateRepo(configRepos, repo)) return res.status(403).json({ error: `Repo ${repo} is not configured for project ${project.name}` });
 
-    const result = await provider.mergePR(integration.authConfig, repo, number, method || 'squash', commitTitle, commitMessage);
-    auditLog(agentName, project.name, 'merge', `${repo}#${number} (${method || 'squash'})`);
-    res.json({ ok: true, sha: result.sha });
+    try {
+      const result = await provider.mergePR(integration.authConfig, repo, number, method || 'squash', commitTitle, commitMessage);
+      auditLog(agentName, project.name, 'merge', `${repo}#${number} (${method || 'squash'})`);
+      res.json({ ok: true, sha: result.sha });
+    } catch (mergeErr: any) {
+      // Detect merge conflicts from GitHub API error
+      // GitHub returns 405 or 409 with message about merge conflicts
+      const isConflict = 
+        (mergeErr.message && (
+          mergeErr.message.includes('405') || 
+          mergeErr.message.includes('409')
+        ) && (
+          mergeErr.message.toLowerCase().includes('merge conflict') ||
+          mergeErr.message.toLowerCase().includes('conflicting') ||
+          mergeErr.message.toLowerCase().includes('cannot be merged')
+        ));
+
+      if (isConflict) {
+        auditLog(agentName, project.name, 'merge-conflict', `${repo}#${number}`);
+        return res.status(409).json({
+          error: 'Merge conflict',
+          conflict: true,
+          message: 'PR has merge conflicts — needs rebase against main',
+        });
+      }
+
+      // Re-throw other errors
+      throw mergeErr;
+    }
   } catch (err) { next(err); }
 });
 
