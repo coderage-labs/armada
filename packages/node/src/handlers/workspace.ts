@@ -128,7 +128,7 @@ export async function handleWorkspaceClone(msg: CommandMessage): Promise<Respons
     if (checkPkg.output.trim() === 'yes') {
       console.log(`[workspace] Found package.json in ${workPath} — running npm install`);
       const npmResult = await containerExec(instanceId, [
-        'npm', 'install', '--prefix', workPath,
+        'npm', 'install', '--include=dev', '--prefix', workPath,
       ]);
       if (npmResult.exitCode !== 0) {
         console.warn(`[workspace] npm install failed (non-fatal): ${npmResult.output}`);
@@ -388,7 +388,7 @@ export async function handleWorkspaceProvision(msg: CommandMessage): Promise<Res
           console.log(`[workspace] Found package.json — running npm ci in ${worktreePath}`);
           // Use base repo's node_modules cache via npm cache
           const npmCiResult = await containerExec(instanceId, [
-            'sh', '-c', `cd "${worktreePath}" && npm ci --prefer-offline 2>&1 || npm install 2>&1`,
+            'sh', '-c', `cd "${worktreePath}" && npm ci --include=dev --prefer-offline 2>&1 || npm install --include=dev 2>&1`,
           ]);
           if (npmCiResult.exitCode !== 0) {
             console.warn(`[workspace] npm ci failed (non-fatal): ${npmCiResult.output}`);
