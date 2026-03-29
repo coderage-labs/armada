@@ -313,6 +313,20 @@ export const workflowStepRuns = sqliteTable('workflow_step_runs', {
   promptHash: text('prompt_hash').notNull().default(''),
 });
 
+// ── workflow_run_costs ───────────────────────────────────────────────
+export const workflowRunCosts = sqliteTable('workflow_run_costs', {
+  id: text('id').primaryKey(),
+  runId: text('run_id').notNull(),
+  stepId: text('step_id').notNull(),
+  agentName: text('agent_name'),
+  inputTokens: integer('input_tokens').notNull().default(0),
+  outputTokens: integer('output_tokens').notNull().default(0),
+  totalTokens: integer('total_tokens').notNull().default(0),
+  model: text('model'),
+  estimatedCostUsd: real('estimated_cost_usd').notNull().default(0),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+});
+
 // ── users ────────────────────────────────────────────────────────────
 export const users = sqliteTable('users', {
   id: text('id').primaryKey(),
