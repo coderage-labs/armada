@@ -13,7 +13,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { getDrizzle } from '../db/drizzle.js';
-import { workflows as workflowsTable, workflowRuns, workflowStepRuns, workflowProjects, issueDependencies, triagedIssues } from '../db/drizzle-schema.js';
+import { workflows as workflowsTable, workflowRuns, workflowStepRuns, workflowProjects, issueDependencies, triagedIssues, workflowRunCosts, apiUsageLog } from '../db/drizzle-schema.js';
 import { eq, and, desc, sql, inArray } from 'drizzle-orm';
 import { dispatchWebhook } from './webhook-dispatcher.js';
 import { broadcast } from '../utils/event-bus.js';
@@ -1190,6 +1190,77 @@ async function handleDispatchFailure(
   }
 }
 
+// ── Cost calculation helper ─────────────────────────────────────────
+
+/**
+ * Calculate estimated cost in USD based on token usage and model.
+ * Pricing is approximate and based on publicly available rates.
+ */
+function calculateCost(usage: { inputTokens: number; outputTokens: number; model?: string }): number {
+  // Rough per-token pricing (USD per token) — adjust as providers update pricing
+  const rates: Record<string, { input: number; output: number }> = {
+    'claude-sonnet-4-5': { input: 3 / 1_000_000, output: 15 / 1_000_000 },
+    'claude-opus-4': { input: 15 / 1_000_000, output: 75 / 1_000_000 },
+    'claude-3.5-sonnet': { input: 3 / 1_000_000, output: 15 / 1_000_000 },
+    'gpt-4o': { input: 2.5 / 1_000_000, output: 10 / 1_000_000 },
+    'gpt-4o-mini': { input: 0.15 / 1_000_000, output: 0.6 / 1_000_000 },
+    'gpt-4-turbo': { input: 10 / 1_000_000, output: 30 / 1_000_000 },
+  };
+  const rate = rates[usage.model || ''] || rates['claude-sonnet-4-5']; // default fallback
+  return (usage.inputTokens * rate.input) + (usage.outputTokens * rate.output);
+}
+
+/**
+ * Track cost for a workflow step by querying api_usage_log for token usage
+ * associated with this task's sessionKey.
+ */
+function trackStepCost(
+  runId: string,
+  stepId: string,
+  agentName: string | null,
+  taskId: string,
+): void {
+  const db = getDrizzle();
+
+  // Query api_usage_log for entries matching this task ID (used as sessionKey in the agent plugin)
+  const usageEntries = db.select().from(apiUsageLog)
+    .where(eq(apiUsageLog.sessionKey, taskId))
+    .all();
+
+  if (usageEntries.length === 0) return; // No usage data recorded
+
+  // Aggregate token usage across all entries (multi-turn tasks can have multiple usage logs)
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
+  let model: string | null = null;
+
+  for (const entry of usageEntries) {
+    totalInputTokens += entry.inputTokens ?? 0;
+    totalOutputTokens += entry.outputTokens ?? 0;
+    if (!model && entry.modelId) model = entry.modelId;
+  }
+
+  const totalTokens = totalInputTokens + totalOutputTokens;
+  const estimatedCostUsd = calculateCost({
+    inputTokens: totalInputTokens,
+    outputTokens: totalOutputTokens,
+    model: model ?? undefined,
+  });
+
+  // Insert cost record
+  db.insert(workflowRunCosts).values({
+    id: randomUUID(),
+    runId,
+    stepId,
+    agentName,
+    inputTokens: totalInputTokens,
+    outputTokens: totalOutputTokens,
+    totalTokens,
+    model,
+    estimatedCostUsd,
+  }).run();
+}
+
 // ── Step completion callback ────────────────────────────────────────
 
 export async function onStepCompleted(
@@ -1250,6 +1321,13 @@ export async function onStepCompleted(
     SET status = ${stepStatus}, output = ${output}, shared_refs_json = ${JSON.stringify(sharedRefs)}, completed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
     WHERE id = ${stepRun.id}
   `);
+
+  // Track token usage and cost for this step (#242)
+  try {
+    trackStepCost(runId, stepId, stepRun.agentName, taskId);
+  } catch (err: any) {
+    console.warn(`[workflow-engine] Failed to track step cost: ${err.message}`);
+  }
 
   // Update run context with step output
   const run = getRunById(runId);

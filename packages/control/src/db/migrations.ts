@@ -662,6 +662,27 @@ const migrations: Migration[] = [
     description: 'Add classification field to patrol_records for failure investigation (#226)',
     sql: "ALTER TABLE patrol_records ADD COLUMN classification TEXT DEFAULT ''",
   },
+
+  // ── workflow_run_costs (#242) ─────────────────────────────────────
+  {
+    version: 47,
+    description: 'Create workflow_run_costs table for per-step token usage and cost tracking (#242)',
+    sql: [
+      `CREATE TABLE IF NOT EXISTS workflow_run_costs (
+        id TEXT PRIMARY KEY,
+        run_id TEXT NOT NULL,
+        step_id TEXT NOT NULL,
+        agent_name TEXT,
+        input_tokens INTEGER DEFAULT 0,
+        output_tokens INTEGER DEFAULT 0,
+        total_tokens INTEGER DEFAULT 0,
+        model TEXT,
+        estimated_cost_usd REAL DEFAULT 0,
+        created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+      )`,
+      'CREATE INDEX IF NOT EXISTS idx_run_costs_run ON workflow_run_costs(run_id)',
+    ],
+  },
 ];
 
 /**

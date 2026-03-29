@@ -1,6 +1,7 @@
 /**
  * Analytics API routes — workflow metrics and agent performance.
  * Phase 3 of #185 (learning system).
+ * Cost tracking added in #242.
  */
 
 import { Router } from 'express';
@@ -15,6 +16,9 @@ import {
   getPromptPerformance,
   getAllStepPromptPerformance,
 } from '../services/prompt-performance.js';
+import { getDrizzle } from '../db/drizzle.js';
+import { workflowRunCosts } from '../db/drizzle-schema.js';
+import { eq, sql } from 'drizzle-orm';
 
 export const analyticsRouter = Router();
 
@@ -93,6 +97,26 @@ const ANALYTICS_TOOLS = [
     parameters: [
       { name: 'workflowId', type: 'string', description: 'Workflow ID', required: true },
       { name: 'stepId', type: 'string', description: 'Step ID', required: true },
+    ],
+  },
+  {
+    category: 'analytics',
+    scope: 'workflows:read',
+    name: 'armada_workflow_costs',
+    description: 'Get token usage and cost summary for all workflow runs, grouped by workflow or agent.',
+    method: 'GET',
+    path: '/api/analytics/costs',
+    parameters: [],
+  },
+  {
+    category: 'analytics',
+    scope: 'workflows:read',
+    name: 'armada_workflow_run_costs',
+    description: 'Get detailed cost breakdown for a specific workflow run, showing per-step token usage and estimated costs.',
+    method: 'GET',
+    path: '/api/analytics/costs/:runId',
+    parameters: [
+      { name: 'runId', type: 'string', description: 'Workflow run ID', required: true },
     ],
   },
 ] as const;
@@ -192,5 +216,118 @@ analyticsRouter.get('/prompts/:workflowId/:stepId', requireScope('workflows:read
   } catch (error: any) {
     console.error('Error fetching step prompt performance:', error);
     res.status(500).json({ error: error.message || 'Failed to fetch step prompt performance' });
+  }
+});
+
+// ── Cost tracking routes (#242) ─────────────────────────────────────
+
+// GET /api/analytics/costs — total costs, per-workflow, per-agent
+analyticsRouter.get('/costs', requireScope('workflows:read'), (_req, res) => {
+  try {
+    const db = getDrizzle();
+
+    // Total cost across all runs
+    const totalRow = db.get(sql`
+      SELECT 
+        SUM(input_tokens) as total_input_tokens,
+        SUM(output_tokens) as total_output_tokens,
+        SUM(total_tokens) as total_tokens,
+        SUM(estimated_cost_usd) as total_cost_usd,
+        COUNT(DISTINCT run_id) as run_count
+      FROM workflow_run_costs
+    `) as any;
+
+    // Cost per workflow (via run_id → workflow_runs → workflow_id)
+    const perWorkflow = db.all(sql`
+      SELECT 
+        w.name as workflow_name,
+        w.id as workflow_id,
+        COUNT(DISTINCT wrc.run_id) as run_count,
+        SUM(wrc.input_tokens) as total_input_tokens,
+        SUM(wrc.output_tokens) as total_output_tokens,
+        SUM(wrc.total_tokens) as total_tokens,
+        SUM(wrc.estimated_cost_usd) as total_cost_usd,
+        AVG(wrc.estimated_cost_usd) as avg_cost_per_step
+      FROM workflow_run_costs wrc
+      JOIN workflow_runs wr ON wr.id = wrc.run_id
+      JOIN workflows w ON w.id = wr.workflow_id
+      GROUP BY w.id, w.name
+      ORDER BY total_cost_usd DESC
+    `) as any[];
+
+    // Cost per agent
+    const perAgent = db.all(sql`
+      SELECT 
+        agent_name,
+        COUNT(*) as step_count,
+        SUM(input_tokens) as total_input_tokens,
+        SUM(output_tokens) as total_output_tokens,
+        SUM(total_tokens) as total_tokens,
+        SUM(estimated_cost_usd) as total_cost_usd,
+        AVG(estimated_cost_usd) as avg_cost_per_step
+      FROM workflow_run_costs
+      WHERE agent_name IS NOT NULL
+      GROUP BY agent_name
+      ORDER BY total_cost_usd DESC
+    `) as any[];
+
+    res.json({
+      total: {
+        inputTokens: totalRow?.total_input_tokens ?? 0,
+        outputTokens: totalRow?.total_output_tokens ?? 0,
+        totalTokens: totalRow?.total_tokens ?? 0,
+        totalCostUsd: totalRow?.total_cost_usd ?? 0,
+        runCount: totalRow?.run_count ?? 0,
+      },
+      byWorkflow: perWorkflow,
+      byAgent: perAgent,
+    });
+  } catch (error: any) {
+    console.error('Error fetching workflow costs:', error);
+    res.status(500).json({ error: error.message || 'Failed to fetch workflow costs' });
+  }
+});
+
+// GET /api/analytics/costs/:runId — cost breakdown for a specific run
+analyticsRouter.get('/costs/:runId', requireScope('workflows:read'), (req, res) => {
+  try {
+    const { runId } = req.params;
+    const db = getDrizzle();
+
+    // Get all cost entries for this run
+    const costs = db.select().from(workflowRunCosts).where(eq(workflowRunCosts.runId, runId)).all();
+
+    if (costs.length === 0) {
+      return res.status(404).json({ error: 'No cost data found for this run' });
+    }
+
+    // Calculate total
+    const total = costs.reduce(
+      (acc, c) => ({
+        inputTokens: acc.inputTokens + (c.inputTokens ?? 0),
+        outputTokens: acc.outputTokens + (c.outputTokens ?? 0),
+        totalTokens: acc.totalTokens + (c.totalTokens ?? 0),
+        totalCostUsd: acc.totalCostUsd + (c.estimatedCostUsd ?? 0),
+      }),
+      { inputTokens: 0, outputTokens: 0, totalTokens: 0, totalCostUsd: 0 },
+    );
+
+    res.json({
+      runId,
+      total,
+      steps: costs.map(c => ({
+        stepId: c.stepId,
+        agentName: c.agentName,
+        inputTokens: c.inputTokens,
+        outputTokens: c.outputTokens,
+        totalTokens: c.totalTokens,
+        model: c.model,
+        estimatedCostUsd: c.estimatedCostUsd,
+        createdAt: c.createdAt,
+      })),
+    });
+  } catch (error: any) {
+    console.error('Error fetching run costs:', error);
+    res.status(500).json({ error: error.message || 'Failed to fetch run costs' });
   }
 });
