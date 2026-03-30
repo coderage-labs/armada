@@ -14,6 +14,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@coderage-labs/armada-indexer": "file:../indexer",
     "@coderage-labs/armada-shared": "*",
     "@simplewebauthn/server": "^11.0.0",
     "@slack/bolt": "^4.6.0",
@@ -31,13 +32,12 @@
     "express": "^4.21.2",
     "grammy": "^1.41.1",
     "microdiff": "^1.5.0",
-    "nodemailer": "^8.0.2",
+    "nodemailer": "^8.0.4",
     "p-graph": "^2.0.0",
     "sharp": "^0.33.5",
     "uuid": "^13.0.0",
     "ws": "^8.19.0",
-    "zod": "^4.3.6",
-    "@coderage-labs/armada-indexer": "file:../indexer"
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
