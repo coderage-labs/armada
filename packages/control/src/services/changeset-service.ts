@@ -26,6 +26,27 @@ export interface ChangesetPreview {
 
 export type ChangesetWithValidation = Changeset & { validation?: ChangesetValidationResult };
 
+export interface DryRunResult {
+  wouldAffect: {
+    instances: string[];
+    agents: string[];
+    templates: string[];
+    files: string[];
+  };
+  operations: Array<{
+    step: string;
+    target: string;
+    description: string;
+    files?: string[];
+  }>;
+  risks: Array<{
+    level: 'low' | 'medium' | 'high';
+    message: string;
+  }>;
+  estimatedDowntime: number;
+  requiresRestart: boolean;
+}
+
 export interface ChangesetService {
   /** Preview what a changeset would look like (dry run) */
   preview(): ChangesetPreview;
@@ -35,6 +56,9 @@ export interface ChangesetService {
 
   /** Get a changeset by ID */
   get(id: string): Changeset | null;
+
+  /** Simulate applying a changeset (dry-run) */
+  dryRun(id: string): DryRunResult;
 
   /** List changesets (most recent first) */
   list(limit?: number): Changeset[];
@@ -462,6 +486,138 @@ export function createChangesetService(): ChangesetService {
     return cs;
   }
 
+  function dryRun(id: string): DryRunResult {
+    const changeset = get(id);
+    if (!changeset) throw new Error(`Changeset "${id}" not found`);
+
+    const wouldAffect = {
+      instances: [] as string[],
+      agents: [] as string[],
+      templates: [] as string[],
+      files: [] as string[],
+    };
+
+    const operations: Array<{
+      step: string;
+      target: string;
+      description: string;
+      files?: string[];
+    }> = [];
+
+    const risks: Array<{ level: 'low' | 'medium' | 'high'; message: string }> = [];
+
+    // Collect affected resources from the changeset's affectedResources field
+    const affectedResources = changeset.affectedResources || [];
+    const instanceNames = new Set<string>();
+    const agentNames = new Set<string>();
+    const templateNames = new Set<string>();
+
+    for (const resource of affectedResources) {
+      if (resource.type === 'instance') {
+        instanceNames.add(resource.name);
+      } else if (resource.type === 'agent') {
+        agentNames.add(resource.name);
+      } else if (resource.type === 'template') {
+        templateNames.add(resource.name);
+      }
+    }
+
+    // Collect files from plan steps
+    const fileSet = new Set<string>();
+    for (const instanceOp of changeset.plan.instanceOps) {
+      instanceNames.add(instanceOp.instanceName);
+
+      for (const step of instanceOp.steps) {
+        const stepName = step.name;
+        const metadata = step.metadata as any;
+
+        // Build operation description
+        let description = '';
+        const files: string[] = [];
+
+        if (stepName === 'push_config') {
+          description = `Update config version to ${metadata?.version ?? 'latest'}`;
+        } else if (stepName === 'push_files') {
+          const fileList = metadata?.files || [];
+          for (const f of fileList) {
+            const path = typeof f === 'string' ? f : f.path;
+            if (path) {
+              files.push(path);
+              fileSet.add(path);
+            }
+          }
+          description = `Write ${files.length} file(s)`;
+        } else if (stepName === 'restart_gateway') {
+          description = 'Restart gateway process';
+        } else if (stepName === 'pull_image') {
+          description = `Pull image ${metadata?.image ?? ''}`;
+        } else if (stepName === 'restart_container') {
+          description = 'Restart container';
+        } else {
+          description = stepName.replace(/_/g, ' ');
+        }
+
+        operations.push({
+          step: stepName,
+          target: instanceOp.instanceName,
+          description,
+          ...(files.length > 0 && { files }),
+        });
+      }
+    }
+
+    wouldAffect.instances = Array.from(instanceNames);
+    wouldAffect.agents = Array.from(agentNames);
+    wouldAffect.templates = Array.from(templateNames);
+    wouldAffect.files = Array.from(fileSet);
+
+    // Generate risk assessment based on impact level
+    const impactLevel = changeset.impactLevel || 'none';
+    if (impactLevel === 'high') {
+      risks.push({
+        level: 'high',
+        message: `High impact: ${changeset.plan.totalRestarts} instance(s) will restart`,
+      });
+    } else if (impactLevel === 'medium') {
+      risks.push({
+        level: 'medium',
+        message: `Medium impact: ${changeset.plan.totalChanges} config change(s) will be applied`,
+      });
+    } else if (impactLevel === 'low') {
+      risks.push({
+        level: 'low',
+        message: 'Low impact: minimal changes, no restarts required',
+      });
+    }
+
+    // Add specific risk messages for affected resources
+    if (changeset.requiresRestart) {
+      risks.push({
+        level: 'high',
+        message: 'One or more agents will require restart',
+      });
+    }
+
+    // If no risks identified, add a default low-risk message
+    if (risks.length === 0) {
+      risks.push({
+        level: 'low',
+        message: 'No significant risks identified',
+      });
+    }
+
+    return {
+      wouldAffect,
+      operations,
+      risks,
+      estimatedDowntime: changeset.plan.instanceOps.reduce(
+        (acc, op) => acc + (op.estimatedDowntime || 0),
+        0,
+      ),
+      requiresRestart: changeset.requiresRestart || false,
+    };
+  }
+
   function list(limit = 20): Changeset[] {
     // Fetch all changeset rows in a single query
     const rows = getDrizzle()
@@ -701,7 +857,7 @@ export function createChangesetService(): ChangesetService {
     eventBus.emit('changeset.removed', { changesetId: id, status: existing.status });
   }
 
-  return { preview, create, get, list, rebuildSteps, approve, apply, retry, cancel, remove } as ChangesetService;
+  return { preview, create, get, dryRun, list, rebuildSteps, approve, apply, retry, cancel, remove } as ChangesetService;
 }
 
 /** Singleton changeset service */
