@@ -8,7 +8,10 @@
  *  - telegram:  POST to https://api.telegram.org/bot{token}/sendMessage
  *  - slack:     POST to webhook URL
  *  - discord:   POST to webhook URL
- *  - email:     SMTP via nodemailer (#281)
+ *  - email:     Multiple providers (#20):
+ *               - smtp (default): via nodemailer (#281)
+ *               - resend: via Resend HTTP API
+ *               - sendgrid: via SendGrid v3 HTTP API
  */
 
 import nodemailer from 'nodemailer';
@@ -82,8 +85,92 @@ async function sendDiscord(channel: NotificationChannel, text: string): Promise<
   }
 }
 
+// ── Email Provider Abstraction (#20) ────────────────────────────────
+
+export type EmailProvider = 'smtp' | 'resend' | 'sendgrid';
+
+export interface EmailSendOptions {
+  to: string | string[];
+  from: string;
+  subject: string;
+  html: string;
+  text?: string;
+}
+
+async function sendViaResend(apiKey: string, opts: EmailSendOptions): Promise<void> {
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: opts.from,
+      to: Array.isArray(opts.to) ? opts.to : [opts.to],
+      subject: opts.subject,
+      html: opts.html,
+      text: opts.text,
+    }),
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    throw new Error(`Resend error: ${response.status} ${body}`);
+  }
+}
+
+async function sendViaSendGrid(apiKey: string, opts: EmailSendOptions): Promise<void> {
+  const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      personalizations: [{ 
+        to: (Array.isArray(opts.to) ? opts.to : [opts.to]).map(email => ({ email })) 
+      }],
+      from: { email: opts.from },
+      subject: opts.subject,
+      content: [
+        { type: 'text/html', value: opts.html },
+        ...(opts.text ? [{ type: 'text/plain', value: opts.text }] : []),
+      ],
+    }),
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    throw new Error(`SendGrid error: ${response.status} ${body}`);
+  }
+}
+
+async function sendViaSMTP(config: {
+  smtp_host: string;
+  smtp_port?: string;
+  smtp_user?: string;
+  smtp_pass?: string;
+}, opts: EmailSendOptions): Promise<void> {
+  const { smtp_host, smtp_port, smtp_user, smtp_pass } = config;
+  const transporter = nodemailer.createTransport({
+    host: smtp_host,
+    port: parseInt(smtp_port ?? '587', 10),
+    secure: smtp_port === '465',
+    auth: smtp_user && smtp_pass ? { user: smtp_user, pass: smtp_pass } : undefined,
+  });
+  await transporter.sendMail({
+    from: opts.from,
+    to: Array.isArray(opts.to) ? opts.to.join(', ') : opts.to,
+    subject: opts.subject,
+    text: opts.text ?? opts.html.replace(/<[^>]+>/g, ''),
+    html: opts.html,
+  });
+}
+
 async function sendEmail(channel: NotificationChannel, text: string): Promise<void> {
   const config = channel.config as {
+    email_provider?: EmailProvider;
+    api_key?: string;
     smtp_host?: string;
     smtp_port?: string;
     smtp_user?: string;
@@ -91,29 +178,59 @@ async function sendEmail(channel: NotificationChannel, text: string): Promise<vo
     from_address?: string;
     to_address?: string;
   };
-  const { smtp_host, smtp_port, smtp_user, smtp_pass, from_address, to_address } = config;
-  if (!smtp_host || !from_address || !to_address) {
-    console.warn(`[notification-service] Email channel "${channel.name}" missing smtp_host, from_address, or to_address`);
+  
+  const { email_provider = 'smtp', api_key, from_address, to_address } = config;
+  
+  if (!from_address || !to_address) {
+    console.warn(`[notification-service] Email channel "${channel.name}" missing from_address or to_address`);
     return;
   }
-  const transporter = nodemailer.createTransport({
-    host: smtp_host,
-    port: parseInt(smtp_port ?? '587', 10),
-    secure: smtp_port === '465',
-    auth: smtp_user && smtp_pass ? { user: smtp_user, pass: smtp_pass } : undefined,
-  });
+
   // Strip HTML tags for plain-text body
   const plainText = text.replace(/<[^>]+>/g, '');
   // Use the event name from the text for the subject
   const subjectMatch = plainText.match(/^[^\n]+/);
   const subject = subjectMatch ? `Armada Alert: ${subjectMatch[0].trim()}` : 'Armada Alert';
-  await transporter.sendMail({
+
+  const emailOpts: EmailSendOptions = {
     from: from_address,
     to: to_address,
     subject,
-    text: plainText,
     html: text,
-  });
+    text: plainText,
+  };
+
+  switch (email_provider) {
+    case 'resend':
+      if (!api_key) {
+        console.warn(`[notification-service] Email channel "${channel.name}" using Resend but missing api_key`);
+        return;
+      }
+      await sendViaResend(api_key, emailOpts);
+      break;
+
+    case 'sendgrid':
+      if (!api_key) {
+        console.warn(`[notification-service] Email channel "${channel.name}" using SendGrid but missing api_key`);
+        return;
+      }
+      await sendViaSendGrid(api_key, emailOpts);
+      break;
+
+    case 'smtp':
+    default:
+      if (!config.smtp_host) {
+        console.warn(`[notification-service] Email channel "${channel.name}" using SMTP but missing smtp_host`);
+        return;
+      }
+      await sendViaSMTP({
+        smtp_host: config.smtp_host,
+        smtp_port: config.smtp_port,
+        smtp_user: config.smtp_user,
+        smtp_pass: config.smtp_pass,
+      }, emailOpts);
+      break;
+  }
 }
 
 async function sendToChannel(channel: NotificationChannel, text: string): Promise<void> {
