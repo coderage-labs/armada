@@ -103,6 +103,21 @@ export interface PRFilters {
   cursor?: string;
 }
 
+export interface PRCheckRun {
+  name: string;
+  status: string;
+  conclusion: string | null;
+  detailsUrl?: string;
+  completedAt?: string;
+}
+
+export interface PRChecks {
+  checks: PRCheckRun[];
+  allPassed: boolean;
+  anyFailed: boolean;
+  pending: boolean;
+}
+
 export interface IntegrationProvider {
   name: string;
   testConnection(auth: AuthConfig): Promise<{ ok: boolean; error?: string }>;
@@ -129,4 +144,5 @@ export interface IntegrationProvider {
   addPRComment?(auth: AuthConfig, repo: string, number: number, comment: string, path?: string, line?: number): Promise<void>;
   mergePR?(auth: AuthConfig, repo: string, number: number, method?: string, title?: string, message?: string): Promise<{ sha: string }>;
   updatePR?(auth: AuthConfig, repo: string, number: number, updates: Partial<{ title: string; body: string; state: string; draft: boolean; labels: string[]; assignees: string[] }>): Promise<ExternalPR>;
+  getPRChecks?(auth: AuthConfig, repo: string, number: number): Promise<PRChecks>;
 }
