@@ -70,4 +70,43 @@ export function wireNotificationEvents(): void {
       data,
     }).catch(() => {});
   });
+
+  // ── Workflow lifecycle ───────────────────────────────────────────
+  eventBus.on('workflow.completed', ({ data }) => {
+    const issue = data?.issueNumber && data?.issueRepo
+      ? ` (${data.issueRepo}#${data.issueNumber})`
+      : '';
+    sendNotification({
+      event: 'workflow.completed',
+      message: `Workflow <b>${data?.workflowName ?? 'unknown'}</b> completed successfully${issue}\n${data?.stepsCompleted ?? 0}/${data?.totalSteps ?? 0} steps completed.`,
+      data,
+    }).catch(() => {});
+  });
+
+  eventBus.on('workflow.failed', ({ data }) => {
+    const issue = data?.issueNumber && data?.issueRepo
+      ? ` (${data.issueRepo}#${data.issueNumber})`
+      : '';
+    const failedStep = data?.failedStepId ? `\nFailed at step: <code>${data.failedStepId}</code>` : '';
+    sendNotification({
+      event: 'workflow.failed',
+      message: `Workflow <b>${data?.workflowName ?? 'unknown'}</b> failed${issue}${failedStep}\n${data?.stepsCompleted ?? 0}/${data?.totalSteps ?? 0} steps completed.`,
+      data,
+    }).catch(() => {});
+  });
+
+  eventBus.on('workflow.gate_reached', ({ data }) => {
+    const issue = data?.issueNumber && data?.issueRepo
+      ? ` (${data.issueRepo}#${data.issueNumber})`
+      : '';
+    const stepName = data?.stepName ? ` "${data.stepName}"` : '';
+    const checksStatus = data?.checks
+      ? `\nChecks: ${(data.checks as any[]).map((c: any) => `${c.passed ? '✅' : '❌'} ${c.name}`).join(', ')}`
+      : '';
+    sendNotification({
+      event: 'workflow.gate_reached',
+      message: `Workflow <b>${data?.workflowName ?? 'unknown'}</b> paused at gate${stepName}${issue}${checksStatus}\nAwaiting approval to continue.`,
+      data,
+    }).catch(() => {});
+  });
 }

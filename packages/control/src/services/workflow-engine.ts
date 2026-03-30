@@ -556,23 +556,40 @@ async function _advanceRunInner(
     // Check gate
     if (step.gate === 'manual' || (step as any).manualGate === true) {
       const changed = markStepStatus(stepRun.id, 'waiting_gate');
-      if (_notifyFn && changed) {
+      if (changed) {
         // Get previous step output from context
         const previousOutput = getPreviousStepOutput(run, step);
         
         // Run gate checks early to show verification status in notification
         const checkResult = runGateChecks(step, run, stepRuns);
         
-        _notifyFn({
-          type: 'gate',
+        // Emit event bus notification for gate reached
+        const vars = (run.context as any)?._vars ?? {};
+        eventBus.emit('workflow.gate_reached', {
           workflowName: workflow.name,
           stepId: step.id,
+          stepName: step.name,
           runId: run.id,
-          previousOutput,
           projectId: run.projectId,
+          issueNumber: vars.issueNumber,
+          issueTitle: vars.issueTitle,
+          issueRepo: vars.issueRepo,
           gatePolicy: step.gatePolicy,
           checks: checkResult.checks,
         });
+
+        if (_notifyFn) {
+          _notifyFn({
+            type: 'gate',
+            workflowName: workflow.name,
+            stepId: step.id,
+            runId: run.id,
+            previousOutput,
+            projectId: run.projectId,
+            gatePolicy: step.gatePolicy,
+            checks: checkResult.checks,
+          });
+        }
       }
       
       continue;
@@ -622,6 +639,25 @@ async function _advanceRunInner(
       UPDATE workflow_runs SET status = ${finalStatus}, completed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ${run.id} AND status = 'running'
     `);
     if ((updateResult as any).changes === 0) return; // Already completed by another concurrent advanceRun
+
+    // ── Emit event bus notification for workflow completion/failure ────
+    const vars = (run.context as any)?._vars ?? {};
+    eventBus.emit(finalStatus === 'completed' ? 'workflow.completed' : 'workflow.failed', {
+      workflowName: workflow.name,
+      runId: run.id,
+      projectId: run.projectId,
+      issueNumber: vars.issueNumber,
+      issueTitle: vars.issueTitle,
+      issueRepo: vars.issueRepo,
+      stepsCompleted: updatedStepRuns.filter(sr => sr.status === 'completed').length,
+      totalSteps: steps.length,
+      ...(finalStatus === 'failed' && {
+        failedStepId: updatedStepRuns.find(sr => {
+          const step = steps.find(s => s.id === sr.stepId);
+          return sr.status === 'failed' && !step?.optional;
+        })?.stepId,
+      }),
+    });
 
     // ── Clean up workspace worktrees for this run ──────────────────────
     if (_cleanupWorkspacesFn) {
