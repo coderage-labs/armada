@@ -12,6 +12,8 @@ import type {
   PRFilters,
   PRReview,
   PRComment,
+  PRChecks,
+  PRCheckRun,
 } from './types.js';
 
 const DEFAULT_GITHUB_API = 'https://api.github.com';
@@ -588,5 +590,52 @@ export class GitHubAdapter implements IntegrationProvider {
     );
 
     return mapPR(updated, repoFullName);
+  }
+
+  async getPRChecks(
+    auth: AuthConfig,
+    repoFullName: string,
+    prNumber: number,
+  ): Promise<PRChecks> {
+    const [owner, repo] = parseRepo(repoFullName);
+
+    // First, get the PR to retrieve the head SHA
+    const pr = await this.fetchGitHub<Record<string, any>>(
+      auth,
+      `/repos/${owner}/${repo}/pulls/${prNumber}`,
+    );
+
+    const headSha = pr.head?.sha;
+    if (!headSha) {
+      throw new Error(`Could not resolve head SHA for PR #${prNumber}`);
+    }
+
+    // Fetch check runs for the head commit
+    const checkRunsData = await this.fetchGitHub<{
+      total_count: number;
+      check_runs: Array<Record<string, any>>;
+    }>(auth, `/repos/${owner}/${repo}/commits/${headSha}/check-runs`);
+
+    const checks: PRCheckRun[] = checkRunsData.check_runs.map(run => ({
+      name: run.name as string,
+      status: run.status as string,
+      conclusion: (run.conclusion as string | null) || null,
+      detailsUrl: run.details_url as string | undefined,
+      completedAt: run.completed_at as string | undefined,
+    }));
+
+    // Determine aggregate status
+    const pending = checks.some(c => c.status !== 'completed');
+    const anyFailed = checks.some(
+      c => c.conclusion && ['failure', 'cancelled', 'timed_out', 'action_required'].includes(c.conclusion),
+    );
+    const allPassed = !pending && !anyFailed && checks.length > 0;
+
+    return {
+      checks,
+      allPassed,
+      anyFailed,
+      pending,
+    };
   }
 }
