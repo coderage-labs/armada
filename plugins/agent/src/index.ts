@@ -791,6 +791,66 @@ export default function register(api: any) {
     });
 
     _logger.info('[armada-agent] Registered armada_find_tools (dynamic tool loading)');
+
+    // ── Tool: armada_unload_tools ────────────────────────────────────────────
+    
+    api.registerTool({
+      name: 'armada_unload_tools',
+      description: 'Unload previously loaded Armada tools by category or name to free context. Note: OpenClaw does not support true tool unregistration — this only prevents future loads via armada_find_tools.',
+      parameters: {
+        type: 'object',
+        properties: {
+          category: { type: 'string', description: 'Category to unload (e.g. "codebase", "learning")' },
+          names: { type: 'string', description: 'Comma-separated tool names to unload' },
+        },
+      },
+      execute: async (_id: string, args: { category?: string; names?: string }) => {
+        const { category, names } = args;
+        
+        if (!category && !names) {
+          return { error: 'Provide either "category" or "names" parameter' };
+        }
+
+        const allDefs = await fetchAllToolDefs();
+        if (!allDefs.length) return { error: 'Failed to fetch tool definitions from control plane' };
+
+        let toUnload: string[] = [];
+
+        // Find tools to unload by category
+        if (category) {
+          const categoryLower = category.trim().toLowerCase();
+          toUnload = allDefs
+            .filter(t => (t as any).category === categoryLower)
+            .map(t => t.name);
+        }
+
+        // Find tools to unload by names
+        if (names) {
+          const namesList = names.split(',').map(n => n.trim()).filter(Boolean);
+          toUnload = [...toUnload, ...namesList];
+        }
+
+        // Remove from dynamically registered set
+        let unloaded = 0;
+        for (const toolName of toUnload) {
+          if (_dynamicallyRegistered.has(toolName)) {
+            _dynamicallyRegistered.delete(toolName);
+            unloaded++;
+          }
+        }
+
+        return {
+          unloaded,
+          tools: toUnload,
+          message: unloaded > 0
+            ? `Unloaded ${unloaded} tool(s) from internal registry. Note: Tools remain registered with OpenClaw until restart. They will not be auto-loaded on next armada_find_tools call.`
+            : `No matching tools found in the dynamically registered set.`,
+          warning: 'OpenClaw does not support true tool unregistration. Tools remain available until gateway/container restart.',
+        };
+      },
+    });
+
+    _logger.info('[armada-agent] Registered armada_unload_tools (dynamic tool management)');
   }
 
   // ── HTTP Routes ─────────────────────────────────────────────────
