@@ -3,8 +3,23 @@
 import { Router } from 'express';
 import { changesetService } from '../services/changeset-service.js';
 import { changesetValidator } from '../services/changeset-validator.js';
+import { registerToolDef } from '../utils/tool-registry.js';
 
 const router = Router();
+
+// ── Tool Definitions ────────────────────────────────────────────────
+
+registerToolDef({
+  category: 'workflows',
+  name: 'armada_changeset_dry_run',
+  description: 'Simulate applying a changeset — shows what would change without actually applying.',
+  scope: 'workflows:read',
+  method: 'POST',
+  path: '/api/changesets/:id/dry-run',
+  parameters: [
+    { name: 'id', type: 'string', description: 'Changeset ID', required: true },
+  ],
+});
 
 // POST /api/changesets/preview — dry run, returns changes + plan without persisting
 router.post('/preview', (req, res) => {
@@ -41,6 +56,19 @@ router.get('/:id', (req, res) => {
   const changeset = changesetService.get(req.params.id);
   if (!changeset) return res.status(404).json({ error: 'Changeset not found' });
   res.json(changeset);
+});
+
+// POST /api/changesets/:id/dry-run — simulate applying the changeset
+router.post('/:id/dry-run', (req, res) => {
+  try {
+    const result = changesetService.dryRun(req.params.id);
+    res.json(result);
+  } catch (err: any) {
+    if (err.message?.includes('not found')) {
+      return res.status(404).json({ error: err.message });
+    }
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // POST /api/changesets/:id/approve — approve a draft changeset
