@@ -6,7 +6,7 @@
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import { getDrizzle } from '../db/drizzle.js';
-import { reviewRecords, agentLessons, projectConventions, agentScores } from '../db/drizzle-schema.js';
+import { reviewRecords, agentLessons, projectConventions, agentScores, workflowRuns } from '../db/drizzle-schema.js';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import { requireScope } from '../middleware/scopes.js';
 import { registerToolDef } from '../utils/tool-registry.js';
@@ -41,6 +41,14 @@ const LEARNING_TOOLS = [
   { category: 'learning', scope: 'projects:write', name: 'armada_conventions_extract', description: 'Manually trigger convention extraction for a project. Analyzes review feedback and extracts recurring patterns.', method: 'POST', path: '/api/learning/conventions/extract',
     parameters: [
       { name: 'projectId', type: 'string', description: 'Project ID', required: true },
+    ] },
+  { category: 'learning', scope: 'projects:write', name: 'armada_knowledge_promote', description: 'Manually trigger lesson promotion to conventions. When multiple agents have similar lessons, promote to shared project conventions.', method: 'POST', path: '/api/learning/knowledge/promote',
+    parameters: [
+      { name: 'projectId', type: 'string', description: 'Project ID', required: true },
+    ] },
+  { category: 'learning', scope: 'projects:read', name: 'armada_knowledge_shared', description: 'List conventions that were promoted from shared lessons across multiple agents.', method: 'GET', path: '/api/learning/knowledge/shared',
+    parameters: [
+      { name: 'projectId', type: 'string', description: 'Filter by project' },
     ] },
 ] as const;
 
@@ -153,16 +161,31 @@ learningRouter.post('/reviews', requireScope('workflows:write'), (req, res) => {
 
   // If rejected, extract lesson from feedback
   if (result === 'rejected' && feedback && executor) {
+    // Resolve projectId from run
+    const run = db.select({ projectId: workflowRuns.projectId })
+      .from(workflowRuns)
+      .where(eq(workflowRuns.id, runId))
+      .get();
+
     const lessonId = randomUUID();
     db.insert(agentLessons).values({
       id: lessonId,
       agentId: executor,
-      projectId: null, // Could be resolved from run
+      projectId: run?.projectId || null,
       lesson: feedback,
       source: 'review',
       severity: score <= 2 ? 'high' : 'medium',
       reviewId: id,
     }).run();
+
+    // Trigger knowledge sharing check (async, don't block response)
+    if (run?.projectId) {
+      import('../services/knowledge-sharing.js').then(({ promoteLessonsToConventions }) => {
+        promoteLessonsToConventions(run.projectId).catch(err => {
+          console.error('[learning] Knowledge sharing failed:', err);
+        });
+      });
+    }
   }
 
   const agentScore = executor
@@ -286,6 +309,43 @@ learningRouter.post('/conventions/extract', requireScope('projects:write'), asyn
     console.error('[learning] Convention extraction failed:', err);
     res.status(500).json({ error: 'Extraction failed', message: (err as Error).message });
   }
+});
+
+// POST /api/learning/knowledge/promote — manually trigger lesson promotion
+learningRouter.post('/knowledge/promote', requireScope('projects:write'), async (req, res) => {
+  const { projectId } = req.body;
+  if (!projectId) return res.status(400).json({ error: 'projectId required' });
+
+  try {
+    const { promoteLessonsToConventions } = await import('../services/knowledge-sharing.js');
+    const result = await promoteLessonsToConventions(projectId);
+    res.json(result);
+  } catch (err) {
+    console.error('[learning] Knowledge sharing failed:', err);
+    res.status(500).json({ error: 'Promotion failed', message: (err as Error).message });
+  }
+});
+
+// GET /api/learning/knowledge/shared — list conventions promoted from shared lessons
+learningRouter.get('/knowledge/shared', requireScope('projects:read'), (req, res) => {
+  const { projectId } = req.query;
+  const db = getDrizzle();
+
+  const conditions = [
+    eq(projectConventions.source, 'shared-lesson'),
+    eq(projectConventions.active, 1)
+  ];
+
+  if (projectId) {
+    conditions.push(eq(projectConventions.projectId, projectId as string));
+  }
+
+  const conventions = db.select().from(projectConventions)
+    .where(and(...conditions))
+    .orderBy(desc(projectConventions.evidenceCount))
+    .all();
+
+  res.json(conventions);
 });
 
 // GET /api/learning/leaderboard — agent score leaderboard
