@@ -156,6 +156,8 @@ export interface Template {
   models?: TemplateModel[];
   tools?: string[];
   projects?: string[];
+  gpgKeyId?: string;        // GPG key ID for git commit signing (e.g. "ABCD1234EF567890")
+  gpgKeyArmored?: string;   // Armored GPG private key (exported with --armor --export-secret-keys)
   createdAt: string;
 }
 

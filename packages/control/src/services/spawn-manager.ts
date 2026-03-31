@@ -135,6 +135,11 @@ class SpawnManagerImpl implements SpawnManager {
         name: agentName,
         emoji: '🤖',
       },
+      extra: {
+        ...(template.gpgKeyId && template.gpgKeyArmored
+          ? { gpg: { keyId: template.gpgKeyId, keyArmored: template.gpgKeyArmored } }
+          : {}),
+      },
     };
 
     // ── 4. Plugin installation is handled by the `install_plugins` changeset step ──

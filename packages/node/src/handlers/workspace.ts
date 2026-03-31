@@ -342,6 +342,31 @@ export async function handleWorkspaceProvision(msg: CommandMessage): Promise<Res
       };
     }
 
+    // Step 3.5: Import GPG keys from agent workspaces if present
+    // Check all agent workspace directories for .gpg-key.asc files and import them
+    const checkAgentKeys = await containerExec(instanceId, [
+      'sh', '-c', `find /home/node/workspace/agents -name '.gpg-key.asc' 2>/dev/null || echo ""`,
+    ]);
+
+    const keyFiles = checkAgentKeys.output
+      .split('\n')
+      .map(p => p.trim())
+      .filter(p => p.length > 0);
+
+    for (const keyFile of keyFiles) {
+      console.log(`[workspace] Found GPG key at ${keyFile} — importing`);
+      const importResult = await containerExec(instanceId, [
+        'sh', '-c', `gpg --batch --import "${keyFile}" 2>&1`,
+      ]);
+      if (importResult.exitCode !== 0) {
+        console.warn(`[workspace] GPG key import failed (non-fatal): ${importResult.output}`);
+      } else {
+        console.log(`[workspace] GPG key imported successfully`);
+        // Remove the key file for security
+        await containerExec(instanceId, ['rm', '-f', keyFile]);
+      }
+    }
+
     // Step 4: Run install
     if (installCmd) {
       console.log(`[workspace] Running custom install command in ${worktreePath}`);
