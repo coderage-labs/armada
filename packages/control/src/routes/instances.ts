@@ -15,6 +15,7 @@ import { mutationService } from '../services/mutation-service.js';
 import { workingCopy } from '../services/working-copy.js';
 import { logAudit } from '../services/audit.js';
 import { setupSSE } from '../utils/sse.js';
+import { getAllInstanceLoads } from '../services/instance-capacity.js';
 
 // ── Tool definitions ────────────────────────────────────────────────
 
@@ -147,6 +148,14 @@ router.get('/', (_req, res, next) => {
   try {
     const instances = instancesRepo.getAll();
     res.json(instances);
+  } catch (err) { next(err); }
+});
+
+// GET /api/instances/capacity — get capacity for all instances
+router.get('/capacity', (_req, res, next) => {
+  try {
+    const loads = getAllInstanceLoads();
+    res.json({ instances: loads });
   } catch (err) { next(err); }
 });
 

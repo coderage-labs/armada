@@ -17,6 +17,7 @@ import { spawnManager } from '../services/spawn-manager.js';
 import { logAudit } from '../services/audit.js';
 import { requireScope } from '../middleware/scopes.js';
 import { resolveInstance } from '../middleware/resolve-instance.js';
+import { getAllInstanceLoads, checkCapacityOrSuggest } from '../services/instance-capacity.js';
 import type { Agent, HeartbeatMeta } from '@coderage-labs/armada-shared';
 import type { NodeManager } from '../node-manager.js';
 
@@ -158,6 +159,28 @@ export function createAgentRoutes(nodeManager: NodeManager): Router {
 
   registerToolDef({
   category: 'instances',
+    name: 'armada_instance_capacity',
+    description: 'Check instance load and available capacity across all instances. Returns current agent count, max capacity, and available slots for each instance.',
+    method: 'GET', path: '/api/instances/capacity',
+    parameters: [],
+    scope: 'agents:read',
+  });
+
+  registerToolDef({
+  category: 'instances',
+    name: 'armada_agent_transfer',
+    description: 'Transfer an agent from one instance to another. Stops the agent on source, copies workspace data, updates DB, and starts on target.',
+    method: 'POST', path: '/api/agents/:name/transfer',
+    parameters: [
+      { name: 'name', type: 'string', description: 'Agent name to transfer', required: true },
+      { name: 'targetInstanceId', type: 'string', description: 'Target instance ID', required: true },
+      { name: 'keepData', type: 'boolean', description: 'Copy workspace files (SOUL.md, AGENTS.md) to target (default: true)' },
+    ],
+    scope: 'agents:write',
+  });
+
+  registerToolDef({
+  category: 'instances',
     name: 'armada_agent_sessions',
     description: 'Get agent session list',
     method: 'GET', path: '/api/agents/:name/session',
@@ -185,6 +208,32 @@ export function createAgentRoutes(nodeManager: NodeManager): Router {
 
   router.get('/capacity', (_req, res) => {
     res.json(getAllAgentCapacity());
+  });
+
+  // ── Transfer endpoint ────────────────────────────────────────────
+
+  router.post('/:name/transfer', requireScope('agents:write'), async (req, res, next) => {
+    try {
+      const { targetInstanceId, keepData } = req.body;
+      if (!targetInstanceId) {
+        res.status(400).json({ error: 'targetInstanceId is required' });
+        return;
+      }
+
+      // Check capacity before attempting transfer
+      const suggestion = checkCapacityOrSuggest();
+      if (suggestion) {
+        res.status(400).json(suggestion);
+        return;
+      }
+
+      const result = await agentManager.transfer(req.params.name, targetInstanceId, keepData);
+      logAudit(req, 'agent.transfer', 'agent', req.params.name, { targetInstanceId });
+      res.json(result);
+    } catch (err: any) {
+      if (err.statusCode) return res.status(err.statusCode).json({ error: err.message });
+      next(err);
+    }
   });
 
   // ── Avatar endpoints ─────────────────────────────────────────────
