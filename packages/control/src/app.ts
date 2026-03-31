@@ -43,6 +43,7 @@ import authRoutes from './routes/auth.js';
 import { getOrigin } from './services/auth-service.js';
 import auditRoutes from './routes/audit.js';
 import settingsRoutes from './routes/settings.js';
+import securityRoutes from './routes/security.js';
 import configRoutes from './routes/config.js';
 import { changesetsRoutes } from './routes/changesets.js';
 import { pendingMutationsRoutes } from './routes/pending-mutations.js';
@@ -145,6 +146,7 @@ export function createApp(opts: AppOptions): express.Express {
   app.use('/api/auth', authRoutes);
   app.use('/api/audit', auditRoutes);
   app.use('/api/settings', settingsRoutes);
+  app.use('/api/security', securityRoutes);
   app.use('/api/config', configRoutes);
   app.use('/api/changesets', changesetsRoutes);
   app.use('/api/pending-mutations', pendingMutationsRoutes);
