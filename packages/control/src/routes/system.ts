@@ -12,6 +12,8 @@ import { logActivity } from '../services/activity-service.js';
 import type { NodeManager } from '../node-manager.js';
 import { CONTROL_VERSION, PROTOCOL_VERSION, MIN_NODE_VERSION, MIN_AGENT_PLUGIN_VERSION } from '../version.js';
 import { nodeConnectionManager } from '../ws/node-connections.js';
+import { getAllInstanceLoads } from '../services/instance-capacity.js';
+import { cleanupStaleData } from '../services/patrol-service.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkgPath = resolve(__dirname, '..', '..', '..', '..', 'package.json');
@@ -41,6 +43,24 @@ registerToolDef({
   scope: 'system:read',
   description: 'Check current Armada version and available updates.',
   method: 'GET', path: '/api/system/version',
+  parameters: [],
+});
+
+registerToolDef({
+  category: 'system',
+  name: 'armada_system_resources',
+  scope: 'system:read',
+  description: 'Resource usage summary across all instances — instance counts, agent counts, capacity utilization, and memory allocation.',
+  method: 'GET', path: '/api/system/resources',
+  parameters: [],
+});
+
+registerToolDef({
+  category: 'system',
+  name: 'armada_cleanup_stale',
+  scope: 'system:write',
+  description: 'Trigger stale data cleanup — marks stale tasks as failed, removes orphaned worktree records, and deletes expired patrol records.',
+  method: 'POST', path: '/api/system/cleanup',
   parameters: [],
 });
 
@@ -190,6 +210,75 @@ export function createSystemRoutes(nodeManager: NodeManager): Router {
     }
   });
 
+  // GET /api/system/resources — resource usage summary across all instances
+  router.get('/system/resources', (_req, res) => {
+    try {
+      const instances = instancesRepo.getAll();
+      const agents = agentsRepo.getAll();
+      const loads = getAllInstanceLoads();
+
+      // Count instances by status
+      const runningInstances = instances.filter(i => i.status === 'running').length;
+      const stoppedInstances = instances.filter(i => i.status === 'stopped').length;
+
+      // Count agents by status
+      const runningAgents = agents.filter(a => a.status === 'running').length;
+      const offlineAgents = agents.filter(a => a.healthStatus === 'offline').length;
+
+      // Calculate capacity utilization
+      const totalCapacity = loads.reduce((sum, l) => sum + l.max, 0);
+      const usedCapacity = loads.reduce((sum, l) => sum + l.current, 0);
+      const utilizationPercent = totalCapacity > 0 ? Math.round((usedCapacity / totalCapacity) * 100) : 0;
+
+      // Calculate memory allocation per instance
+      const memoryPerInstance: Record<string, string> = {};
+      for (const instance of instances) {
+        if (instance.memory) {
+          memoryPerInstance[instance.name] = instance.memory;
+        }
+      }
+
+      // Sum total allocated memory (parse values like "2g", "512m")
+      let totalMemoryMb = 0;
+      for (const instance of instances) {
+        if (instance.memory) {
+          const match = instance.memory.match(/^(\d+(?:\.\d+)?)(g|m)?$/i);
+          if (match) {
+            const value = parseFloat(match[1]);
+            const unit = (match[2] || 'g').toLowerCase();
+            if (unit === 'g') totalMemoryMb += value * 1024;
+            else if (unit === 'm') totalMemoryMb += value;
+          }
+        }
+      }
+      const totalMemoryGb = (totalMemoryMb / 1024).toFixed(1);
+
+      res.json({
+        instances: {
+          total: instances.length,
+          running: runningInstances,
+          stopped: stoppedInstances,
+        },
+        agents: {
+          total: agents.length,
+          running: runningAgents,
+          offline: offlineAgents,
+        },
+        capacity: {
+          used: usedCapacity,
+          total: totalCapacity,
+          utilizationPercent,
+        },
+        memory: {
+          allocated: `${totalMemoryGb}g`,
+          perInstance: memoryPerInstance,
+        },
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // GET /api/system/plugin-versions — plugin drift: library vs installed versions
   router.get('/system/plugin-versions', (_req, res) => {
     try {
@@ -331,6 +420,25 @@ export function createSystemRoutes(nodeManager: NodeManager): Router {
       count: mutations.length,
       mutations: mutations.map(m => ({ id: m.id, entityId: m.entityId })),
     });
+  });
+
+  // POST /api/system/cleanup — trigger stale data cleanup
+  router.post('/system/cleanup', requireScope('system:write'), (_req, res) => {
+    try {
+      const result = cleanupStaleData();
+      
+      logActivity({
+        eventType: 'system.cleanup',
+        detail: `Cleanup complete: ${result.staleTasksCleaned} stale tasks, ${result.orphanedWorktreesCleaned} orphaned worktrees, ${result.expiredPatrolRecordsCleaned} expired patrol records`,
+      });
+
+      res.json({
+        success: true,
+        ...result,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   return router;
