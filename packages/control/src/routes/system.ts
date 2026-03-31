@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { agentsRepo, instancesRepo, nodesRepo } from '../repositories/index.js';
 import { pluginLibraryRepo, skillLibraryRepo } from '../repositories/index.js';
 import { registerToolDef } from '../utils/tool-registry.js';
-import { getLatestVersion, isNewerVersion } from '../services/version-checker.js';
+import { getLatestVersion, isNewerVersion, getArmadaVersionInfo } from '../services/version-checker.js';
 import { mutationService } from '../services/mutation-service.js';
 import { logActivity } from '../services/activity-service.js';
 import type { NodeManager } from '../node-manager.js';
@@ -32,6 +32,15 @@ registerToolDef({
   scope: 'system:read',
   description: 'Full armada system status — agent counts, node health, resource usage (CPU, memory, disk).',
   method: 'GET', path: '/api/status',
+  parameters: [],
+});
+
+registerToolDef({
+  category: 'system',
+  name: 'armada_system_version',
+  scope: 'system:read',
+  description: 'Check current Armada version and available updates.',
+  method: 'GET', path: '/api/system/version',
   parameters: [],
 });
 
@@ -169,6 +178,16 @@ export function createSystemRoutes(nodeManager: NodeManager): Router {
       instances: instanceVersions,
       nodes: nodeVersions,
     });
+  });
+
+  // GET /api/system/version — current Armada version and available updates
+  router.get('/system/version', async (_req, res) => {
+    try {
+      const versionInfo = await getArmadaVersionInfo();
+      res.json(versionInfo);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   // GET /api/system/plugin-versions — plugin drift: library vs installed versions
