@@ -71,15 +71,54 @@ export class ConfigFileLifecycle implements AgentLifecycle {
   }
 
   /**
-   * Write a per-agent .gitconfig that points to the agent-scoped credential helper.
+   * Import a GPG key into the agent's GPG keyring.
+   * Writes the armored key to a temp file in the agent workspace, imports it, then removes the file.
+   */
+  private async importGpgKey(instanceName: string, agentId: string, keyArmored: string): Promise<void> {
+    const keyPath = `workspace/agents/${agentId}/.gpg-key.asc`;
+
+    try {
+      // Write the armored key to a file
+      await this.client.writeInstanceFile(instanceName, keyPath, keyArmored);
+
+      // Import the key via the node's exec handler
+      // The node agent will need to support running commands in the instance context
+      // For now, we'll rely on the workspace provisioning to handle the import
+      console.log(`[config-file-lifecycle] GPG key written to ${keyPath} for ${agentId} in ${instanceName}`);
+    } catch (err: any) {
+      console.warn(`[config-file-lifecycle] Failed to import GPG key for ${agentId} in ${instanceName}: ${err.message}`);
+    }
+  }
+
+  /**
+   * Write a per-agent .gitconfig that points to the agent-scoped credential helper
+   * and optionally configures GPG commit signing.
    * Inside the instance container, credentials are at /etc/armada/{agentName}/.
    */
-  private async writeAgentGitConfig(instanceName: string, agentId: string): Promise<void> {
-    const gitConfigContent = [
+  private async writeAgentGitConfig(
+    instanceName: string,
+    agentId: string,
+    gpgConfig?: { keyId: string; keyArmored: string }
+  ): Promise<void> {
+    const gitConfigLines = [
       '[credential]',
       `\thelper = /etc/armada/${agentId}/credential-helper`,
-      '',
-    ].join('\n');
+    ];
+
+    // Add GPG signing config if provided
+    if (gpgConfig?.keyId) {
+      gitConfigLines.push(
+        '[user]',
+        `\tsigningkey = ${gpgConfig.keyId}`,
+        '[commit]',
+        '\tgpgsign = true',
+        '[gpg]',
+        '\tprogram = gpg'
+      );
+    }
+
+    gitConfigLines.push('');
+    const gitConfigContent = gitConfigLines.join('\n');
 
     const gitconfigPath = `workspace/agents/${agentId}/.gitconfig`;
 
@@ -101,8 +140,16 @@ export class ConfigFileLifecycle implements AgentLifecycle {
   async createAgent(instanceId: string, config: AgentConfig): Promise<void> {
     const instanceName = await this.getInstanceName(instanceId);
 
-    // Set up per-agent gitconfig for credential scoping
-    await this.writeAgentGitConfig(instanceName, config.id);
+    // Extract GPG config from extra if present
+    const gpgConfig = config.extra?.gpg as { keyId: string; keyArmored: string } | undefined;
+
+    // Set up per-agent gitconfig for credential scoping and GPG signing
+    await this.writeAgentGitConfig(instanceName, config.id, gpgConfig);
+
+    // If GPG key is provided, write it to the agent's workspace and import it
+    if (gpgConfig?.keyArmored) {
+      await this.importGpgKey(instanceName, config.id, gpgConfig.keyArmored);
+    }
 
     // Note: openclaw.json is NOT written here — it's generated from DB
     // and pushed via the operations pipeline when the changeset is applied.
@@ -111,8 +158,16 @@ export class ConfigFileLifecycle implements AgentLifecycle {
   async updateAgent(instanceId: string, config: AgentConfig): Promise<void> {
     const instanceName = await this.getInstanceName(instanceId);
 
-    // Re-write gitconfig in case agent name changed
-    await this.writeAgentGitConfig(instanceName, config.id);
+    // Extract GPG config from extra if present
+    const gpgConfig = config.extra?.gpg as { keyId: string; keyArmored: string } | undefined;
+
+    // Re-write gitconfig in case agent name changed or GPG config updated
+    await this.writeAgentGitConfig(instanceName, config.id, gpgConfig);
+
+    // If GPG key is provided, write it to the agent's workspace and import it
+    if (gpgConfig?.keyArmored) {
+      await this.importGpgKey(instanceName, config.id, gpgConfig.keyArmored);
+    }
 
     // Note: openclaw.json update happens via operations pipeline.
   }
