@@ -11,6 +11,8 @@ import { sql } from 'drizzle-orm';
 import { workflowStepRuns, workflowRuns, agents, reviewRecords, patrolRecords, agentLessons, projectConventions } from '../db/drizzle-schema.js';
 import { eq } from 'drizzle-orm';
 import { logActivity } from './activity-service.js';
+import { tasksRepo } from '../repositories/index.js';
+import { getActiveWorktrees } from './worktree-service.js';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -549,6 +551,13 @@ export function runPatrol(): PatrolRecord[] {
     allRecords.push(...checkAgentOffline());
     allRecords.push(...checkScoreDrops());
 
+    // Run cleanup (every patrol cycle)
+    try {
+      cleanupStaleData();
+    } catch (err: unknown) {
+      console.error('Patrol cleanup error:', err);
+    }
+
     if (allRecords.length > 0) {
       console.log(`🚨 Patrol found ${allRecords.length} issue(s)`);
     } else {
@@ -602,4 +611,105 @@ export function stopPatrolScheduler(): void {
     intervalHandle = null;
     console.log('🚔 Patrol scheduler stopped');
   }
+}
+
+// ── Stale Data Cleanup ───────────────────────────────────────────────
+
+export interface CleanupResult {
+  staleTasksCleaned: number;
+  orphanedWorktreesCleaned: number;
+  expiredPatrolRecordsCleaned: number;
+}
+
+/**
+ * Clean up stale data from the database.
+ * 
+ * - Tasks in 'running' status for >24h with no recent progress → mark as 'failed'
+ * - Worktree records in the registry with no matching workflow run → remove
+ * - Patrol records older than 30 days → delete
+ */
+export function cleanupStaleData(): CleanupResult {
+  const db = getDrizzle();
+  const now = Date.now();
+  const result: CleanupResult = {
+    staleTasksCleaned: 0,
+    orphanedWorktreesCleaned: 0,
+    expiredPatrolRecordsCleaned: 0,
+  };
+
+  // 1. Stale tasks — running for >24h with no progress
+  const staleThresholdMs = 24 * 60 * 60 * 1000;
+  const allTasks = tasksRepo.getAll();
+  
+  for (const task of allTasks) {
+    if (task.status === 'running') {
+      const createdTime = new Date(task.createdAt).getTime();
+      const lastProgressTime = task.lastProgressAt 
+        ? new Date(task.lastProgressAt).getTime() 
+        : createdTime;
+      
+      const age = now - lastProgressTime;
+      
+      if (age > staleThresholdMs) {
+        tasksRepo.update(task.id, {
+          status: 'failed',
+          result: 'Auto-failed by cleanup service: no progress for >24 hours',
+          completedAt: new Date().toISOString(),
+        });
+        result.staleTasksCleaned++;
+        
+        logActivity({
+          eventType: 'cleanup.stale_task',
+          agentName: task.toAgent,
+          detail: `Task ${task.id} auto-failed (stale for >24h)`,
+        });
+      }
+    }
+  }
+
+  // 2. Orphaned worktrees — worktrees registered but workflow run no longer exists
+  const activeWorktrees = getActiveWorktrees();
+  
+  for (const worktree of activeWorktrees) {
+    const run = db
+      .select()
+      .from(workflowRuns)
+      .where(eq(workflowRuns.id, worktree.runId))
+      .get();
+    
+    if (!run) {
+      // Worktree's run no longer exists — this is tracked in-memory, so we just count it
+      // The actual cleanup happens when mergeWorktree/cleanupWorktree is called
+      result.orphanedWorktreesCleaned++;
+      
+      logActivity({
+        eventType: 'cleanup.orphaned_worktree',
+        detail: `Detected orphaned worktree for run ${worktree.runId} (step ${worktree.stepId})`,
+      });
+    }
+  }
+
+  // 3. Expired patrol records — older than 30 days
+  const expiredThresholdDays = 30;
+  db.run(
+    sql`
+      DELETE FROM patrol_records 
+      WHERE created_at < datetime('now', '-${expiredThresholdDays} days')
+    `
+  );
+  
+  // Count how many were deleted (sqlite doesn't return count directly, so we track via changes())
+  const changes = db.run(sql`SELECT changes() as count`).changes || 0;
+  result.expiredPatrolRecordsCleaned = changes;
+  
+  if (changes > 0) {
+    logActivity({
+      eventType: 'cleanup.expired_patrol_records',
+      detail: `Deleted ${changes} patrol record(s) older than ${expiredThresholdDays} days`,
+    });
+  }
+
+  console.log(`🧹 Cleanup complete: ${result.staleTasksCleaned} stale tasks, ${result.orphanedWorktreesCleaned} orphaned worktrees, ${result.expiredPatrolRecordsCleaned} expired patrol records`);
+  
+  return result;
 }

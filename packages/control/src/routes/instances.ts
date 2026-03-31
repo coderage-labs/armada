@@ -15,7 +15,7 @@ import { mutationService } from '../services/mutation-service.js';
 import { workingCopy } from '../services/working-copy.js';
 import { logAudit } from '../services/audit.js';
 import { setupSSE } from '../utils/sse.js';
-import { getAllInstanceLoads } from '../services/instance-capacity.js';
+import { getAllInstanceLoads, getIdleInstances } from '../services/instance-capacity.js';
 
 // ── Tool definitions ────────────────────────────────────────────────
 
@@ -139,6 +139,18 @@ registerToolDef({
   scope: 'instances:read',
 });
 
+registerToolDef({
+  category: 'instances',
+  name: 'armada_idle_instances',
+  description: 'List idle instances — instances where none of the agents have had a heartbeat in the threshold period (default 60 minutes).',
+  method: 'GET',
+  path: '/api/instances/idle',
+  parameters: [
+    { name: 'idleThresholdMinutes', type: 'number', description: 'Idle threshold in minutes (default: 60)' },
+  ],
+  scope: 'instances:read',
+});
+
 // ── Routes ──────────────────────────────────────────────────────────
 
 const router = Router();
@@ -156,6 +168,18 @@ router.get('/capacity', (_req, res, next) => {
   try {
     const loads = getAllInstanceLoads();
     res.json({ instances: loads });
+  } catch (err) { next(err); }
+});
+
+// GET /api/instances/idle — get idle instances
+router.get('/idle', (_req, res, next) => {
+  try {
+    const thresholdMinutes = _req.query.idleThresholdMinutes 
+      ? parseInt(_req.query.idleThresholdMinutes as string, 10) 
+      : 60;
+    
+    const idleInstances = getIdleInstances(thresholdMinutes);
+    res.json({ instances: idleInstances, thresholdMinutes });
   } catch (err) { next(err); }
 });
 
