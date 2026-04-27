@@ -1,6 +1,6 @@
 {
   "name": "@coderage-labs/armada-plugin-shared",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Shared utilities for armada plugins",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

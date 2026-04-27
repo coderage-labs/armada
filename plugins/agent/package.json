@@ -1,6 +1,6 @@
 {
   "name": "@coderage-labs/armada-agent-plugin",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Armada agent plugin for OpenClaw — managed team communication with ACL, status reporting, and maintenance support",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -19,7 +19,7 @@
   "author": "Chris Kitch",
   "license": "MIT",
   "dependencies": {
-    "@coderage-labs/armada-plugin-shared": "0.2.0"
+    "@coderage-labs/armada-plugin-shared": "0.2.1"
   },
   "devDependencies": {
     "@types/node": "^25.3.2"
