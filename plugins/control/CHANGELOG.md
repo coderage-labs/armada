@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.3.0](https://github.com/coderage-labs/armada/compare/armada-control-plugin-v0.2.0...armada-control-plugin-v0.3.0) (2026-04-27)
+
+
+### Features
+
+* user triager dispatch — route triage tasks to user's hooksUrl ([#148](https://github.com/coderage-labs/armada/issues/148)) ([11708d3](https://github.com/coderage-labs/armada/commit/11708d32acc622ccff954bd94d9aa3fe75105f1d))
+
+
+### Bug Fixes
+
+* credential sync writes plain-text git-credentials for store helper ([9e05761](https://github.com/coderage-labs/armada/commit/9e057615488014bb9b8ad2af2bdc1da58a498616))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @coderage-labs/armada-plugin-shared bumped from 0.2.0 to 0.2.1
+
 ## [0.2.0](https://github.com/coderage-labs/armada/compare/armada-control-plugin-v0.1.0...armada-control-plugin-v0.2.0) (2026-03-16)
 
 

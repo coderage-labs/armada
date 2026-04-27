@@ -1,6 +1,6 @@
 {
   "name": "@coderage-labs/armada-node",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "description": "Per-host daemon that manages Docker containers and instance lifecycle",
   "main": "dist/index.js",
