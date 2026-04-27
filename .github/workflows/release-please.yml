@@ -108,7 +108,7 @@ jobs:
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
-      - run: npm install -g npm@latest
+      - run: npm install -g npm@11.6.2
       - run: npm install
       - run: npm run build -w @coderage-labs/armada-plugin-shared
       - name: Publish to npm (trusted publishing)
@@ -127,7 +127,7 @@ jobs:
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
-      - run: npm install -g npm@latest
+      - run: npm install -g npm@11.6.2
       - run: npm install
       - run: npm run build -w @coderage-labs/armada-plugin-shared
       - run: npm run build -w @coderage-labs/armada-control-plugin
@@ -147,7 +147,7 @@ jobs:
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
-      - run: npm install -g npm@latest
+      - run: npm install -g npm@11.6.2
       - run: npm install
       - run: npm run build -w @coderage-labs/armada-plugin-shared
       - run: npm run build -w @coderage-labs/armada-agent-plugin
